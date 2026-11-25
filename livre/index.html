@@ -1,0 +1,144 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0e13"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.DRAGONS_SITE = true;</script></head><body><title>Livre des dragons</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Écran de jeu plein écran : la 3D derrière, l'interface par-dessus. Un seul thème sombre, voulu. */
+:root {
+  color-scheme: dark;
+  --nuit: #0d0e13;
+  --panneau: rgba(17, 18, 26, 0.86);
+  --panneau-plein: #15161f;
+  --trait: rgba(236, 230, 218, 0.1);
+  --trait-fort: rgba(236, 230, 218, 0.22);
+  --texte: #ece6da;
+  --doux: #a7a196;
+  --ambre: #f2b544;
+  --ambre-sombre: #7a5410;
+  --feu: #ff6a3d;
+  --glace: #7fd6ff;
+  --eau: #2fd0c0;
+  --bon: #6fd68a;
+  --mal: #ff5d5d;
+  --titre: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --corps: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --bord-g: max(16px, env(safe-area-inset-left, 0px));
+  --bord-d: max(16px, env(safe-area-inset-right, 0px));
+  --haut: env(safe-area-inset-top, 0px);
+  --hud: calc(env(safe-area-inset-top, 0px) + 50px);
+  --bas: env(safe-area-inset-bottom, 0px);
+}
+html, body { height: 100%; }
+body { background: var(--nuit); color: var(--texte); font-family: var(--corps); font-size: 14px; overflow: hidden; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+#scene3d { position: fixed; inset: 0; display: block; touch-action: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--ambre); outline-offset: 2px; }
+h1, h2, h3, h4 { font-family: var(--titre); margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.doux { color: var(--doux); }
+.feu { --el: var(--feu); } .glace { --el: var(--glace); } .eau { --el: var(--eau); }
+
+/* ---------- Barre du haut ---------- */
+#hud { position: fixed; top: 0; left: 0; right: 0; z-index: 20; padding: calc(var(--haut) + 8px) var(--bord-d) 8px var(--bord-g); display: flex; gap: 8px; align-items: center; pointer-events: none; }
+#hud > * { pointer-events: auto; }
+.logo { font-family: var(--titre); font-weight: 700; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ambre); white-space: nowrap; margin-right: 4px; }
+.logo small { display: block; font-size: 9px; letter-spacing: 0.18em; color: var(--doux); font-weight: 500; }
+.ressources { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; }
+.ressources::-webkit-scrollbar { display: none; }
+.puce { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px 4px 6px; border-radius: 999px; background: var(--panneau); border: 1px solid var(--trait); font-family: var(--mono); font-size: 12px; white-space: nowrap; backdrop-filter: blur(8px); }
+.puce svg { width: 16px; height: 16px; flex: none; }
+.puce.energie { border-color: rgba(242, 181, 68, 0.4); }
+.puce .jauge { width: 38px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.puce .jauge i { display: block; height: 100%; background: var(--ambre); }
+
+/* ---------- Barre du bas ---------- */
+#nav { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bas) + 10px); z-index: 20; display: flex; gap: 4px; padding: 5px; background: var(--panneau); border: 1px solid var(--trait); border-radius: 16px; backdrop-filter: blur(10px); max-width: calc(100% - 24px); }
+#nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 58px; padding: 6px 8px; border-radius: 11px; color: var(--doux); text-decoration: none; font-size: 11px; font-weight: 600; position: relative; }
+#nav a svg { width: 22px; height: 22px; }
+#nav a.actif { background: rgba(242, 181, 68, 0.14); color: var(--ambre); }
+#nav a:hover { color: var(--texte); }
+#nav .pastille { position: absolute; top: 2px; right: 8px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--mal); color: #fff; font-size: 10px; line-height: 16px; text-align: center; font-family: var(--mono); }
+@media (max-width: 560px) { #nav a { min-width: 0; flex: 1; padding: 6px 2px; font-size: 10px; } #nav { left: var(--bord-g); right: var(--bord-d); transform: none; max-width: none; justify-content: space-between; } }
+
+/* ---------- Panneaux ---------- */
+#ecran { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+#ecran > * { pointer-events: auto; }
+.panneau { background: var(--panneau); border: 1px solid var(--trait); border-radius: 16px; backdrop-filter: blur(12px); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,0.06); font-weight: 600; font-size: 13px; transition: background .15s, transform .1s; }
+.btn:hover { background: rgba(255,255,255,0.12); }
+.btn:active { transform: translateY(1px); }
+.btn.principal { background: var(--ambre); color: #1c1305; border-color: transparent; }
+.btn.principal:hover { background: #ffc85c; }
+.btn.danger { border-color: rgba(255, 93, 93, 0.5); color: #ffb0b0; }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.btn.petit { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+.btn svg { width: 16px; height: 16px; }
+.etiquette { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--doux); font-weight: 600; }
+.pil { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: color-mix(in srgb, var(--el, var(--ambre)) 18%, transparent); color: var(--el, var(--ambre)); border: 1px solid color-mix(in srgb, var(--el, var(--ambre)) 40%, transparent); white-space: nowrap; }
+.barre { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.09); overflow: hidden; }
+.barre i { display: block; height: 100%; border-radius: 4px; background: var(--bon); transition: width .4s; }
+.barre.pv i { background: linear-gradient(90deg, #4fc46f, #8be08f); }
+.barre.pv.moyen i { background: linear-gradient(90deg, #d8a53a, #f2c85c); }
+.barre.pv.bas i { background: linear-gradient(90deg, #d84a3a, #ff7a5c); }
+.barre.xp i { background: linear-gradient(90deg, #6a7aff, #9ab0ff); }
+.recette { display: flex; flex-wrap: wrap; gap: 6px; }
+.recette .puce { background: rgba(255,255,255,0.04); }
+.recette .manque { border-color: rgba(255, 93, 93, 0.6); color: #ffb0b0; }
+
+/* ---------- Toasts et fenêtres ---------- */
+#toasts { position: fixed; z-index: 60; top: calc(var(--haut) + 58px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: min(92vw, 420px); }
+.toast { padding: 9px 14px; border-radius: 10px; background: var(--panneau-plein); border: 1px solid var(--trait-fort); font-size: 13px; animation: entre .25s ease-out; box-shadow: 0 8px 24px rgba(0,0,0,.4); text-align: center; }
+.toast.bon { border-color: rgba(111, 214, 138, .6); }
+.toast.mal { border-color: rgba(255, 93, 93, .6); }
+@keyframes entre { from { opacity: 0; transform: translateY(-6px); } }
+#modale { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(5,5,8,.55); padding: 16px var(--bord-d) 16px var(--bord-g); }
+#modale .boite { width: min(520px, 100%); max-height: 86vh; overflow: auto; padding: 20px; background: var(--panneau-plein); border: 1px solid var(--trait-fort); border-radius: 18px; animation: entre .2s; }
+#modale h2 { font-size: 20px; margin-bottom: 8px; }
+#modale .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+/* ---------- Titre ---------- */
+.ecran-titre { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 var(--bord-d) calc(var(--bas) + 12vh) var(--bord-g); background: linear-gradient(180deg, rgba(13,14,19,0) 30%, rgba(13,14,19,.85)); text-align: center; gap: 14px; }
+.ecran-titre h1 { font-size: clamp(40px, 9vw, 92px); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: .9; color: var(--texte); text-shadow: 0 4px 40px rgba(255, 140, 60, .35); }
+.ecran-titre h1 span { color: var(--ambre); }
+.ecran-titre p { max-width: 46ch; color: var(--doux); margin: 0; }
+.ecran-titre .note { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+
+/* ---------- Portail d'entrée ---------- */
+.portail { position: fixed; inset: 0; z-index: 90; pointer-events: none; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle, rgba(20,10,40,0) 0, rgba(8,5,18,.85) 60%); animation: portail-fond 2.3s ease-in forwards; }
+.portail > * { grid-area: 1 / 1; }
+.portail .anneau { width: 50vmin; height: 50vmin; border-radius: 50%; background: conic-gradient(from 0deg, #7a3aff, #ff8a4a, #2fd0c0, #7fd6ff, #c89aff, #7a3aff); -webkit-mask: radial-gradient(circle, transparent 46%, #000 48%, #000 56%, transparent 58%); mask: radial-gradient(circle, transparent 46%, #000 48%, #000 56%, transparent 58%); filter: blur(1px) drop-shadow(0 0 18px #b48aff); animation: portail-tourne .7s linear infinite, portail-avance 2.3s cubic-bezier(.6,0,.9,.4) forwards; }
+.portail .a2 { width: 34vmin; height: 34vmin; animation-duration: .5s, 2.3s; animation-direction: reverse, normal; opacity: .8; }
+.portail .a3 { width: 72vmin; height: 72vmin; animation-duration: 1.1s, 2.3s; opacity: .55; }
+.portail .coeur { width: 22vmin; height: 22vmin; border-radius: 50%; background: radial-gradient(circle, #fff 0, #ffd6a0 20%, #b05aff 55%, transparent 72%); animation: portail-avance 2.3s cubic-bezier(.6,0,.9,.4) forwards; }
+.portail i { width: 4px; height: 4px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px #c89aff; transform: rotate(var(--a)) translateX(var(--r)); animation: portail-etincelle 1.2s var(--d) ease-in infinite; }
+.portail .eclair { width: 100%; height: 100%; background: #fff; opacity: 0; animation: portail-eclair 2.3s ease-out forwards; }
+@keyframes portail-tourne { to { rotate: 360deg; } }
+@keyframes portail-avance { 0% { scale: .15; opacity: 0; } 20% { opacity: 1; } 55% { scale: 1; } 100% { scale: 9; opacity: 1; } }
+@keyframes portail-etincelle { from { transform: rotate(var(--a)) translateX(var(--r)); opacity: 1; } to { transform: rotate(calc(var(--a) + 40deg)) translateX(0); opacity: 0; } }
+@keyframes portail-eclair { 0%, 55% { opacity: 0; } 66% { opacity: .95; } 100% { opacity: 0; } }
+@keyframes portail-fond { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---------- Livre seul ---------- */
+.wiki-entete { position: fixed; top: 0; left: 0; right: 0; z-index: 20; padding: calc(var(--haut) + 12px) var(--bord-d) 10px var(--bord-g); display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.wiki-entete b { font-family: var(--titre); font-size: 18px; letter-spacing: .06em; text-transform: uppercase; color: var(--ambre); }
+.wiki-entete span { font-size: 12px; color: var(--doux); }
+.lv-droite, .lv-plein { bottom: calc(var(--bas) + 16px) !important; }
+@media (min-width: 901px) { .lv-gauche { bottom: calc(var(--bas) + 16px) !important; } }
+@media (max-width: 900px) { .lv-droite { bottom: calc(var(--bas) + 12px) !important; } .wiki-entete span { display: none; } }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+<style id="styles-ecrans"></style>
+
+<canvas id="scene3d"></canvas>
+<div id="ecran"></div>
+<header class="wiki-entete"><b>Livre des dragons</b><span>Dragons Island · les 21 dragons en 3D, leurs stats et les règles</span></header>
+<div id="toasts" aria-live="polite"></div>
+<div id="modale" hidden></div>
+<noscript>Ce jeu a besoin de JavaScript.</noscript>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module" src="js/wiki_main.js"></script>
+</body></html>

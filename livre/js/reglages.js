@@ -1,0 +1,56 @@
+// Réglages : mode d'éclosion (podomètre ou temps), son, chrono des combats.
+import { E, changer, lieuSauvegarde } from "./etat.js";
+import { COUVOIR } from "./regles.js";
+import { el, styles, toast } from "./ui.js";
+import { Son, Musique, reglerSon, initAudio } from "./son.js";
+
+let ctxJeu = null, ui = null;
+
+styles("reglages", `
+.rg { position: fixed; z-index: 15; top: calc(var(--hud) + 8px); left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 170px); overflow: auto; padding: 18px; display: grid; gap: 14px; background: rgba(13,14,19,.92); }
+.rg h2 { font-size: 26px; }
+.rg .opt { display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--trait); background: rgba(255,255,255,.03); }
+.rg .opt h3 { font-size: 15px; }
+.rg .opt p { margin: 0; font-size: 12px; color: var(--doux); line-height: 1.5; }
+.rg .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.rg .seg button { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); font-weight: 600; font-size: 13px; }
+.rg .seg button.actif { border-color: var(--ambre); color: var(--ambre); background: rgba(242,181,68,.12); }
+`);
+
+export function ouvrir(ctx) { ctxJeu = ctx; ui = document.getElementById("ecran"); rendre(); }
+export function fermer() {}
+
+function seg(options, valeur, choisir) {
+  const s = el("div", { class: "seg", role: "radiogroup" });
+  for (const [v, nom] of options) s.append(el("button", { class: valeur === v ? "actif" : "", role: "radio", "aria-checked": valeur === v ? "true" : "false", onclick: () => { Son.clic(); choisir(v); rendre(); } }, nom));
+  return s;
+}
+
+function rendre() {
+  ui.innerHTML = "";
+  const e = E();
+  const r = e.reglages;
+  const p = el("section", { class: "rg panneau" });
+  p.append(el("div", {}, el("div", { class: "etiquette" }, "Préférences"), el("h2", {}, "Réglages")));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Faire éclore les œufs"),
+    el("p", {}, `Par défaut, il faut marcher : ${COUVOIR[0].pas.toLocaleString("fr-FR")} pas par œuf (podomètre du téléphone). Tu peux désactiver le podomètre, sur PC comme sur téléphone : l'œuf éclot alors avec le temps (${COUVOIR[0].heures} h par œuf, ${COUVOIR[1].heures} h pour le grand couvoir).`),
+    seg([["podometre", "Podomètre (par défaut)"], ["temps", "Temps à la place"]], r.mode, (v) => changer((s) => {
+      // On garde l'avancement des œufs déjà au couvoir quand on change de mode
+      const def = COUVOIR[s.oeufs.couvoir.niveau];
+      for (const sl of s.oeufs.couvoir.slots) {
+        const av = s.reglages.mode === "temps" ? Math.min(1, (Date.now() + s.decalage - sl.debut) / (def.heures * 3600e3)) : Math.min(1, (s.pas.total - sl.pasDepart) / def.pas);
+        sl.pasDepart = s.pas.total - av * def.pas;
+        sl.debut = Date.now() + s.decalage - av * def.heures * 3600e3;
+      }
+      s.reglages.mode = v;
+    }))));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Son"),
+    seg([[true, "Bruitages activés"], [false, "Bruitages coupés"]], r.son, (v) => { changer((s) => { s.reglages.son = v; }); initAudio(); reglerSon(v, E().reglages.musique); }),
+    seg([[true, "Musique activée"], [false, "Musique coupée"]], r.musique, (v) => { changer((s) => { s.reglages.musique = v; }); initAudio(); reglerSon(E().reglages.son, v); })));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Temps pour choisir en combat"),
+    el("p", {}, "20 secondes dans le jeu final. Tu peux l'enlever pour tester tranquillement."),
+    seg([[20, "20 secondes"], [40, "40 secondes"], [0, "Sans limite"]], r.chrono, (v) => changer((s) => { s.reglages.chrono = v; }))));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Sauvegarde"), el("p", {}, lieuSauvegarde() === "compte" ? "Ta partie est enregistrée avec ton compte : tu la retrouves sur tes autres appareils en ouvrant ce lien." : "Ta partie est enregistrée dans ce navigateur. Si tu effaces les données du site, elle sera perdue.")));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.8 : jeu complet hors ligne, avec des bots à la place des vrais adversaires. Le podomètre, le GPS et les nids NFC arriveront avec l'appli mobile.")));
+  ui.append(p);
+}
