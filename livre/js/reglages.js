@@ -51,6 +51,6 @@ function rendre() {
     el("p", {}, "20 secondes dans le jeu final. Tu peux l'enlever pour tester tranquillement."),
     seg([[20, "20 secondes"], [40, "40 secondes"], [0, "Sans limite"]], r.chrono, (v) => changer((s) => { s.reglages.chrono = v; }))));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Sauvegarde"), el("p", {}, lieuSauvegarde() === "compte" ? "Ta partie est enregistrée avec ton compte : tu la retrouves sur tes autres appareils en ouvrant ce lien." : "Ta partie est enregistrée dans ce navigateur. Si tu effaces les données du site, elle sera perdue.")));
-  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.8 : jeu complet hors ligne, avec des bots à la place des vrais adversaires. Le podomètre, le GPS et les nids NFC arriveront avec l'appli mobile.")));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.9 : jeu complet hors ligne, avec des bots à la place des vrais adversaires. Le podomètre, le GPS et les nids NFC arriveront avec l'appli mobile.")));
   ui.append(p);
 }

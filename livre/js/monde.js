@@ -618,6 +618,29 @@ export function construireNoeud(type, element, seed) {
     }
     if (element === "glace") { const n = mesh(bloc(0.3, 0.12, 0.3, 0, 0.2), mat(0xffffff)); n.position.y = 0.5; g.add(n); }
     if (element === "eau") for (let k = 0; k < 3; k++) { const fr = mesh(new T.IcosahedronGeometry(0.05, 0), mat(0xff5a6a)); fr.position.set((r() - 0.5) * 0.5, 0.35 + r() * 0.15, (r() - 0.5) * 0.5); g.add(fr); }
+  } else if (type === "epave") {
+    // Débris d'épave qui flottent : une caisse, un tonneau et des planches
+    const bois = mat(0x8a5a32, { r: 0.9 }), fonce = mat(0x5a3a22, { r: 0.9 }), cercle = mat(0x3a3a40, { r: 0.5, m: 0.5 });
+    const caisse = mesh(new T.BoxGeometry(0.46, 0.4, 0.46), bois); caisse.position.set(-0.12, 0.08, 0.05); caisse.rotation.set(0.12, 0.5, -0.08); g.add(caisse);
+    for (const y of [-0.12, 0.12]) { const l = mesh(new T.BoxGeometry(0.48, 0.05, 0.05), fonce); l.position.set(0, y, 0.235); caisse.add(l); }
+    const tonneau = mesh(new T.CylinderGeometry(0.17, 0.17, 0.44, 9), fonce); tonneau.rotation.set(Math.PI / 2, 0, 0.5); tonneau.position.set(0.36, 0.02, -0.18); g.add(tonneau);
+    for (const y of [-0.13, 0.13]) { const c = mesh(new T.CylinderGeometry(0.178, 0.178, 0.04, 9), cercle); c.position.y = y; tonneau.add(c); }
+    for (let k = 0; k < 3; k++) { const p = mesh(new T.BoxGeometry(0.7 + r() * 0.3, 0.05, 0.13), bois); p.position.set((r() - 0.5) * 0.5, -0.06, (r() - 0.5) * 0.7); p.rotation.y = r() * 3; g.add(p); }
+    g.userData.flotte = true;
+  } else if (type === "recif") {
+    // Récif au fond du lagon : roche, coraux et un gros coquillage
+    const roche = mat(0x6a7a80, { r: 1 });
+    const b = mesh(bloc(0.5, 0.32, 0.42, 0, 0.35, seed), roche); b.position.y = 0.2; g.add(b);
+    const b2 = mesh(bloc(0.28, 0.22, 0.26, 0, 0.35, seed + 2), roche); b2.position.set(-0.42, 0.12, 0.2); g.add(b2);
+    const couls = [0xff7a5a, 0xb07aff, 0xffc04a, 0xff7aa8];
+    for (let k = 0; k < 6; k++) {
+      const c = couls[k % 4];
+      const t = mesh(new T.CylinderGeometry(0.025, 0.06, 0.45 + r() * 0.3, 4).translate(0, 0.25, 0), mat(c, { r: 0.6 }));
+      t.position.set((r() - 0.5) * 0.6, 0.4, (r() - 0.5) * 0.5); t.rotation.set((r() - 0.5) * 0.8, r() * 3, (r() - 0.5) * 0.8); g.add(t);
+      const bt = mesh(new T.IcosahedronGeometry(0.07, 0), mat(c, { r: 0.5, e: c, ei: 0.25 })); bt.position.set(0, 0.5, 0); t.add(bt);
+    }
+    const coq = mesh(new T.SphereGeometry(0.2, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xf4e0d0, { r: 0.5 })); coq.scale.set(1, 0.5, 1.2); coq.position.set(0.42, 0.06, 0.18); g.add(coq);
+    const perle = mesh(new T.IcosahedronGeometry(0.06, 1), mat(0xffffff, { r: 0.2, m: 0.3, e: 0x8ad0ff, ei: 0.5 })); perle.position.set(0.42, 0.08, 0.18); g.add(perle);
   } else if (type === "rocher") {
     const c = element === "glace" ? 0x7a8aa0 : element === "feu" ? 0x4a3a36 : 0x8a8478;
     const b = mesh(bloc(0.45, 0.35, 0.4, 0, 0.35, seed), mat(c, { r: 1 })); b.position.y = 0.25; g.add(b);

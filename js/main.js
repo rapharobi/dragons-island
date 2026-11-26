@@ -66,7 +66,7 @@ function majHud() {
   const en = energie();
   hud.innerHTML = "";
   hud.append(
-    el("div", { class: "logo" }, "Dragons Island", el("small", {}, "bêta 0.8")),
+    el("div", { class: "logo" }, "Dragons Island", el("small", {}, "bêta 0.9")),
     el("div", { class: "ressources" },
       el("span", { class: "puce energie", title: "Énergie : se recharge de 1 par heure" }, icone("energie"), el("span", { class: "jauge" }, el("i", { style: { width: (en / ENERGIE_MAX) * 100 + "%" } })), `${en}`),
       el("span", { class: "puce", title: "Rations" }, icone("rations"), `${r.rations}`),

@@ -29,11 +29,11 @@ export const ELEMENTS_FUTURS = {
 export const domine = (a, b) => ELEMENTS[a].bat.includes(b);
 
 export const MATERIAUX = {
-  brindilles: { nom: "Brindilles", desc: "On les trouve en cassant les buissons." },
+  brindilles: { nom: "Brindilles", desc: "On les trouve en cassant les buissons, ou les épaves qui flottent dans le lagon de l'île d'Eau." },
   pierres: { nom: "Pierres", desc: "On les trouve en cassant les rochers." },
   obsidienne: { nom: "Obsidienne", desc: "Roche noire de l'île de Feu." },
   givrite: { nom: "Givrite", desc: "Cristal bleu de l'île de Glace." },
-  corail: { nom: "Corail", desc: "Branches roses de l'île d'Eau." },
+  corail: { nom: "Corail", desc: "Branches roses de l'île d'Eau, et morceaux des récifs du lagon que cassent les dragons nageurs." },
   coeurs: { nom: "Cœurs de dragon", desc: "Gagnés en remportant un duel de mage classé (+1 par victoire), ou dans le pack Seigneur des dragons. Servent aux nids uniques." },
   braises: { nom: "Braises d'éclosion", desc: "Réchauffent un œuf du couvoir : chaque braise le fait avancer d'un quart. S'achètent à la boutique." },
   rations: { nom: "Rations", desc: "Nourriture de base, gagnée en combat et sur les buissons. Rend des PV." },

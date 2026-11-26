@@ -67,6 +67,7 @@ export const Son = {
   recolte(type = "bois") {
     const t = T0();
     if (type === "bois") { bruit(t, 0.08, 0.5, "bandpass", 1800, 600, busEffets, { q: 2 }); bruit(t + 0.05, 0.15, 0.3, "lowpass", 800); }
+    else if (type === "eau") { bruit(t, 0.35, 0.55, "bandpass", 1400, 260, busEffets, { q: 1.2 }); bruit(t + 0.04, 0.12, 0.3, "bandpass", 500, 200, busEffets, { q: 3 }); osc("sine", 300, t, 0.2, 0.12, busEffets, { vers: 900 }); }
     else if (type === "pierre") { bruit(t, 0.12, 0.6, "bandpass", 500, 200, busEffets, { q: 3 }); osc("sine", 120, t, 0.15, 0.3, busEffets, { vers: 60 }); }
     else { osc("sine", 1800, t, 0.4, 0.12, busEffets, { rev: 0.5 }); osc("sine", 2700, t + 0.05, 0.4, 0.08, busEffets, { rev: 0.5 }); }
     osc("triangle", 880, t + 0.12, 0.1, 0.08); osc("triangle", 1320, t + 0.2, 0.15, 0.08);
