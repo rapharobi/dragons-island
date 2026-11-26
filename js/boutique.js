@@ -10,7 +10,7 @@ import { Son, Musique } from "./son.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null;
-const vue = { uid: null, ul: true };
+const vue = { uid: null, ul: false };
 
 styles("boutique", `
 .bq-panneau { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: min(430px, 40vw); padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
@@ -42,6 +42,7 @@ styles("boutique", `
 .article .prix.g { color: #e8c8ff; display: inline-flex; align-items: center; gap: 4px; }
 .article .prix.g svg { width: 16px; height: 16px; }
 .bq-ruban { justify-self: start; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1208; background: var(--ambre); border-radius: 6px; padding: 1px 6px; }
+.bq-apercu { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); top: calc(var(--hud) + var(--tuto, 0px) + 10px); padding: 5px 12px; border-radius: 999px; background: rgba(13,14,19,.75); border: 1px solid var(--trait); font-size: 12px; color: var(--doux); white-space: nowrap; }
 @media (max-width: 420px) { .bq-gemmes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .bq-panneau { left: var(--bord-g); right: var(--bord-d); width: auto; top: 50vh; bottom: calc(var(--bas) + 78px); } }
 `);
@@ -67,7 +68,7 @@ function montrer(d, ul) {
   D.support.add(rig.racine);
   D.anim = new Animateur(rig); D.anim.jouer("joie");
   const h = rig.taille.y, l = Math.max(rig.taille.x, rig.taille.z);
-  const etroit = window.innerWidth / window.innerHeight < 0.8 ? 1.9 : 1;
+  const etroit = window.innerWidth / window.innerHeight < 0.8 ? 2.4 : 1;
   D.orbite.viser(new T.Vector3(0, h * 0.45, 0), Math.max(2.4, Math.max(h * 1.4, l) * 1.5) * etroit, 0.7, 1.2);
 }
 
@@ -77,7 +78,7 @@ export function ouvrir(ctx, params = {}) {
   ui = document.getElementById("ecran");
   Musique.jouer("livre");
   const e = E();
-  if (params.uid) vue.uid = params.uid;
+  if (params.uid) { vue.uid = params.uid; vue.ul = true; } else vue.ul = false;
   if (!vue.uid || !e.dragons.some((d) => d.uid === vue.uid)) vue.uid = e.dragons[0] ? e.dragons[0].uid : null;
   rendre();
   // Arrivée depuis une fiche : on descend directement à la bonne section
@@ -232,6 +233,7 @@ function rendre() {
         : el("button", { class: "btn principal", onclick: () => payer(PRIX_UL, `${src.nom} UL`, (s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ulPossede = true; x.ul = true; }) }, icone("gemmes"), `${src.nom} UL · ${nb(PRIX_UL)} gemmes`),
     ));
   } else p.append(el("p", { class: "doux" }, "Fais éclore un dragon pour voir sa version UL."));
+  if (d) ui.append(el("div", { class: "bq-apercu" }, `${PAR_ID[d.id].nom} · ${vue.ul ? "version UL" : "version normale"}`));
   ui.append(p);
   p.scrollTop = defile;
 }

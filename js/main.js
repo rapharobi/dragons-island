@@ -27,6 +27,9 @@ const ctx = {
     if (ctx.ecran && ECRANS[ctx.ecran].fermer) ECRANS[ctx.ecran].fermer();
     document.getElementById("ecran").innerHTML = "";
     ctx.ecran = nom;
+    document.body.classList.toggle("ecran-iles", nom === "iles");
+    majHud();
+    if (ctx.majHauteurHud) ctx.majHauteurHud();
     if (location.hash !== "#" + nom) history.replaceState(null, "", "#" + nom);
     majNav();
     ECRANS[nom].ouvrir(ctx, params);
@@ -96,13 +99,17 @@ function majHud() {
   const hud = document.getElementById("hud");
   const r = e.ressources;
   const en = energie();
+  // Une ressource n'apparaît qu'après avoir été obtenue une première fois
+  e.resVues = e.resVues || [];
+  for (const k of Object.keys(r)) if (r[k] > 0 && !e.resVues.includes(k)) e.resVues.push(k);
+  const vue = (k) => e.resVues.includes(k);
   hud.innerHTML = "";
   hud.append(
     el("div", { class: "logo" }, "Dragon World", el("small", {}, "bêta 0.12")),
     el("div", { class: "ressources" },
       el("span", { class: "puce energie", title: "Énergie : se recharge de 1 par heure", role: "button", onclick: () => { Son.clic(); infoRessource("energie"); } }, icone("energie"), el("span", { class: "jauge" }, el("i", { style: { width: (en / ENERGIE_MAX) * 100 + "%" } })), `${en}`),
-      el("span", { class: "puce gemmes", title: "Gemmes : touche pour ouvrir la boutique", role: "button", style: { pointerEvents: "auto", cursor: "pointer" }, onclick: () => { Son.clic(); ctx.aller("boutique"); } }, icone("gemmes"), `${(r.gemmes || 0).toLocaleString("fr-FR")}`),
-      ...PUCES.filter(([k]) => k !== "braises" || r.braises).map(([k, titre]) => el("span", { class: "puce", title: titre, role: "button", onclick: () => { Son.clic(); infoRessource(k); } }, icone(k), `${r[k] || 0}`)),
+      vue("gemmes") && el("span", { class: "puce gemmes", title: "Gemmes : touche pour ouvrir la boutique", role: "button", style: { pointerEvents: "auto", cursor: "pointer" }, onclick: () => { Son.clic(); ctx.aller("boutique"); } }, icone("gemmes"), `${(r.gemmes || 0).toLocaleString("fr-FR")}`),
+      ...PUCES.filter(([k]) => vue(k)).map(([k, titre]) => el("span", { class: "puce", title: titre, role: "button", onclick: () => { Son.clic(); infoRessource(k); } }, icone(k), `${r[k] || 0}`)),
     ),
   );
   if (e.oeufs.choix !== dernierChoix) { dernierChoix = e.oeufs.choix; majNav(); }
@@ -110,7 +117,11 @@ function majHud() {
 
 function suivreHud() {
   const hud = document.getElementById("hud");
-  const maj = () => { const b = hud.hidden ? 0 : hud.getBoundingClientRect().bottom; if (b > 0) document.documentElement.style.setProperty("--hud", Math.round(b) + "px"); };
+  const maj = () => {
+    if (document.body.classList.contains("ecran-iles")) { document.documentElement.style.setProperty("--hud", "calc(var(--haut) + 6px)"); return; }
+    const b = hud.hidden ? 0 : hud.getBoundingClientRect().bottom; if (b > 0) document.documentElement.style.setProperty("--hud", Math.round(b) + "px");
+  };
+  ctx.majHauteurHud = maj;
   if (window.ResizeObserver) new ResizeObserver(maj).observe(hud);
   window.addEventListener("resize", maj);
   setInterval(maj, 1500);

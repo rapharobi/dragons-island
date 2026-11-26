@@ -29,6 +29,8 @@ export const LIEN_LIVRE = window.DRAGONS_SITE ? "livre/" : "https://claude.ai/ar
 styles("iles", `
 .iles-choix { position: fixed; top: calc(var(--hud) + var(--tuto, 0px) + 6px); left: var(--bord-g); display: flex; gap: 6px; flex-wrap: wrap; z-index: 15; }
 .iles-choix .btn.actif { border-color: var(--ambre); color: var(--ambre); }
+body.ecran-iles .iles-choix { left: auto; right: var(--bord-d); flex-direction: column; align-items: flex-end; flex-wrap: nowrap; gap: 5px; }
+body.ecran-iles .iles-choix .btn { padding: 6px 10px; font-size: 12px; }
 .iles-aide { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bas) + 86px); z-index: 12; font-size: 12px; color: var(--doux); background: var(--panneau); border: 1px solid var(--trait); padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
 .fiche-ile { position: fixed; z-index: 16; right: var(--bord-d); bottom: calc(var(--bas) + 84px); width: min(380px, calc(100vw - 32px)); padding: 14px 16px 16px; max-height: calc(100vh - 220px); overflow: auto; }
 .fiche-ile header { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; }
@@ -284,19 +286,39 @@ function dansObstacle(v, x, z) {
 // Repousse le dragon hors des obstacles en le faisant glisser autour
 function repousser(v, dt) {
   const p = v.mobile.position;
-  let pousse = false;
+  let pousse = null;
   for (const o of obstacles(v)) {
     const rr = o.source ? o.r : rayonAutour(v, o);
     if (rr <= 0) continue;
     const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz);
     if (d >= rr || d < 1e-4) continue;
     p.x = o.x + (dx / d) * rr; p.z = o.z + (dz / d) * rr;
-    // Petit pas de côté pour ne pas rester coincé face à l'obstacle
-    p.x += (-dz / d) * dt * 0.8; p.z += (dx / d) * dt * 0.8;
-    pousse = true;
+    pousse = o;
   }
   v.bloque = pousse ? (v.bloque || 0) + dt : 0;
+  // Bloqué contre un obstacle : on fait le tour par le côté le plus court
+  if (pousse && v.bloque > 0.4 && v.cible && ["marche", "nid", "rejoindre", "versRecolte", "rituel"].includes(v.etat)) contourner(v, pousse);
   if (v.bloque > 2.5 && (v.etat === "marche" || v.etat === "rejoindre")) { v.etat = "pause"; v.minuteur = 0.5; v.bloque = 0; v.anim.jouer("repos"); }
+}
+function contourner(v, o) {
+  const p = v.mobile.position;
+  const rr = (o.source ? o.r : rayonAutour(v, o)) + 0.5;
+  const ap = Math.atan2(p.z - o.z, p.x - o.x), ac = Math.atan2(v.cible.z - o.z, v.cible.x - o.x);
+  let d = ac - ap; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+  // Toujours le même côté pour un même obstacle (pas d'hésitation gauche-droite)
+  if (v.sensTour === undefined || v.obstTour !== o) { v.sensTour = Math.sign(d) || 1; v.obstTour = o; }
+  const a = ap + v.sensTour * Math.min(Math.max(Math.abs(d), 0.5), 0.9);
+  v.etapes = [v.cible, ...(v.etapes || [])];
+  v.cible = new T.Vector3(o.x + Math.cos(a) * rr, 0, o.z + Math.sin(a) * rr);
+  v.bloque = 0;
+  v.detours = (v.detours || 0) + 1;
+  if (v.detours > 10) {
+    // Vraiment impossible de passer : il casse depuis là où il est, ou il s'arrête
+    v.detours = 0; v.etapes = []; v.obstTour = null;
+    if (v.etat === "versRecolte") { v.etat = "recolte"; v.recolte.t = 0; v.prochainCoup = 0; }
+    else { v.etat = "pause"; v.minuteur = 1; }
+    v.anim.jouer(enEau(v) ? "nage" : "repos");
+  }
 }
 // Hauteur minimale de vol au-dessus du relief et des obstacles autour de (x, z)
 function plafondVol(v, x, z) {
@@ -345,7 +367,7 @@ function pointAuHasard(v, autour, rayon) {
   }
   return null;
 }
-function allerVers(v, cible, etat, vitesse = 1) { v.cible = cible; v.etat = etat; v.vitesse = vitesse; }
+function allerVers(v, cible, etat, vitesse = 1) { v.cible = cible; v.etat = etat; v.vitesse = vitesse; v.detours = 0; v.obstTour = null; }
 
 // ---------- La vie des dragons ----------
 const ACTIONS_SEUL = ["renifler", "regarder", "secouer", "etirer", "bailler", "joie", "jouer", "rugir"];
@@ -1064,7 +1086,7 @@ function zoneVisible() {
   if (l <= 560) {
     // Entre le bas de l'interface du haut (barre, conseil de Maëlis) et le haut de la fiche
     let haut = 50;
-    for (const sel of ["#hud", ".tuto-bulle", "#iles-choix"]) {
+    for (const sel of document.body.classList.contains("ecran-iles") ? [".tuto-bulle"] : ["#hud", ".tuto-bulle", "#iles-choix"]) {
       const e = document.querySelector(sel);
       if (!e || e.hidden) continue;
       const r = e.getBoundingClientRect();

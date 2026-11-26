@@ -56,6 +56,13 @@ h1, h2, h3, h4 { font-family: var(--titre); margin: 0; text-wrap: balance; lette
 .info-res-tete { display: flex; align-items: center; gap: 10px; } .info-res-tete svg { width: 34px; height: 34px; } .info-res-tete b { font-size: 26px; }
 .puce .jauge { width: 38px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .puce .jauge i { display: block; height: 100%; background: var(--ambre); }
+/* Sur les îles : les ressources en colonne à gauche, sous le conseil de Maëlis */
+body.ecran-iles #hud { right: auto; bottom: auto; top: calc(var(--hud) + var(--tuto, 0px) + 4px); padding: 0 0 0 var(--bord-g); flex-direction: column; align-items: flex-start; z-index: 14; max-height: calc(100vh - var(--hud) - var(--tuto, 0px) - var(--bas) - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+body.ecran-iles #hud::-webkit-scrollbar { display: none; }
+body.ecran-iles .logo { display: none; }
+body.ecran-iles .ressources { display: flex !important; flex-direction: column; align-items: flex-start; gap: 4px; flex: none; }
+body.ecran-iles .puce { padding: 3px 8px 3px 5px; font-size: 11px; }
+body.ecran-iles .puce .jauge { width: 26px; }
 
 /* ---------- Barre du bas ---------- */
 #nav { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bas) + 10px); z-index: 20; display: flex; gap: 4px; padding: 5px; background: var(--panneau); border: 1px solid var(--trait); border-radius: 16px; backdrop-filter: blur(10px); max-width: calc(100% - 24px); }
