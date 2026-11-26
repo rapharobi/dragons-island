@@ -210,10 +210,62 @@ const PISTES = {
 let pisteVoulue = null, planif = null, prochaineMesure = 0, pas = 0, pisteCourante = null;
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
+// ---------- Musiques (composées avec Lyria 3, dans musique/) ----------
+// Chaque scène a sa liste ; les morceaux s'enchaînent en fondu. On passe d'une scène à l'autre en douceur,
+// sauf au début d'un combat ou d'une attaque, où la musique change vite.
+const LISTES = {
+  portail: ["portail"],
+  iles: ["monde1", "monde2"], tout: ["monde1", "monde2"], centre: ["monde2", "monde1"],
+  feu: ["feu", "monde2"], glace: ["glace1", "glace2"], eau: ["eau", "monde1"],
+  couvoir: ["couvoir"], livre: ["boutique"], boutique: ["boutique"],
+  combat: ["combat"], tour: ["tour"], attaque: ["attaque"],
+};
+const RAPIDES = new Set(["combat", "tour", "attaque"]);
+const VOLUMES = { combat: 0.5, attaque: 0.55, tour: 0.5, portail: 0.6 };
+let lecteur = null;
+function fichierMusique(f) { return new URL(`../musique/${f}.mp3`, import.meta.url).href; }
+function lancerMorceau(nom, i, fondu) {
+  const liste = LISTES[nom];
+  const audio = new Audio();
+  audio.src = fichierMusique(liste[i % liste.length]);
+  audio.preload = "auto";
+  audio.loop = liste.length === 1;
+  const g = ctx.createGain();
+  try { ctx.createMediaElementSource(audio).connect(g); } catch (e) { return null; }
+  g.connect(busMusique);
+  const t = ctx.currentTime;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(VOLUMES[nom] ?? 0.55, t + fondu);
+  const l = { nom, i, audio, g, suite: false };
+  // Plusieurs morceaux : le suivant arrive en fondu un peu avant la fin
+  if (liste.length > 1) audio.addEventListener("timeupdate", () => {
+    if (l.suite || lecteur !== l || !audio.duration) return;
+    if (audio.duration - audio.currentTime < 4) { l.suite = true; lecteur = lancerMorceau(nom, i + 1, 4) || l; arreterMorceau(l, 4); }
+  });
+  audio.play().catch(() => {});
+  return l;
+}
+function arreterMorceau(l, fondu) {
+  if (!l) return;
+  const t = ctx.currentTime;
+  l.g.gain.cancelScheduledValues(t);
+  l.g.gain.setValueAtTime(Math.max(0.0001, l.g.gain.value), t);
+  l.g.gain.linearRampToValueAtTime(0.0001, t + fondu);
+  setTimeout(() => { l.audio.pause(); l.audio.removeAttribute("src"); l.audio.load(); }, fondu * 1000 + 150);
+}
 export const Musique = {
   jouer(nom) {
     pisteVoulue = nom;
     if (!ctx) return;
+    if (LISTES[nom]) {
+      if (lecteur && (lecteur.nom === nom || (LISTES[lecteur.nom] === LISTES[nom]))) return;
+      clearInterval(planif); pisteCourante = nom;
+      const fondu = RAPIDES.has(nom) ? 0.6 : 3;
+      const ancien = lecteur;
+      lecteur = lancerMorceau(nom, 0, fondu);
+      arreterMorceau(ancien, fondu);
+      return;
+    }
     if (pisteCourante === nom) return;
     pisteCourante = nom;
     clearInterval(planif);

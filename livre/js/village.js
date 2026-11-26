@@ -9,7 +9,7 @@ import { mat, mesh, rng, cone } from "./outils3d.js";
 import { construireDragon } from "./modele.js";
 import { Animateur } from "./anim.js";
 import { el, styles, toast, modale, icone, barre } from "./ui.js";
-import { Son } from "./son.js";
+import { Son, Musique } from "./son.js";
 import { extensions, moteurIles, focaliser, souffler, particule, fermerFiche } from "./iles.js";
 
 const T = window.THREE;
@@ -467,6 +467,7 @@ function lancerBataille(elxIgnore, auto) {
   }
   V.bataille = { auto, vitesse: auto ? 2 : 1, n, bats, couvoir, ennemis, dragons, groupe, t: 0, tirs: [], fini: false, coupDeMain: 0 };
   Son.crier("eau", 1);
+  Musique.jouer("attaque");
   const bandeau = el("div", { class: "vl-bandeau panneau", id: "vl-bandeau" });
   document.getElementById("ecran").append(bandeau);
   majBandeau();
@@ -665,6 +666,7 @@ function finBataille(victoire) {
     for (const t of B.tirs) t.boule.parent && t.boule.parent.remove(t.boule);
     for (const x of B.dragons) { x.etat = "nid"; x.cible = x.maison.clone(); x.vitesse = 0.9; if (!x.ko) x.anim.jouer(victoire ? "joie" : "repos"); }
     V.bataille = null; V.cle = null;
+    Musique.jouer("iles");
     for (const [, o] of V.objets) { o.g.parent && o.g.parent.remove(o.g); }
     V.objets.clear(); synchro();
     const bd = document.getElementById("vl-bandeau"); if (bd) bd.remove();

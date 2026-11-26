@@ -1036,6 +1036,7 @@ function majCadrage() {
 // ---------- Caméra ----------
 export function focaliser(elx, rapproche = true) {
   D.fond = false;
+  if (ctxJeu && ctxJeu.ecran === "iles") Musique.jouer(elx === "feu" || elx === "glace" || elx === "eau" ? elx : "iles");
   D.focus = elx;
   D.suivi = null;
   const s = D.lum.soleil;

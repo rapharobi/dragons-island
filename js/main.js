@@ -198,6 +198,8 @@ async function demarrer() {
     surJouer: () => { initAudio(); Son.portail(); accueil.ouvrir(entrer); },
   });
   document.body.append(accueil.racine);
+  // La musique du portail démarre au premier toucher (les navigateurs l'exigent)
+  accueil.racine.addEventListener("pointerdown", () => { initAudio(); Musique.jouer("portail"); }, { once: true });
   window.addEventListener("hashchange", () => {
     if (codeDuel() && !document.querySelector(".accueil") && !E().intro) { ctx.aller("combat", { rejoindre: codeDuel() }); return; }
     const h = location.hash.slice(1);

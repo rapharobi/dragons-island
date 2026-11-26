@@ -921,7 +921,7 @@ function lancer() {
   D.orbite.auto = 0;
   viserArene();
   ctxJeu.moteur.definirZone({ x: 0, y: 0.06, l: 1, h: window.innerWidth > 760 ? 0.58 : 0.5 });
-  Musique.jouer("combat");
+  Musique.jouer(prep.mode === "tour" ? "tour" : "combat");
   ui.innerHTML = "";
   if (prep.mode !== "ami") {
     const nivAdv = Math.round(lui.reduce((s, m) => s + m.niveau, 0) / lui.length);
