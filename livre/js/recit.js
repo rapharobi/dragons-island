@@ -9,7 +9,7 @@ import { parler, MENTOR } from "./tuto.js";
 const CHAPITRES = [
   {
     id: "village",
-    quand: (e) => e.tuto.etape === "fini" && e.oeufs.couvoir.niveau >= 1,
+    quand: (e) => e.oeufs.couvoir.niveau >= 1,
     pages: [
       ["Un village s'éveille", "Ton couvoir a grandi. Les dragons sauvages des alentours le sentent : c'est devenu le cœur d'un vrai village."],
       [`${MENTOR}`, "Sur tes trois îles, des cercles dorés montrent où bâtir. Touche-en un : scierie, carrière et verger travaillent même quand tu dors. Les entrepôts gardent tes réserves, et les tours protègent le tout."],

@@ -483,6 +483,8 @@ function choixOrdinateur(moi, lui, hasard = 0.12) {
 
 // ---------- Préparation ----------
 let prep = { mode: "bot", equipe: [], niveauAmi: 10 };
+// Lancé par Lia pendant le guide : { tours, eux, faible, uids, nom, titre, texte }
+export function combatGuide(ctx, conf) { ctx.aller("combat"); prep.mode = "guide"; prep.guide = conf; lancer(); }
 export function ouvrir(ctx, params = {}) {
   ctxJeu = ctx;
   if (!D) construireArene();
@@ -496,7 +498,7 @@ export function ouvrir(ctx, params = {}) {
   if (L) { L.pret = 0; L.recu = {}; publierLigne(); }
   if (params.rejoindre && codeValide(params.rejoindre)) prep.mode = "ligne";
   const e = E();
-  const dispo = e.dragons.filter((d) => d.pv > 0 && !d.chantier);
+  const dispo = e.dragons.filter((d) => d.pv > 0 && !d.chantier && !d.expedition);
   if (Array.isArray(e.equipe) && e.equipe.length) prep.equipe = [...e.equipe];
   prep.equipe = prep.equipe.filter((uid) => dispo.some((d) => d.uid === uid));
   if (!prep.equipe.length) {
@@ -729,7 +731,7 @@ let L = null;
 const NOM_MAX = 18;
 function nomMage() { return String(E().reglages.nomMage || "").trim().slice(0, NOM_MAX) || "Mage"; }
 function nomPropre(x) { return String(x || "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, "").trim().slice(0, NOM_MAX) || "Ton ami"; }
-function dragonsPrets() { const e = E(); return prep.equipe.map((u) => e.dragons.find((d) => d.uid === u)).filter((d) => d && d.pv > 0 && !d.chantier); }
+function dragonsPrets() { const e = E(); return prep.equipe.map((u) => e.dragons.find((d) => d.uid === u)).filter((d) => d && d.pv > 0 && !d.chantier && !d.expedition); }
 function equipeCompacte() { return dragonsPrets().map((d) => [d.id, d.niveau, d.nid || 0, d.armure || "", d.ul ? 1 : 0, Math.round(d.pv)]); }
 function publierLigne() {
   if (!L || !L.salon) return;
@@ -894,6 +896,31 @@ function lancer() {
     if (!ok) { toast("Pas assez d'énergie.", "mal"); return; }
   }
   const et = etapeTuto();
+  // Combat du guide : contre des dragons sauvages, avec les dragons demandés
+  if (prep.mode === "guide") {
+    const g = prep.guide;
+    const miens = e.dragons.filter((d) => (g.uids ? g.uids.includes(d.uid) : true) && !d.expedition && !d.chantier);
+    changer(() => { for (const d of miens) d.pv = pvMax(d); });
+    const moiG = miens.slice(0, 7).map(membreJoueur);
+    const niv = Math.max(1, Math.round(moiG.reduce((s, m) => s + m.niveau, 0) / moiG.length));
+    const luiG = [];
+    for (let i = 0; i < g.eux; i++) {
+      const elx = g.faible ? ELEMENTS[moiG[i % moiG.length].element].bat[0] : ["feu", "glace", "eau"][Math.floor(Math.random() * 3)];
+      const l = DRAGONS.filter((x) => x.element === elx);
+      // Le chef a ton niveau moyen moins un, ses compagnons un peu moins : gagnable, sans être donné
+      luiG.push(membreBot(l[Math.floor(Math.random() * l.length)].id, g.faible ? 1 : Math.max(1, niv - (i === 0 ? 1 : 2)), g.faible ? 0 : 1));
+    }
+    C = { mode: "guide", tour: 1, tours: g.tours, totaux: [0, 0], equipes: [moiG, luiG], noms: ["Toi", g.nom || "Dragons sauvages"], choix: [null, null], fini: false, sel: [null, null], historique: [], etage: 0, adv: null };
+    ctxJeu.cacherInterface(true);
+    D.orbite.auto = 0; viserArene();
+    ctxJeu.moteur.definirZone({ x: 0, y: 0.06, l: 1, h: window.innerWidth > 760 ? 0.58 : 0.5 });
+    Musique.jouer("combat");
+    ui.innerHTML = "";
+    const m = el("div", { class: "relais" }, el("div", {}, el("div", { class: "etiquette" }, g.titre || "Combat"), el("h2", {}, g.nom || "Dragons sauvages"), el("p", { class: "doux" }, g.texte || "")));
+    ui.append(m);
+    setTimeout(() => { m.remove(); debutTour(); }, 1800);
+    return;
+  }
   // Attaque d'un village : une autre scène, avec l'équipe choisie
   if (prep.mode === "village") {
     const eq = dragonsPrets();
@@ -972,11 +999,11 @@ function debutTour() {
   if (!C || C.fini) return;
   // Fin si plus personne ne peut jouer
   const vivants = C.equipes.map((eq) => eq.some((m) => m.pv > 0));
-  if (C.tour > TOURS || !vivants[0] || !vivants[1]) { finCombat(); return; }
+  if (C.tour > (C.tours || TOURS) || !vivants[0] || !vivants[1]) { finCombat(); return; }
   C.choix = [null, null];
   C.dernierChoix = null;
   viserArene();
-  if (C.mode === "bot" || C.mode === "sauvage" || C.mode === "tour") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" ? 0.45 : C.mode === "tour" ? Math.max(0, 0.5 - C.etage * 0.024) : 0.12);
+  if (C.mode === "bot" || C.mode === "sauvage" || C.mode === "tour" || C.mode === "guide") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" || C.mode === "guide" ? 0.45 : C.mode === "tour" ? Math.max(0, 0.5 - C.etage * 0.024) : 0.12);
   if (!D.cotes[0]) { const m = C.equipes[0].find((x) => x.pv > 0); placerDragon(0, m); }
   if (!D.cotes[1]) { const m = C.equipes[1].find((x) => x.pv > 0); placerDragon(1, m); }
   rendreChoix(0);
@@ -989,7 +1016,7 @@ function rendreHaut() {
     el("div", { class: "tot" }, Math.round(C.totaux[i])),
     el("div", { class: "points-eq" }, C.equipes[i].map((m) => el("i", { class: (m.pv <= 0 ? "ko " : "") + m.element, title: `${m.nom} ${Math.max(0, Math.round(m.pv))}/${m.pvMax}`, style: { background: ELEMENTS[m.element].couleur, opacity: m.pv <= 0 ? 0.2 : 0.35 + 0.65 * (m.pv / m.pvMax) } }))),
   );
-  h.append(cote(0), el("div", { class: "tour panneau" }, el("span", { class: "etiquette" }, "Tour"), el("b", {}, `${Math.min(C.tour, TOURS)} / ${TOURS}`), el("span", { class: "chrono", id: "chrono" }, "")), cote(1));
+  h.append(cote(0), el("div", { class: "tour panneau" }, el("span", { class: "etiquette" }, "Tour"), el("b", {}, `${Math.min(C.tour, C.tours || TOURS)} / ${C.tours || TOURS}`), el("span", { class: "chrono", id: "chrono" }, "")), cote(1));
   return h;
 }
 
@@ -1446,6 +1473,8 @@ function finCombat(raison) {
     boutons: enLigne ? [
       { texte: "Quitter", action: () => { quitterLigne(); ctxJeu.cacherInterface(false); ctxJeu.aller("iles"); } },
       { texte: L && L.autre ? "Revanche" : "Nouveau combat", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ouvrir(ctxJeu); } },
+    ] : C.mode === "guide" ? [
+      { texte: "Continuer", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ctxJeu.aller("iles"); } },
     ] : C.mode === "tour" ? [
       { texte: "Retour aux îles", action: () => { ctxJeu.cacherInterface(false); ctxJeu.aller("iles"); } },
       { texte: C.finTour === "suite" ? "Continuer l'ascension" : "Retour à la tour", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ouvrir(ctxJeu); } },

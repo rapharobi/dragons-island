@@ -20,10 +20,11 @@ export function nouvellePartie() {
   return {
     version: 1, cree: t, decalage: 0, compteur: 0,
     energie: { val: ENERGIE_MAX, maj: t },
-    ressources: { brindilles: 10, pierres: 5, obsidienne: 0, givrite: 0, corail: 0, coeurs: 0, rations: 10, rations_feu: 0, rations_glace: 0, rations_eau: 0, braises: 0, gemmes: 0 },
+    ressources: { brindilles: 20, pierres: 20, obsidienne: 0, givrite: 0, corail: 0, coeurs: 0, rations: 10, rations_feu: 0, rations_glace: 0, rations_eau: 0, braises: 0, gemmes: 60 },
     achats: {},
     dragons: [],
-    oeufs: { choix: 0, reserve: [], couvoir: { niveau: 0, slots: [] }, minuteur: { compte: 1, prochain: null }, dernierJour: null },
+    oeufs: { choix: 0, reserve: [], couvoir: { niveau: 0, slots: [], ruine: true }, minuteur: { compte: 1, prochain: null }, dernierJour: null },
+    ilesVisibles: [], joueur: null,
     pas: { total: 0 },
     fermes: { feu: { niveau: 0, stock: 0, maj: t }, glace: { niveau: 0, stock: 0, maj: t }, eau: { niveau: 0, stock: 0, maj: t } },
     sources: { feu: { niveau: 0, stock: 0, maj: t }, glace: { niveau: 0, stock: 0, maj: t }, eau: { niveau: 0, stock: 0, maj: t } },
@@ -33,7 +34,7 @@ export function nouvellePartie() {
     reglages: { mode: "temps", son: true, musique: true, chrono: 20, qualite: "haute", combatAuto: false },
     tourNid: { run: null, record: 0, sommets: 0 },
     intro: true,
-    tuto: { etape: "histoire" },
+    tuto: { etape: "nom" },
     journal: [],
   };
 }
@@ -91,6 +92,8 @@ async function synchroniserCompte(local) {
 export function lieuSauvegarde() { return stockage ? stockage.nom : "navigateur"; }
 
 function migrer(o) {
+  // Anciennes parties : toutes les îles sont déjà là
+  if (!("ilesVisibles" in o)) o.ilesVisibles = null;
   const base = nouvellePartie();
   for (const k of Object.keys(base)) if (o[k] === undefined) o[k] = base[k];
   for (const k of Object.keys(base.ressources)) if (o.ressources[k] === undefined) o.ressources[k] = 0;
@@ -179,6 +182,9 @@ export function mettreAJour() {
       d.faimComptee = jours;
     }
   }
+  // Réparation du couvoir en ruine (début du jeu)
+  const cv = etat.oeufs.couvoir;
+  if (cv.reparation && t >= cv.reparation.fin) { cv.ruine = false; cv.reparation = null; etat.cineReparation = true; }
   if (etat.oeufs.couvoir.chantier && t >= etat.oeufs.couvoir.chantier.fin) { finirChantier(); etat.chantierFini = true; }
   // Minuteur des œufs
   const mi = etat.oeufs.minuteur;
@@ -369,6 +375,7 @@ export function finirChantier() {
 }
 export function remplirCouvoir() {
   const c = etat.oeufs.couvoir, def = COUVOIR[c.niveau];
+  if (c.ruine) return;
   while (c.slots.length < def.places && etat.oeufs.reserve.length) {
     const o = etat.oeufs.reserve.shift();
     c.slots.push({ oeuf: o, pasDepart: etat.pas.total, debut: maintenant() });

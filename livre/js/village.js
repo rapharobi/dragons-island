@@ -11,6 +11,7 @@ import { Animateur } from "./anim.js";
 import { el, styles, toast, modale, icone, barre } from "./ui.js";
 import { Son, Musique } from "./son.js";
 import { extensions, moteurIles, focaliser, souffler, particule, fermerFiche } from "./iles.js";
+import { signaler } from "./tuto.js";
 
 const T = window.THREE;
 const H = 3600e3;
@@ -338,6 +339,7 @@ function construireIci(a) {
   if (!ok) { toast("Pas assez de ressources.", "mal"); return; }
   Son.recolte("bois"); setTimeout(() => Son.recolte("pierre"), 180);
   toast(`${BATIMENTS[a.bat].nom} construit !`, "bon");
+  signaler("construit", a.bat);
   synchro();
   const o = [...V.objets.values()].find((x) => x.b.place === a.place);
   if (o) poussiere(o.g);
@@ -442,7 +444,7 @@ function lancerBataille(elxIgnore, auto) {
   const couvoir = { pv: pvC, max: pvC, barre: bc, w: monde(D.forteresse), tourelles: (D.forteresse.userData.tourelles || []).map((c) => ({ c, recharge: Math.random() })) };
   // Les pillards : de jeunes dragons sauvages, plus nombreux et plus solides à chaque vague
   const groupe = new T.Group(); D.scene.add(groupe); extensions.cibles.push(groupe);
-  const nb = Math.min(16, 3 + n), ennemis = [];
+  const nb = V.vagueGuide ? 3 : Math.min(16, 3 + n), ennemis = [];
   for (let i = 0; i < nb; i++) {
     const elx = ILES3[Math.floor(Math.random() * 3)];
     const brute = i % 4 === 3;
@@ -665,7 +667,8 @@ function finBataille(victoire) {
     B.couvoir.barre.parent && B.couvoir.barre.parent.remove(B.couvoir.barre);
     for (const t of B.tirs) t.boule.parent && t.boule.parent.remove(t.boule);
     for (const x of B.dragons) { x.etat = "nid"; x.cible = x.maison.clone(); x.vitesse = 0.9; if (!x.ko) x.anim.jouer(victoire ? "joie" : "repos"); }
-    V.bataille = null; V.cle = null;
+    V.bataille = null; V.cle = null; V.vagueGuide = false;
+    setTimeout(() => signaler("vague_finie", { victoire }), 100);
     Musique.jouer("iles");
     for (const [, o] of V.objets) { o.g.parent && o.g.parent.remove(o.g); }
     V.objets.clear(); synchro();
@@ -681,6 +684,7 @@ function finBataille(victoire) {
 extensions.update.push(update);
 extensions.action.batiment = (a) => { if (V.bataille) return; Son.clic(); ficheBatiment(a.uid); };
 extensions.action.vplace = (a) => construireIci(a);
+extensions.cibleLibre = () => { const D = moteurIles(); const m = V.libres.find((x) => x.visible); return m ? m.getWorldPosition(new T.Vector3()).add(new T.Vector3(0, 0.8, 0)) : null; };
 extensions.action.vlibre = (a) => { if (V.bataille) return; Son.clic(); construireSur(a.ile, a.place); };
 // Toucher le sol près d'un emplacement libre ouvre aussi « Construire ici »
 extensions.sol = (elx, p) => {
@@ -694,6 +698,7 @@ extensions.sol = (elx, p) => {
 };
 extensions.action.ennemi = (a) => toucherEnnemi(a);
 extensions.boutons.push(() => ouvert() && el("button", { class: "btn petit", style: { borderColor: "rgba(111,214,138,.55)", color: "#b8f0c8" }, onclick: () => { Son.clic(); ouvrirVillage(); } }, "Village"));
+export function lancerVagueGuide() { V.vagueGuide = true; lancerBataille(null, false); }
 export function lancerVagueTest(elx) { const v = vil(); const iles = [...new Set(v.batiments.map((b) => b.ile))]; lancerBataille(elx && iles.includes(elx) ? elx : iles[0], false); }
 
 export const _places = (elx) => places(elx).length;

@@ -7,7 +7,9 @@ import { mat, mesh, bloc } from "./outils3d.js";
 import { E, changer, choisirOeuf, avancement, tempsRestant, eclore, defCouvoir, maintenant, elementComplet, nouveauDragon, demarrerMinuteur, payer, assez, energie, noter, livreComplet, chaufferOeuf, braisesPourFinir, manqueChantier, dureeChantier, finirChantier } from "./etat.js";
 import { PAR_ID, ELEMENTS, COUVOIR, RECETTE_COUVOIR, attenteOeuf, fmtDuree, STADES, CHANTIER_COUVOIR } from "./regles.js";
 import { el, styles, toast, modale, barre, recette, icone } from "./ui.js";
-import { signaler, apresPremierOeuf, enApprentissage, MENTOR } from "./tuto.js";
+import { signaler, apresPremierOeuf, enApprentissage, MENTOR, etape as etapeTuto } from "./tuto.js";
+import { revelerIle } from "./iles.js";
+import { blocExpedition } from "./expeditions.js";
 import { Son, Musique } from "./son.js";
 
 const T = window.THREE;
@@ -196,12 +198,20 @@ function animerEclosion(element, id, double, apres) {
 export function ouvrir(ctx, params = {}) {
   ctxJeu = ctx;
   if (!D) construireDecor();
-  intro = !!params.intro || E().intro;
+  // Pendant le guide, les 3 premiers œufs se choisissent sur l'écran d'intro
+  intro = !!params.intro || E().intro || ["oeuf1", "oeuf2", "oeuf3"].includes(etapeTuto());
   if (params.celebrer) { ctx.moteur.montrer(D, null); Musique.jouer("couvoir"); ui = document.getElementById("ecran"); ui.innerHTML = ""; ctx.cacherInterface(true); celebrer(params.celebrer, params.apres); return; }
   ctx.moteur.montrer(D, window.innerWidth > 560 ? { x: 0.32, y: 0, l: 0.68, h: 1 } : { x: 0, y: 0, l: 1, h: 0.5 });
   Musique.jouer("couvoir");
   ui = document.getElementById("ecran");
-  if (intro) { ctx.cacherInterface(true); ctx.moteur.definirZone(null); ecranIntro(); }
+  if (E().oeufs.couvoir.ruine) {
+    // Le couvoir est encore en ruine : on le répare depuis les îles
+    ui.innerHTML = ""; ctx.moteur.definirZone(null);
+    ui.append(el("section", { class: "couv-panneau panneau" }, el("div", { class: "etiquette" }, "Rocher central"), el("h2", {}, "Le couvoir en ruine"),
+      el("p", { class: "doux" }, "Il faut d'abord le réparer. Va sur les îles et touche les ruines du couvoir."),
+      el("button", { class: "btn principal", onclick: () => ctx.aller("iles") }, "Aller aux ruines")));
+  }
+  else if (intro) { ctx.cacherInterface(true); ctx.moteur.definirZone(null); ecranIntro(); }
   else { mode = E().oeufs.choix > 0 && params.choisir ? "choix" : "couvoir"; rendre(); }
   clearInterval(minuteurUI);
   minuteurUI = setInterval(() => { if (!intro && mode === "couvoir") majProgression(); }, 1000);
@@ -225,10 +235,12 @@ export function fermer() { clearInterval(minuteurUI); ctxJeu.moteur.definirZone(
 function ecranIntro() {
   ui.innerHTML = "";
   afficherChoix(true);
-  ui.append(el("div", { class: "titre-intro" }, el("h2", {}, "Choisis ton premier œuf"), el("p", {}, "Chaque œuf cache un dragon d'un élément. Le Feu bat la Glace, la Glace bat l'Eau, l'Eau bat le Feu.")));
+  const deja = E().ilesVisibles || [];
+  const restants = ["feu", "glace", "eau"].filter((x) => !deja.includes(x));
+  ui.append(el("div", { class: "titre-intro" }, el("h2", {}, restants.length === 3 ? "Trois œufs !" : "Choisis le prochain œuf"), el("p", {}, "Touche un œuf pour le choisir. Chaque œuf cache un dragon d'un élément, et son île surgira quand il éclora. Le Feu bat la Glace, la Glace bat l'Eau, l'Eau bat le Feu.")));
   const starters = { feu: "braisil", glace: "givrelin", eau: "ondin" };
   const z = el("div", { class: "choix-oeufs" });
-  for (const elx of ["feu", "glace", "eau"]) {
+  for (const elx of restants) {
     z.append(el("button", { class: `${elx} ${selection === elx ? "choisi" : ""}`, onclick: () => selectionner(elx, () => {
       Son.ok();
       z.remove(); ui.querySelector(".titre-intro")?.remove();
@@ -236,9 +248,9 @@ function ecranIntro() {
         const tuto = enApprentissage();
         changer((e) => {
           const d = nouveauDragon(starters[elx]);
-          e.intro = false;
-          if (tuto) apresPremierOeuf(e, d);
-          else { e.ressources.brindilles += 15; demarrerMinuteur(); }
+          if (Array.isArray(e.ilesVisibles) && !e.ilesVisibles.includes(elx)) e.ilesVisibles.push(elx);
+          if (!Array.isArray(e.ilesVisibles) || e.ilesVisibles.length >= 3) e.intro = false;
+          if (!tuto) { e.ressources.brindilles += 15; demarrerMinuteur(); }
           noter(`${PAR_ID[d.id].nom} est né.`);
         });
         const src = PAR_ID[starters[elx]];
@@ -247,10 +259,10 @@ function ecranIntro() {
           contenu: el("div", {},
             el("p", {}, `${src.titre}. ${src.histoire}`),
             tuto
-              ? el("p", { class: "doux" }, `${MENTOR} : « Ton premier dragon ! Il vit sur l'île ${elx === "eau" ? "d'Eau" : elx === "feu" ? "de Feu" : "de Glace"}. Allons le voir, je vais t'apprendre à t'en occuper. »`)
+              ? el("p", { class: "doux" }, `${MENTOR} : « Regarde bien : son île va surgir des nuages ! »`)
               : el("p", { class: "doux" }, "Il lui faut un nid pour grandir. Sur son île, touche-le puis « Construire le nid ». Le prochain œuf arrive dans 1 heure."),
           ),
-          boutons: [{ texte: "Aller sur son île", classe: "principal", action: () => { ctxJeu.cacherInterface(false); intro = false; ctxJeu.aller("iles"); } }],
+          boutons: [{ texte: "Voir son île apparaître", classe: "principal", action: () => { ctxJeu.cacherInterface(false); intro = false; ctxJeu.aller("iles"); setTimeout(() => revelerIle(elx, () => signaler("ile_revelee", elx)), 200); } }],
           fermable: false,
         });
       });
@@ -297,7 +309,7 @@ function blocChantier() {
   const choix = el("div", { style: { display: "flex", gap: "5px", flexWrap: "wrap" } });
   for (const d of [...e.dragons].sort((x, y) => y.niveau - x.niveau)) {
     const on = batisseurs.has(d.uid);
-    choix.append(el("button", { class: "btn petit" + (on ? " principal" : ""), disabled: d.pv <= 0, onclick: () => { on ? batisseurs.delete(d.uid) : batisseurs.add(d.uid); Son.clic(); rendre(); } }, `${PAR_ID[d.id].nom} · ${d.niveau}`));
+    choix.append(el("button", { class: "btn petit" + (on ? " principal" : ""), disabled: !!d.expedition, onclick: () => { on ? batisseurs.delete(d.uid) : batisseurs.add(d.uid); Son.clic(); rendre(); } }, `${PAR_ID[d.id].nom} · ${d.niveau}`));
   }
   const nb = batisseurs.size;
   b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, `Choisis tes bâtisseurs : ${nb ? `chantier de ${fmtDuree(dureeChantier(n, nb))} avec ${nb} dragon${nb > 1 ? "s" : ""}` : `${c.heures - 1} h avec un seul dragon, une heure de moins par dragon en plus`}.`), choix);
@@ -316,6 +328,7 @@ function blocChantier() {
   return b;
 }
 function rendre() {
+  const defile = ui && ui.querySelector(".couv-panneau") ? ui.querySelector(".couv-panneau").scrollTop : 0;
   ui.innerHTML = "";
   const e = E();
   ctxJeu.moteur.definirZone(mode === "choix" ? null : window.innerWidth > 560 ? { x: 0.32, y: 0, l: 0.68, h: 1 } : { x: 0, y: 0, l: 1, h: 0.5 });
@@ -362,7 +375,10 @@ function rendre() {
   p.append(coll);
   // Le couvoir est aussi l'hôtel du village : on l'agrandit par un chantier
   p.append(blocChantier());
+  // Expéditions pour trouver des œufs (rapides pendant le guide)
+  p.append(blocExpedition(rendre, E().tuto && E().tuto.etape === "expedition"));
   ui.append(p);
+  p.scrollTop = defile;
 }
 
 function majProgression() {

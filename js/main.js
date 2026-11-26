@@ -14,7 +14,8 @@ import * as Reglages from "./reglages.js";
 import * as Pilotage from "./pilotage.js";
 import "./village.js";
 import { verifierRecits } from "./recit.js";
-import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto } from "./tuto.js";
+import { verifierExpedition } from "./expeditions.js";
+import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto, accueillir, signaler } from "./tuto.js";
 
 enregistrerElements(DRAGONS);
 
@@ -172,6 +173,9 @@ async function demarrer() {
   // L'histoire reprend de temps en temps, et le chantier du couvoir prévient quand il est fini
   setInterval(() => {
     verifierRecits(ctx);
+    // Fin de la réparation du couvoir : la cinématique se joue sur les îles
+    if (E().cineReparation && ctx.ecran === "iles" && document.getElementById("modale").hidden) { E().cineReparation = false; Iles.cinematiqueReparation(() => signaler("reparation_finie")); }
+    verifierExpedition();
     if (E().chantierFini) { delete E().chantierFini; toast("Le chantier du couvoir est terminé !", "bon"); Son.evolution(); if (ctx.ecran === "couvoir") ctx.aller("couvoir"); }
   }, 2000);
   // Écran d'accueil : le portail magique (sans les îles derrière)
@@ -181,8 +185,10 @@ async function demarrer() {
     majHud();
     // On arrive du ciel : la caméra plonge vers les îles
     Iles.decor(ctx).plongee();
-    if (E().intro && etapeTuto() === "histoire") { document.getElementById("hud").hidden = true; document.getElementById("nav").hidden = true; histoire(() => { ctx.aller("couvoir", { intro: true }); }); }
-    else if (E().intro) ctx.aller("couvoir", { intro: true });
+    // Nouvelle partie : les ruines du couvoir, et Lia qui demande ton nom
+    if (etapeTuto() === "nom") { ctx.aller("iles"); setTimeout(accueillir, 600); }
+    else if (E().intro && etapeTuto() === "histoire") { document.getElementById("hud").hidden = true; document.getElementById("nav").hidden = true; histoire(() => { ctx.aller("couvoir", { intro: true }); }); }
+    else if (E().intro && !E().ilesVisibles) ctx.aller("couvoir", { intro: true });
     else if (codeDuel()) ctx.aller("combat", { rejoindre: codeDuel() });
     else {
       const h = location.hash.slice(1);

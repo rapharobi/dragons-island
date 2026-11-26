@@ -468,7 +468,7 @@ export function construireCentre() {
 
 // L'hôtel de ville : le couvoir est entouré d'une forteresse qui couvre tout le rocher central.
 // Une porte face à chaque pont, des tours entre les portes. Niveau 2 : une tourelle qui tire ; niveau 4 : deux ; niveau 5 : trois.
-export function construireForteresse(niveau) {
+export function construireForteresse(niveau, ruine = false) {
   const g = new T.Group();
   const pierre = mat(0x7a7268, { r: 0.95 }), pierreFoncee = mat(0x5a544c, { r: 0.95 }), toit = mat(0x6a3a5a, { r: 0.8 }), or = mat(0xf2b544, { r: 0.4, m: 0.6, e: 0x6a4200, ei: 0.4 });
   const R = 2.95, haut = 0.9 + niveau * 0.18;
@@ -509,6 +509,20 @@ export function construireForteresse(niveau) {
   });
   g.userData.tourelles = tourelles;
   g.userData.anim = (t) => tourelles.forEach((c, i) => { c.rotation.y = t * 1.4 + i; c.position.y += Math.sin(t * 2 + i) * 0.002; });
+  if (ruine) {
+    // Ruines : des pans de mur tombés, des tours décapitées, de la pierre noircie
+    const r = rng(1234);
+    g.traverse((o) => {
+      if (!o.isMesh) return;
+      const x = r();
+      if (o.geometry.type === "ConeGeometry" || o.geometry.type === "SphereGeometry") { o.visible = false; return; }
+      if (x < 0.38) o.visible = false;
+      else if (x < 0.7) { o.rotation.z += (r() - 0.5) * 1.3; o.rotation.x += (r() - 0.5) * 0.8; o.position.y *= 0.45; o.scale.y *= 0.6; }
+      o.material = mat(0x4a4540, { r: 1 });
+    });
+    for (let i = 0; i < 14; i++) { const p = mesh(new T.DodecahedronGeometry(0.15 + r() * 0.25, 0), mat(0x5a544c, { r: 1 })); const a = r() * 6.28, d = 1 + r() * 2.2; p.position.set(Math.cos(a) * d, 0.1, Math.sin(a) * d); p.rotation.set(r() * 3, r() * 3, 0); g.add(p); }
+    g.userData.tourelles = []; g.userData.anim = null;
+  }
   return g;
 }
 

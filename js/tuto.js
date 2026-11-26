@@ -58,88 +58,127 @@ const RUNE = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1
 const nomPremier = () => { const d = E().dragons[0]; return d ? PAR_ID[d.id].nom : "ton dragon"; };
 const tous3 = () => { const els = new Set(E().dragons.map((d) => PAR_ID[d.id].element)); return els.size >= 3; };
 
-// Chaque étape : texte, condition pour passer à la suite, effets à l'arrivée, bouton du menu à faire briller.
+// ---------- Le grand guide de Lia ----------
+// De la ruine du couvoir jusqu'à la ligue : 3 œufs, 3 îles qui surgissent, des combats de plus en plus grands,
+// le village, une défense, une attaque, une expédition, puis le duel classé. Lia laisse souffler entre les étapes.
+const dernier = () => { const l = E().dragons; return l[l.length - 1]; };
+const nomDernier = () => { const d = dernier(); return d ? PAR_ID[d.id].nom : "ton dragon"; };
+const ileDe = () => { const d = dernier(); return d ? PAR_ID[d.id].element : "feu"; };
+const nomIle = (elx) => (elx === "eau" ? "d'Eau" : elx === "feu" ? "de Feu" : "de Glace");
+const nomJoueur = () => (E().joueur && E().joueur.nom) || "mage";
+function combattre(conf) { import("./combat.js").then((m) => m.combatGuide(ctx, conf)); }
+function recompenseIle(e) { e.ressources.brindilles += 25; e.ressources.pierres += 20; e.ressources.rations += 10; }
+function etapesIle(k) {
+  const suite = k < 3 ? `oeuf${k + 1}` : "eclore";
+  return {
+    [`oeuf${k}`]: {
+      cible: "couvoir",
+      entree: k > 1 ? (e) => recompenseIle(e) : null,
+      texte: () => (k === 1 ? "Trois œufs dormaient sous les ruines ! Touche celui que tu veux, puis confirme : il va éclore." : `Bravo, l'île est à toi ! Il reste ${4 - k} œuf${4 - k > 1 ? "s" : ""} au couvoir : choisis le prochain.`),
+      quand: (n) => n === "ile_revelee", suite: `mini${k}`,
+    },
+    [`mini${k}`]: {
+      cible: "iles", triangle: k === 1,
+      texte: () => `Un dragon sauvage rôde sur l'île ${nomIle(ileDe())} ! ${nomDernier()} va lui montrer qui commande : un petit combat de 3 tours, contre un élément que tu bats.`,
+      bouton: { texte: "Combattre !", action: () => combattre({ tours: 3, eux: 1, faible: true, uids: [dernier().uid], nom: "Dragon sauvage", titre: "Mini-combat · 3 tours", texte: "Choisis ton dragon, puis une posture. ATK frappe fort, DEF protège." }) },
+      quand: (n, d) => n === "combat_fini" && d && d.mode === "guide", suite: `nid${k}`,
+    },
+    [`nid${k}`]: {
+      cible: "iles",
+      vise: () => { const r = E().ressources; return r.brindilles < 20 ? "buisson" : r.pierres < 5 ? "rocher" : "dragon"; },
+      texte: () => { const r = E().ressources; return `${nomDernier()} a besoin d'un nid pour grandir. Touche un buisson, puis un rocher : il ira récolter (${Math.min(20, r.brindilles)}/20 brindilles, ${Math.min(5, r.pierres)}/5 pierres). Ensuite touche-le, puis « Construire le nid ».`; },
+      quand: (n) => n === "nid", fini: () => !!dernier() && dernier().nid >= 1, suite: `ile${k}`,
+    },
+    [`ile${k}`]: {
+      cible: "iles",
+      texte: () => `Le chef des dragons sauvages de l'île ${nomIle(ileDe())} te défie avec ${k} dragon${k > 1 ? "s" : ""} ! Vrai combat : 9 manches, ou jusqu'à ce qu'une équipe tombe.${k > 1 ? " Toute ta couvée se bat avec toi." : ""} Si tu perds, soigne-toi et recommence.`,
+      bouton: { texte: "Affronter le chef", action: () => combattre({ tours: 9, eux: k, faible: false, nom: "Chef des dragons sauvages", titre: `Île ${nomIle(ileDe())} · ${k} contre ${k}`, texte: "9 manches, ou jusqu'au K.O. de toute une équipe." }) },
+      quand: (n, d) => n === "combat_fini" && d && d.mode === "guide" && d.victoire, suite,
+    },
+  };
+}
 const ETAPES = {
-  recolter: {
-    num: 1, cible: "iles", vise: () => (E().ressources.brindilles < 20 ? "buisson" : "rocher"),
-    texte: () => { const r = E().ressources; return `Voici ${nomPremier()}. Pour grandir, il lui faut un nid. Touche un buisson : ton dragon ira le récolter pour toi. Il te faut 20 brindilles (${Math.min(20, r.brindilles)}/20) et 5 pierres (${Math.min(5, r.pierres)}/5), que donnent les rochers.`; },
-    fini: () => E().ressources.brindilles >= 20 && E().ressources.pierres >= 5,
-    suite: "nid",
+  reparer: {
+    cible: "iles", vise: () => "couvoir",
+    texte: () => (E().oeufs.couvoir.reparation
+      ? "Les pierres se remettent en place… Deux minutes de travaux. Tu peux aussi tout finir maintenant avec tes gemmes : je t'en ai offert 60. Touche le couvoir."
+      : `Bienvenue, ${nomJoueur()} ! Voici tout ce qu'il reste du couvoir des dragons… Touche les ruines pour le réparer : tu as juste assez de pierres et de brindilles.`),
+    quand: (n) => n === "reparation_finie", suite: "oeuf1",
   },
-  nid: {
-    num: 2, cible: "iles", vise: () => "dragon",
-    texte: () => `Bravo ! Touche ${nomPremier()}, puis « Construire le nid ». Un nid de base lui permet d'évoluer jusqu'au niveau 5. Plus tard, le nid de l'élément puis le nid unique débloqueront ses autres évolutions.`,
-    quand: (n) => n === "nid", suite: "nourrir",
-  },
-  nourrir: {
-    num: 3, cible: "iles", vise: () => "dragon",
-    texte: () => `L'éclosion l'a épuisé : regarde sa barre de PV. Touche-le et donne-lui une ration. Les PV perdus en combat ne reviennent qu'en mangeant, et chaque dragon doit manger une fois par jour.`,
-    quand: (n) => n === "nourri", suite: "oeufs",
-  },
-  oeufs: {
-    num: 4, cible: "couvoir",
-    entree: (e) => {
-      const deja = new Set(e.dragons.map((d) => PAR_ID[d.id].element));
-      for (const elx of ["feu", "glace", "eau"]) if (!deja.has(elx)) e.oeufs.reserve.push({ uid: "o" + (++e.compteur), element: elx, tuto: true });
-      remplirCouvoir();
-    },
-    texte: () => "Ta tablette vibre… Deux nouveaux œufs viennent de traverser le portail ! Ils t'attendent au Couvoir, sur le rocher central.",
-    quand: (n, d) => n === "ecran" && d === "couvoir", suite: "eclore",
-  },
+  ...etapesIle(1), ...etapesIle(2), ...etapesIle(3),
   eclore: {
-    num: 5, cible: "couvoir",
-    texte: () => "Les œufs éclosent avec le temps : 2 h d'habitude. Ces deux-là sont pressés, une minute suffit (ou une braise, si tu en as). Quand la barre est pleine, appuie sur « Faire éclore ».",
-    fini: () => tous3(), suite: "ferme",
+    cible: "couvoir",
+    entree: (e) => { recompenseIle(e); e.oeufs.choix += 2; e.ressources.braises = (e.ressources.braises || 0) + 8; },
+    texte: () => `Les trois îles sont libres ! En récompense, deux nouveaux œufs t'attendent au couvoir, avec 8 braises : 4 braises font éclore un œuf tout de suite. Tu as ${E().dragons.length}/5 dragons.`,
+    fini: () => E().dragons.length >= 5, suite: "chantier",
   },
-  ferme: {
-    num: 6, cible: "iles", vise: () => "source",
-    entree: (e) => {
-      for (const d of e.dragons) if (!d.nid) d.nid = 1;
-      e.ressources.brindilles = Math.max(e.ressources.brindilles, 15);
-      e.ressources.pierres = Math.max(e.ressources.pierres, 10);
-    },
-    texte: () => "Un dragon de chaque élément ! Je leur ai tressé des nids. Au cœur de chaque île dort une source magique : une fissure de lave, une crevasse gelée, un gouffre sous le lagon. Touche celle d'une de tes îles pour voir comment la réveiller.",
-    quand: (n) => n === "source", suite: "sauvage1",
+  chantier: {
+    cible: "couvoir",
+    entree: (e) => { e.ressources.gemmes = (e.ressources.gemmes || 0) + 30; },
+    texte: () => { const r = E().ressources; return `Cinq dragons ! Le couvoir peut grandir. Il faut 40 brindilles (${Math.min(40, r.brindilles)}) et 40 pierres (${Math.min(40, r.pierres)}) : récolte sur tes îles si besoin. Puis choisis tes bâtisseurs et lance le chantier : 6 h, une heure de moins par dragon. Je t'ai donné 30 gemmes pour le finir tout de suite.`; },
+    fini: () => E().oeufs.couvoir.niveau >= 1, suite: "batir",
   },
-  sauvage1: {
-    num: 7, cible: "combat", triangle: true,
-    texte: () => "Les sources se réveillent plus tard. Pour l'instant, tes dragons doivent combattre pour monter de niveau. Un jeune dragon sauvage rôde : il est d'un élément que tu bats, ce sera facile. Va dans Combat, mode « Dragons sauvages ». Regarde d'abord le triangle des éléments !",
-    quand: (n, d) => n === "combat_fini" && d.mode === "sauvage", suite: "sauvage2",
+  batir: {
+    cible: "iles", vise: () => "libre",
+    entree: (e) => { e.ressources.brindilles += 30; e.ressources.pierres += 40; },
+    texte: () => "Ton couvoir est devenu le cœur d'un village ! Je t'offre des pierres et des brindilles pour commencer. Va sur une île et touche un cercle doré : construis une scierie ou une carrière. Elles produisent toutes seules, même quand tu dors.",
+    quand: (n, d) => n === "construit" && ["scierie", "carriere", "verger"].includes(d), suite: "tourd",
   },
-  sauvage2: {
-    num: 8, cible: "combat", triangle: true,
-    entree: () => soignerTout(),
-    texte: () => "Bien joué ! J'ai soigné tes dragons (après l'apprentissage, ce sera à toi de les nourrir). Toute l'équipe gagne de l'expérience : encore un combat sauvage et tes trois dragons atteindront le niveau 3.",
-    quand: (n, d) => n === "combat_fini" && d.mode === "sauvage", suite: "mage",
+  tourd: {
+    cible: "iles", vise: () => "libre",
+    entree: (e) => { e.ressources.brindilles += 20; e.ressources.pierres += 50; },
+    texte: () => "Il faut aussi défendre tout ça. Touche un autre cercle doré et construis une tour : la lave brûle, le givre ralentit, l'eau repousse. Elle tirera toute seule.",
+    quand: (n, d) => n === "construit" && String(d).startsWith("tour"), suite: "defense",
   },
-  mage: {
-    num: 9, cible: "combat", triangle: true,
-    entree: (e) => { for (const d of e.dragons) if (d.niveau < 3) fixerNiveau(d, 3); soignerTout(); },
-    texte: () => "Tes trois dragons sont niveau 3. Attention… un autre portail s'ouvre : un mage rival te défie en duel ! Va dans Combat, mode « Duel de mage ». Choisis bien : il va essayer de deviner tes coups.",
-    quand: (n, d) => n === "combat_fini" && d.mode === "bot", suite: "recompense",
+  defense: {
+    cible: "iles",
+    texte: () => "Attention, des pillards ont repéré ton village ! Ils arrivent par les bords des îles et visent tes bâtiments, puis le couvoir par les ponts. Touche-les : ta tablette les frappe et tes dragons foncent dessus.",
+    bouton: { texte: "Défendre !", action: () => import("./village.js").then((m) => m.lancerVagueGuide()) },
+    quand: (n) => n === "vague_finie", suite: "attaque",
   },
-  recompense: {
-    num: 10, cible: null,
-    entree: () => soignerTout(),
-    texte: () => "Quel duel ! Pour te remercier d'avoir pris soin de ta couvée, le portail t'offre un 4e dragon. Choisis l'élément et le dragon que tu veux.",
-    bouton: { texte: "Choisir mon 4e dragon", action: () => choisirQuatrieme() },
-    quand: (n) => n === "quatrieme", suite: "couvoir2",
+  attaque: {
+    cible: "combat",
+    texte: () => "À ton tour d'attaquer ! Dans Combat, choisis « Attaquer un village », garde ton équipe, puis lance l'assaut. Touche un bâtiment pour que tes dragons le visent ; le couvoir au centre fait gagner.",
+    quand: (n, d) => n === "attaque_finie" && d && d.victoire, suite: "expedition",
   },
-  couvoir2: {
-    num: 11, cible: "couvoir",
-    entree: (e) => { e.oeufs.choix += 1; demarrerMinuteur(); },
-    texte: () => {
-      const e = E(), n = e.dragons.length, haut = Math.max(0, ...e.dragons.map((d) => d.niveau));
-      return `Le couvoir est le cœur de ton futur village, et son niveau limite celui de tes dragons : niveau 4 pour l'instant. Pour l'agrandir, il faut un dragon de chaque élément (${Math.min(3, n)}/3), dont un au niveau 4 (meilleur : ${haut}), et 40 brindilles et 40 pierres. Le chantier dure 6 h, une heure de moins par dragon bâtisseur. Au début, l'expérience est doublée : combats un peu, puis lance le chantier au couvoir.`;
-    },
-    fini: () => E().oeufs.couvoir.niveau >= 1 || !!E().oeufs.couvoir.chantier, suite: "fin",
+  expedition: {
+    cible: "couvoir",
+    entree: (e) => { e.ressources.braises = (e.ressources.braises || 0) + 4; },
+    texte: () => `Le butin contenait un œuf ! Fais-le éclore au couvoir (4 braises offertes). Puis envoie une expédition chercher un autre œuf : pour cette première, quelques minutes suffisent. Tu as ${E().dragons.length}/7 dragons.`,
+    fini: () => E().dragons.length >= 7, suite: "ligue",
+  },
+  ligue: {
+    cible: "combat",
+    entree: (e) => { const m = [...e.dragons].sort((a, b) => b.niveau - a.niveau)[0]; if (m && m.niveau < 5) fixerNiveau(m, 5); soignerTout(); },
+    texte: () => "Sept dragons, et ton meilleur atteint le niveau 5 : le duel classé s'ouvre ! Tu entres en ligue Bronze. Chaque victoire rapporte des trophées : Argent à 400, Or à 900… Va dans Combat, « Duel de mage (classé) ».",
+    quand: (n, d) => n === "combat_fini" && d && d.mode === "bot", suite: "fin",
   },
   fin: {
-    num: 12, cible: null,
-    texte: () => "Le chantier est lancé ! Tes bâtisseurs ne combattent pas pendant ce temps, mais plus ils sont nombreux, plus ça va vite (et les gemmes peuvent tout finir d'un coup). Récolte, nourris tes dragons chaque jour, réveille les sources : leur nourriture est indispensable après le niveau 10. La suite de l'histoire t'attend quand le couvoir sera prêt…",
-    bouton: { texte: "Terminer l'apprentissage", action: () => terminer() },
+    cible: null,
+    texte: () => `Tu as tout vu, ${nomJoueur()} ! Récolte, nourris tes dragons, agrandis le couvoir (8 dragons pour le niveau 3), défends ton village, attaque, pars en expédition et grimpe dans les ligues. La tour du nid t'attend aussi dans Combat. Les dragons comptent sur toi !`,
+    bouton: { texte: "Terminer le guide", action: () => terminer() },
   },
 };
+
+// Accueil : Lia se présente et demande le nom du joueur
+export function accueillir() {
+  const champ = el("input", { type: "text", maxlength: 18, placeholder: "Ton nom de mage", style: { width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid rgba(190,150,255,.5)", background: "rgba(255,255,255,.05)", color: "inherit", font: "inherit", fontSize: "16px" } });
+  const valider = () => {
+    const nom = String(champ.value || "").trim().slice(0, 18) || "Mage";
+    changer((e) => { e.joueur = { nom }; e.reglages.nomMage = nom; e.tuto.etape = "reparer"; });
+    fermerModale(); dernierParle = null; afficher();
+  };
+  champ.addEventListener("keydown", (e) => { if (e.key === "Enter") valider(); });
+  modale({
+    titre: `Je suis ${MENTOR}`,
+    contenu: el("div", { style: { display: "grid", gap: "10px" } },
+      el("p", { style: { margin: 0 } }, "Bienvenue, voyageur du portail. Je suis la gardienne des dragons de ces îles… enfin, de ce qu'il en reste. Comment t'appelles-tu ?"), champ),
+    boutons: [{ texte: "C'est moi !", classe: "principal", action: valider }],
+    fermable: false,
+  });
+  parler("Bienvenue, voyageur du portail. Je suis Lia, la gardienne des dragons de ces îles. Comment t'appelles-tu ?");
+  setTimeout(() => champ.focus(), 300);
+}
 
 export function initTuto(c) {
   ctx = c;
@@ -208,7 +247,7 @@ export function montrerTriangle() {
   parler("Le feu bat la glace, la glace bat l'eau, et l'eau bat le feu. À chaque tour, choisis en secret un dragon puis une posture. Celui qui fait le plus de dégâts en neuf tours gagne.");
 }
 export function etape() { const t = E() && E().tuto; return t ? t.etape : "fini"; }
-export function tutoActif() { const et = etape(); return et !== "fini" && et !== "histoire"; }
+export function tutoActif() { const et = etape(); return !!ETAPES[et]; }
 export function enApprentissage() { return etape() !== "fini"; }
 
 export function signaler(nom, donnee) {
@@ -311,11 +350,7 @@ export function histoire(suite) {
 }
 
 // Appelé quand l'œuf de départ éclot
-export function apresPremierOeuf(e, d) {
-  if (e.tuto.etape === "fini") return;
-  e.tuto.etape = "recolter";
-  d.pv = Math.round(pvMax(d) * 0.55);
-}
+export function apresPremierOeuf() {}
 
 // ---------- Le 4e dragon ----------
 function choisirQuatrieme() {

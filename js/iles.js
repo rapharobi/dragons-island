@@ -167,7 +167,7 @@ function construireDecor() {
     const rb = rayonBord(elx, angLocal) - 0.4;
     const b = POS_ILES[elx].clone().sub(dir.clone().multiplyScalar(rb)); b.y += iles[elx].sol(Math.cos(angLocal) * rb, Math.sin(angLocal) * rb) - 0.05;
     scene.add(pont(a, b));
-    ponts[elx] = { a: a.clone(), b: b.clone() };
+    ponts[elx] = { a: a.clone(), b: b.clone(), g: scene.children[scene.children.length - 1] };
   }
   for (const elx of ["feu", "glace", "eau"]) {
     NOEUDS[elx].forEach(([type, ang], i) => {
@@ -229,7 +229,7 @@ function construireDecor() {
     });
   }
   D = {
-    scene, camera, orbite, iles, centre, sky, nuages, lum, ponts, forteresse: null, forteresseNiv: -1,
+    scene, camera, orbite, iles, centre, sky, nuages, lum, ponts, forteresse: null, forteresseNiv: null,
     dragons: new Map(),
     couvoir: null, couvoirCle: null,
     focus: null, t: 0, fond: false, suivi: null, placement: null, marqueurs: [], repas: [], rituel: null, eclats: [], meteores: [], secousse: 0, eclipse: 0,
@@ -403,7 +403,7 @@ function allerVers(v, cible, etat, vitesse = 1) { v.cible = cible; v.etat = etat
 // ---------- La vie des dragons ----------
 const ACTIONS_SEUL = ["renifler", "regarder", "secouer", "etirer", "bailler", "joie", "jouer", "rugir"];
 const ACTIONS_EAU = ["regarder", "joie", "secouer", "rugir"];
-const HUMEURS = { marche: "se promène", pause: "observe", dort: "fait la sieste", vol: "vole", rejoindre: "va voir un ami", attendre: "attend un ami", jeu: "joue", action: "s'amuse", nid: "rentre au nid", ko: "K.O.", versRecolte: "part récolter", recolte: "récolte", rituel: "rejoint la source", rituelPret: "attend", repas: "mange", nage: "nage", plonge: "nage au fond", chantier: "construit le couvoir", bataille: "défend le village" };
+const HUMEURS = { marche: "se promène", pause: "observe", dort: "fait la sieste", vol: "vole", rejoindre: "va voir un ami", attendre: "attend un ami", jeu: "joue", action: "s'amuse", nid: "rentre au nid", ko: "K.O.", versRecolte: "part récolter", recolte: "récolte", rituel: "rejoint la source", rituelPret: "attend", repas: "mange", nage: "nage", plonge: "nage au fond", chantier: "construit le couvoir", expedition: "en expédition", bataille: "défend le village" };
 
 function choisirEnvie(v) {
   const p = v.mobile.position;
@@ -898,13 +898,18 @@ function synchroniser() {
     D.centre.couvoir.add(D.couvoir);
     D.couvoirCle = cleC;
   }
+  // Îles encore cachées au début du jeu (elles surgissent à chaque éclosion)
+  for (const elx of ["feu", "glace", "eau"]) { const vis = ileVisible(elx) && D.revele !== elx; D.iles[elx].groupe.visible = vis || D.iles[elx].groupe.userData.enCine === true; if (D.ponts[elx].g) D.ponts[elx].g.visible = vis; }
+  // Le couvoir en ruine : pas d'autel ni d'œuf
+  if (D.couvoir) D.couvoir.visible = !c.ruine;
   // L'hôtel de ville : la forteresse grandit avec le couvoir
-  if (D.forteresseNiv !== c.niveau) {
+  const cleF = c.ruine ? -1 : c.niveau;
+  if (D.forteresseNiv !== cleF && !D.cine) {
     if (D.forteresse) D.centre.groupe.remove(D.forteresse);
-    D.forteresse = construireForteresse(c.niveau);
+    D.forteresse = construireForteresse(Math.max(0, cleF), c.ruine);
     D.forteresse.userData.action = { type: "couvoir" };
     D.centre.groupe.add(D.forteresse);
-    D.forteresseNiv = c.niveau;
+    D.forteresseNiv = cleF;
   }
 }
 
@@ -958,7 +963,7 @@ function installerClics() {
     const v = new T.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
     ray.setFromCamera(v, D.camera);
     const cibles = [];
-    for (const ile of Object.values(D.iles)) cibles.push(ile.groupe);
+    for (const ile of Object.values(D.iles)) if (ile.groupe.visible) cibles.push(ile.groupe);
     cibles.push(D.centre.groupe);
     for (const g of extensions.cibles) cibles.push(g);
     const hits = ray.intersectObjects(cibles, true);
@@ -1002,7 +1007,7 @@ function action(a, objet) {
     if (!noeudDispo(a.cle)) { toast(`Ça repousse : encore ${fmtDuree(e.noeuds[a.cle] - maintenant())}.`); return; }
     lancerRecolte(a, objet);
   } else if (a.type === "source") { Son.clic(); focaliser(a.element, false); ficheSource(a.element); signaler("source"); }
-  else if (a.type === "couvoir") { Son.clic(); ctxJeu.aller("couvoir"); }
+  else if (a.type === "couvoir") { Son.clic(); if (E().oeufs.couvoir.ruine) { focaliser("centre"); ficheRuine(); } else ctxJeu.aller("couvoir"); }
 }
 
 // La caméra se rapproche du dragon et le suit
@@ -1047,7 +1052,7 @@ export function focaliser(elx, rapproche = true) {
   Object.assign(s.shadow.camera, { left: -z, right: z, top: z, bottom: -z });
   s.shadow.camera.updateProjectionMatrix();
   if (elx === "tout") D.orbite.viser(new T.Vector3(0, 0, 0), 64, D.orbite.thetaV, 0.95);
-  else if (elx === "centre") D.orbite.viser(new T.Vector3(0, 0.8, 0), 11, D.orbite.thetaV, 1.1);
+  else if (elx === "centre") D.orbite.viser(new T.Vector3(0, 0.8, 0), window.innerWidth / window.innerHeight < 0.8 ? 19 : 12, D.orbite.thetaV, 1.05);
   else {
     const p = POS_ILES[elx];
     const theta = Math.atan2(p.x, p.z);
@@ -1074,7 +1079,7 @@ function majEtiquettes() {
     const d = info.d;
     if (!lab) { lab = el("div", { class: "etiq" }); calqueEtiq.append(lab); etiquettes.set(uid, lab); lab.dataset.k = ""; }
     const enRecolte = info.etat === "recolte" && info.recolte;
-    const humeur = info.ko ? "ko" : d.chantier ? "chantier" : nage(info) && (info.etat === "pause" || info.etat === "nage") ? (info.habitat === "fond" ? "plonge" : "nage") : info.etat;
+    const humeur = info.ko ? "ko" : d.chantier ? "chantier" : d.expedition ? "expedition" : nage(info) && (info.etat === "pause" || info.etat === "nage") ? (info.habitat === "fond" ? "plonge" : "nage") : info.etat;
     const k = `${d.niveau}|${d.pv}|${evolutionBloquee(d)}|${attendPercee(d)}|${humeur}|${enRecolte ? Math.ceil(info.recolte.duree - info.recolte.t) : ""}`;
     if (lab.dataset.k !== k) {
       lab.dataset.k = k; lab.innerHTML = "";
@@ -1094,11 +1099,110 @@ function majEtiquettes() {
 
 // ---------- Écran ----------
 let racineUI = null, ficheUI = null;
+// ---------- Début du jeu : îles cachées, réparation du couvoir, îles qui surgissent ----------
+export function ileVisible(elx) { const l = E().ilesVisibles; return !l || l.includes(elx); }
+const lisse = (x) => x * x * (3 - 2 * x);
+// Réparation : les ruines s'effacent, la forteresse sort de terre, la lumière jaillit, l'autel apparaît
+export function cinematiqueReparation(apres) {
+  if (!D) return apres && apres();
+  fermerFiche();
+  D.cine = true;
+  ctxJeu.cacherInterface(true);
+  focaliser("centre");
+  D.orbite.viser(new T.Vector3(0, 1, 0), 13, D.orbite.thetaV, 1.05);
+  const ruine = D.forteresse;
+  const neuve = construireForteresse(0);
+  neuve.position.y = -4; D.centre.groupe.add(neuve);
+  const lum = new T.PointLight(0xffd890, 0, 14); lum.position.set(0, 3, 0); D.centre.groupe.add(lum);
+  Son.seisme(); Musique.jouer("couvoir");
+  let t = 0, avant = performance.now();
+  const pas = (ms = performance.now()) => {
+    t += Math.min(0.5, Math.max(0, (ms - avant) / 1000)); avant = ms;
+    D.orbite.thetaV += 0.004;
+    const k = lisse(Math.min(1, t / 3));
+    neuve.position.y = -4 + 4 * k;
+    if (ruine) ruine.position.y = -2.5 * Math.min(1, t / 2);
+    if (Math.random() < 0.5) particule(D.centre.groupe, new T.Vector3((Math.random() - 0.5) * 6, 0.2, (Math.random() - 0.5) * 6), 0xb8a890, new T.Vector3(0, 1 + Math.random(), 0), { vie: 1.2, grossit: 1.5, taille: 3, o: 0.5 });
+    if (t > 3 && t < 3.1) { Son.evolution(); D.secousse = 0.5; }
+    lum.intensity = t < 3 ? 0 : Math.max(0, 6 * (1 - (t - 3) / 1.5));
+    if (t > 3.2 && D.couvoir) D.couvoir.visible = true;
+    if (t < 5) requestAnimationFrame(pas);
+    else {
+      if (ruine) D.centre.groupe.remove(ruine);
+      D.centre.groupe.remove(lum);
+      D.forteresse = neuve; D.forteresse.userData.action = { type: "couvoir" }; D.forteresseNiv = 0;
+      D.cine = false;
+      ctxJeu.cacherInterface(false);
+      apres && apres();
+    }
+  };
+  requestAnimationFrame(pas);
+}
+// Éclosion : l'œuf s'envole du couvoir, et l'île de son élément surgit des nuages avec son pont
+export function revelerIle(elx, apres) {
+  if (!D) return apres && apres();
+  D.cine = true; D.revele = elx;
+  ctxJeu.cacherInterface(true);
+  fermerFiche();
+  const ile = D.iles[elx], g = ile.groupe;
+  const yFin = POS_ILES[elx].y;
+  g.userData.enCine = true; g.visible = false; g.position.y = yFin - 30; g.scale.setScalar(0.5);
+  focaliser("tout");
+  const oeuf = construireOeuf(elx, 0.7); D.scene.add(oeuf);
+  const dep = new T.Vector3(0, 2, 0), arr = POS_ILES[elx].clone().setY(yFin + 4);
+  Son.ailes(0.3);
+  let t = 0, avant = performance.now();
+  const pas = (ms = performance.now()) => {
+    t += Math.min(0.5, Math.max(0, (ms - avant) / 1000)); avant = ms;
+    if (t < 1.8) {
+      const k = lisse(t / 1.8);
+      oeuf.position.lerpVectors(dep, arr, k); oeuf.position.y += Math.sin(k * Math.PI) * 9; oeuf.rotation.y += 0.25;
+      particule(D.scene, oeuf.position, 0xfff0c0, new T.Vector3((Math.random() - 0.5) * 0.4, -0.3, (Math.random() - 0.5) * 0.4), { e: true, vie: 0.8, grossit: 1, taille: 2 });
+    } else {
+      if (oeuf.parent) { D.scene.remove(oeuf); g.visible = true; Son.portail(); D.secousse = 0.6; }
+      const k = lisse(Math.min(1, (t - 1.8) / 2.2));
+      g.position.y = yFin - 30 * (1 - k); g.scale.setScalar(0.5 + 0.5 * k);
+      if (Math.random() < 0.7) particule(D.scene, POS_ILES[elx].clone().add(new T.Vector3((Math.random() - 0.5) * 22, yFin - 2 + Math.random() * 3, (Math.random() - 0.5) * 22)), 0xe8e0ff, new T.Vector3(0, 2 + Math.random() * 3, 0), { vie: 1.4, grossit: 2, taille: 4, o: 0.45 });
+      if (k >= 1 && t > 4.4) {
+        g.userData.enCine = false; D.revele = null; D.cine = false;
+        synchroniser();
+        if (D.ponts[elx].g) D.ponts[elx].g.visible = true;
+        ctxJeu.cacherInterface(false);
+        focaliser(elx);
+        apres && apres();
+        return;
+      }
+    }
+    requestAnimationFrame(pas);
+  };
+  requestAnimationFrame(pas);
+}
+// Le couvoir en ruine : fiche de réparation
+function ficheRuine() {
+  const e = E(), c = e.oeufs.couvoir;
+  const f = nouvelleFiche();
+  const rec = { pierres: 20, brindilles: 20 };
+  f.append(enTete("Le couvoir en ruine", el("span", { class: "pil" }, "Rocher central")));
+  if (c.reparation) {
+    const reste = Math.max(0, c.reparation.fin - maintenant()), total = c.reparation.fin - c.reparation.debut;
+    const gem = Math.max(1, Math.ceil(reste / 60000 * 2.5));
+    f.append(el("div", { class: "bloc" }, el("div", { class: "info" }, "Les pierres se remettent en place…"), barre(total - reste, total, "xp"),
+      el("div", { class: "actions" }, el("button", { class: "btn principal petit", disabled: (e.ressources.gemmes || 0) < gem, onclick: () => { changer((s) => { s.ressources.gemmes -= gem; s.oeufs.couvoir.reparation.fin = maintenant(); }); Son.achat(); fermerFiche(); } }, icone("gemmes"), `Finir maintenant · ${gem}`))));
+    return;
+  }
+  f.append(el("div", { class: "bloc" }, el("div", { class: "info" }, "Les murs sont tombés et l'autel est enfoui. Il faut des pierres et des brindilles pour le relever (2 minutes de travaux)."), recette(rec, e.ressources, energie()),
+    el("div", { class: "actions" }, el("button", { class: "btn principal petit", disabled: !assez(rec), onclick: () => {
+      changer((s) => { if (!payer(rec)) return; const t0 = maintenant(); s.oeufs.couvoir.reparation = { debut: t0, fin: t0 + 2 * 60e3 }; });
+      Son.recolte("pierre"); toast("Les travaux commencent !", "bon"); signaler("reparation"); ficheRuine();
+    } }, "Réparer le couvoir"))));
+}
 // Où la flèche de Lia doit pointer (position à l'écran), pour le tutoriel
 function cibleTuto(nom) {
   if (!D || !ctxJeu || ctxJeu.ecran !== "iles" || ctxJeu.moteur.decor !== D) return null;
   let w = null;
-  if (nom === "dragon") { const d = E().dragons[0]; const v = d && D.dragons.get(d.uid); if (v) { w = new T.Vector3(); v.mobile.getWorldPosition(w); w.y += v.hauteur + 0.4; } }
+  if (nom === "couvoir") { w = new T.Vector3(0, 2.4, 0); }
+  else if (nom === "libre") { w = extensions.cibleLibre ? extensions.cibleLibre() : null; }
+  else if (nom === "dragon") { const d = E().dragons[E().dragons.length - 1]; const v = d && D.dragons.get(d.uid); if (v) { w = new T.Vector3(); v.mobile.getWorldPosition(w); w.y += v.hauteur + 0.4; } }
   else if (nom === "buisson" || nom === "rocher") {
     const ile = D.iles[D.focus];
     if (!ile) return null;
@@ -1128,7 +1232,7 @@ export function ouvrir(ctx) {
   racineUI.append(calqueEtiq);
   etiquettes.clear();
   racineUI.append(el("div", { class: "iles-aide" }, "Touche un arbre, un rocher, une épave ou un récif : un dragon de l'île ira le casser. Deux doigts (ou clic droit) pour te déplacer."));
-  if (!D.focus) { const premier = E().dragons[0]; focaliser(premier ? PAR_ID[premier.id].element : "tout"); } else focaliser(D.focus);
+  if (!D.focus || (D.focus !== "tout" && D.focus !== "centre" && !ileVisible(D.focus))) { const premier = E().dragons[0]; focaliser(premier ? PAR_ID[premier.id].element : "centre"); } else focaliser(D.focus);
   ctx.majHud();
   signaler("ecran", "iles");
 }
@@ -1140,7 +1244,7 @@ function majBoutons() {
   c.innerHTML = "";
   if (E().dragons.length) c.append(el("button", { class: "btn petit mes-dragons", onclick: () => { Son.clic(); ouvrirListe(); } }, `Mes dragons (${E().dragons.length})`));
   for (const b of extensions.boutons) { const x = b(); if (x) c.append(x); }
-  for (const [id, nom] of [["tout", "Vue d'ensemble"], ["feu", "Île de Feu"], ["glace", "Île de Glace"], ["eau", "Île d'Eau"], ["centre", "Couvoir"]]) {
+  for (const [id, nom] of [["tout", "Vue d'ensemble"], ["feu", "Île de Feu"], ["glace", "Île de Glace"], ["eau", "Île d'Eau"], ["centre", "Couvoir"]].filter(([k]) => k === "tout" || k === "centre" || ileVisible(k))) {
     const cls = id === "feu" || id === "glace" || id === "eau" ? id : "";
     c.append(el("button", { class: `btn petit ${D.focus === id && !D.suivi ? "actif" : ""} ${cls}`, style: cls ? { color: `var(--${cls})` } : null, onclick: () => { Son.clic(); if (id === "centre" && D.focus === "centre") { ctxJeu.aller("couvoir"); return; } fermerFiche(); focaliser(id); } }, nom));
   }
