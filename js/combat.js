@@ -493,6 +493,7 @@ export function ouvrir(ctx, params = {}) {
   if (params.rejoindre && codeValide(params.rejoindre)) prep.mode = "ligne";
   const e = E();
   const dispo = e.dragons.filter((d) => d.pv > 0);
+  if (Array.isArray(e.equipe) && e.equipe.length) prep.equipe = [...e.equipe];
   prep.equipe = prep.equipe.filter((uid) => dispo.some((d) => d.uid === uid));
   if (!prep.equipe.length) {
     // Équipe par défaut : les plus forts, en alternant les éléments
@@ -577,6 +578,7 @@ function rendrePrep() {
       if (choisi) prep.equipe = prep.equipe.filter((u) => u !== d.uid);
       else if (prep.equipe.length < 7) prep.equipe.push(d.uid);
       else toast("7 dragons maximum.");
+      if (prep.mode !== "tour") changer((s) => { s.equipe = [...prep.equipe]; });
       rendrePrep();
     } },
       el("b", {}, src.nom),

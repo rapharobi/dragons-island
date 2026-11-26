@@ -12,6 +12,7 @@ import * as Combat from "./combat.js";
 import * as Boutique from "./boutique.js";
 import * as Reglages from "./reglages.js";
 import * as Pilotage from "./pilotage.js";
+import "./village.js";
 import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto } from "./tuto.js";
 
 enregistrerElements(DRAGONS);
@@ -118,7 +119,7 @@ function majHud() {
 function suivreHud() {
   const hud = document.getElementById("hud");
   const maj = () => {
-    if (document.body.classList.contains("ecran-iles")) { document.documentElement.style.setProperty("--hud", "calc(var(--haut) + 6px)"); return; }
+    if (document.body.classList.contains("ecran-iles") && !document.body.classList.contains("hud-ligne")) { document.documentElement.style.setProperty("--hud", "calc(var(--haut) + 6px)"); return; }
     const b = hud.hidden ? 0 : hud.getBoundingClientRect().bottom; if (b > 0) document.documentElement.style.setProperty("--hud", Math.round(b) + "px");
   };
   ctx.majHauteurHud = maj;

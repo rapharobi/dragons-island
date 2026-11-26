@@ -14,16 +14,20 @@ import {
 } from "./etat.js";
 import {
   PAR_ID, ELEMENTS, NIDS, SOURCES, PRODUCTION_SOURCE, CONDITIONS_SOURCE, NOMS_HABITAT, COULEUR_HABITAT, habitatDe, MATERIAUX,
-  recetteNid, stadeEffectif, stadeDuNiveau, evolutionBloquee, pvMax, xpSuivant, nomStade, fmtDuree, armuresDe, NIVEAU_PERCEE,
+  recetteNid, stadeEffectif, stadeDuNiveau, evolutionBloquee, pvMax, xpSuivant, nomStade, fmtDuree, armuresDe, NIVEAU_PERCEE, postures,
 } from "./regles.js";
 import { el, styles, toast, barre, recette, icone } from "./ui.js";
 import { Son, Musique } from "./son.js";
 import { GENOMES } from "./genomes.js";
+import { attacher as attacherPortrait } from "./portraits.js";
 import { signaler, afficher as afficherTuto } from "./tuto.js";
 
 const T = window.THREE;
 let D = null;
 let ctxJeu = null;
+// Accroches pour d'autres modules (le village) : mise à jour à chaque image, actions au toucher, bouton dans la barre
+export const extensions = { update: [], action: {}, boutons: [] };
+export function moteurIles() { return D; }
 export const LIEN_LIVRE = window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM";
 
 styles("iles", `
@@ -66,7 +70,7 @@ body.ecran-iles .iles-choix .btn { padding: 6px 10px; font-size: 12px; }
 .ld-filtres .btn.actif { border-color: var(--ambre); color: var(--ambre); }
 .ld-outils select { padding: 7px 8px; border-radius: 9px; border: 1px solid var(--trait-fort); background: #1a1b24; color: inherit; font: inherit; font-size: 12px; }
 .ld-corps { overflow: auto; display: grid; gap: 6px; align-content: start; flex: 1; min-height: 0; }
-.ld-ligne { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--trait); background: rgba(255,255,255,.03); color: inherit; }
+.ld-ligne { display: grid; grid-template-columns: 52px 1fr auto; gap: 10px; cursor: pointer; align-items: center; text-align: left; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--trait); background: rgba(255,255,255,.03); color: inherit; }
 .ld-ligne:active { background: rgba(255,255,255,.08); }
 .ld-pastille { width: 10px; height: 34px; border-radius: 4px; background: var(--doux); }
 .ld-ligne.feu .ld-pastille { background: var(--feu); } .ld-ligne.glace .ld-pastille { background: var(--glace); } .ld-ligne.eau .ld-pastille { background: var(--eau); }
@@ -75,6 +79,29 @@ body.ecran-iles .iles-choix .btn { padding: 6px 10px; font-size: 12px; }
 .ld-droite { display: grid; gap: 4px; justify-items: end; font-size: 12px; } .ld-droite .barre { width: 70px; height: 5px; }
 .ld-alerte { color: var(--ambre); font-size: 10px; }
 .iles-choix .mes-dragons { border-color: var(--ambre); color: var(--ambre); }
+.ld-vignette { border-radius: 10px; background: radial-gradient(circle at 50% 60%, rgba(255,255,255,.1), rgba(255,255,255,.02) 70%); display: block; }
+.ld-ligne.feu .ld-vignette { background: radial-gradient(circle at 50% 65%, rgba(255,106,61,.28), rgba(255,255,255,.02) 70%); }
+.ld-ligne.glace .ld-vignette { background: radial-gradient(circle at 50% 65%, rgba(127,214,255,.28), rgba(255,255,255,.02) 70%); }
+.ld-ligne.eau .ld-vignette { background: radial-gradient(circle at 50% 65%, rgba(47,208,192,.28), rgba(255,255,255,.02) 70%); }
+.ld-mini { display: flex; align-items: center; gap: 6px; font-size: 11px; } .ld-mini .barre { width: 60px; height: 4px; }
+.ld-boutons { display: grid; gap: 4px; }
+.ld-b { font-size: 11px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); color: var(--doux); white-space: nowrap; }
+.ld-b.on { border-color: var(--ambre); color: var(--ambre); background: rgba(242,181,68,.12); }
+.ld-onglets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--trait); }
+.ld-onglets button { padding: 8px 4px; border-radius: 9px; border: 0; background: none; color: var(--doux); font-weight: 700; font-size: 12px; }
+.ld-onglets button.actif { background: rgba(242,181,68,.16); color: var(--ambre); }
+.ld-haut { display: grid; gap: 8px; }
+.ld-aide { margin: 0; font-size: 12px; }
+.ld-equipe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ld-case { display: grid; justify-items: center; gap: 2px; padding: 6px 2px; border-radius: 10px; border: 1px solid var(--trait); background: rgba(255,255,255,.03); color: inherit; min-height: 98px; align-content: start; }
+.ld-case b { font-size: 11px; font-family: var(--titre); } .ld-case small { font-size: 10px; color: var(--doux); }
+.ld-case.vide { place-items: center; align-content: center; color: var(--doux); font-size: 22px; border-style: dashed; }
+.ld-case.feu { border-color: rgba(255,106,61,.45); } .ld-case.glace { border-color: rgba(127,214,255,.45); } .ld-case.eau { border-color: rgba(47,208,192,.45); }
+.ld-cmp { display: grid; gap: 6px 8px; align-items: center; padding: 10px; border-radius: 12px; border: 1px solid rgba(242,181,68,.35); background: rgba(242,181,68,.05); }
+.ld-cmp-tete { display: grid; justify-items: center; gap: 3px; text-align: center; } .ld-cmp-tete b { font-family: var(--titre); font-size: 14px; }
+.ld-cmp-nom { font-size: 11px; color: var(--doux); }
+.ld-cmp-val { text-align: center; font-size: 13px; padding: 3px 0; border-radius: 6px; }
+.ld-cmp-val.mieux { color: #b8f0c8; background: rgba(111,214,138,.14); font-weight: 700; }
 @media (max-width: 560px) { .fiche-ile { left: var(--bord-g); right: var(--bord-d); width: auto; bottom: calc(var(--bas) + 76px); max-height: min(40vh, calc(100vh - var(--hud) - var(--tuto, 0px) - var(--bas) - 240px)); padding: 12px 14px 14px; } .fiche-ile h3 { font-size: 19px; } body.avec-fiche .iles-choix { display: none; } .iles-aide { display: none; } .etiq .humeur { display: none; } }
 `);
 
@@ -236,6 +263,7 @@ function construireDecor() {
         }
       }
       majEclats(dt);
+      for (const f of extensions.update) f(dt);
       if (D.couvoir) for (const o of D.couvoir.userData.oeufs || []) { o.rotation.y += dt * 0.6; o.position.y = Math.sin(D.t * 2) * 0.03; }
       if (D.rituel) majRituel(dt);
       if (D.fond) orbite.thetaV += dt * 0.035;
@@ -545,6 +573,7 @@ function vivre(v, dt) {
       if (dist <= 0.15 && p.y - sol < 0.1) { v.anim.jouer("repos"); if (v.proche) Son.atterrir(grave(v)); poserRepas(v); }
       break;
     }
+    case "bataille": break; // le village dirige le dragon pendant une attaque
     case "repas": {
       if (v.minuteur <= 0) { v.etat = "pause"; v.minuteur = 1; }
       break;
@@ -924,7 +953,7 @@ function installerClics() {
     for (const h of hits) {
       let o = h.object;
       while (o && !o.userData.action) o = o.parent;
-      if (o && (!D.placement || o.userData.action.type === "emplacement")) { action(o.userData.action, o); return; }
+      if (o && (!D.placement || o.userData.action.type === "emplacement" || (D.placement.village && o.userData.action.type === "vplace"))) { action(o.userData.action, o); return; }
     }
     if (D.placement) return;
     for (const h of hits) for (const [elx, ile] of Object.entries(D.iles)) {
@@ -946,6 +975,7 @@ function action(a, objet) {
     signaler("placement");
     return;
   }
+  if (extensions.action[a.type]) { extensions.action[a.type](a, objet); return; }
   if (a.type === "dragon") {
     Son.clic();
     const d = e.dragons.find((x) => x.uid === a.uid);
@@ -1073,6 +1103,7 @@ function majBoutons() {
   if (!c) return;
   c.innerHTML = "";
   if (E().dragons.length) c.append(el("button", { class: "btn petit mes-dragons", onclick: () => { Son.clic(); ouvrirListe(); } }, `Mes dragons (${E().dragons.length})`));
+  for (const b of extensions.boutons) { const x = b(); if (x) c.append(x); }
   for (const [id, nom] of [["tout", "Vue d'ensemble"], ["feu", "Île de Feu"], ["glace", "Île de Glace"], ["eau", "Île d'Eau"], ["centre", "Couvoir"]]) {
     const cls = id === "feu" || id === "glace" || id === "eau" ? id : "";
     c.append(el("button", { class: `btn petit ${D.focus === id && !D.suivi ? "actif" : ""} ${cls}`, style: cls ? { color: `var(--${cls})` } : null, onclick: () => { Son.clic(); if (id === "centre" && D.focus === "centre") { ctxJeu.aller("couvoir"); return; } fermerFiche(); focaliser(id); } }, nom));
@@ -1376,11 +1407,42 @@ function voisinDragon(d, sens) {
   Son.glisse();
   voirDragon(l[(i + sens + l.length) % l.length].uid);
 }
-const vueListe = { filtre: "tous", tri: "element", texte: "" };
+const vueListe = { filtre: "tous", tri: "element", texte: "", onglet: "liste", comparer: [] };
+const animDe = (uid) => { const v = D && D.dragons.get(uid); return v ? v.anim : null; };
+function vignette(d, taille = 52) {
+  const c = el("canvas", { class: "ld-vignette", style: { width: taille + "px", height: taille + "px" } });
+  attacherPortrait(c, d, animDe);
+  return c;
+}
+function equipeActuelle() { const e = E(); const l = Array.isArray(e.equipe) ? e.equipe : []; return l.filter((u) => e.dragons.some((d) => d.uid === u)); }
+function basculerEquipe(d) {
+  const l = equipeActuelle();
+  if (l.includes(d.uid)) changer((s) => { s.equipe = l.filter((u) => u !== d.uid); });
+  else if (l.length >= 7) { toast("7 dragons maximum dans l'équipe."); return; }
+  else changer((s) => { s.equipe = [...l, d.uid]; });
+  Son.clic();
+}
+function basculerComparer(d) {
+  const l = vueListe.comparer;
+  if (l.includes(d.uid)) vueListe.comparer = l.filter((u) => u !== d.uid);
+  else if (l.length >= 3) { toast("3 dragons maximum à comparer."); return; }
+  else l.push(d.uid);
+  Son.clic();
+}
 function ouvrirListe() {
   fermerListe();
+  document.body.classList.add("hud-ligne");
+  if (ctxJeu.majHauteurHud) ctxJeu.majHauteurHud();
   const p = el("section", { class: "liste-dragons panneau", id: "liste-dragons" });
   const corps = el("div", { class: "ld-corps" });
+  const onglets = el("div", { class: "ld-onglets" });
+  const outils = el("div", { class: "ld-haut" });
+  const majOnglets = () => {
+    onglets.innerHTML = "";
+    const nEq = equipeActuelle().length, nCmp = vueListe.comparer.length;
+    for (const [k, n] of [["liste", "Tous"], ["equipe", `Équipe (${nEq}/7)`], ["comparer", `Comparer (${nCmp}/3)`]])
+      onglets.append(el("button", { class: vueListe.onglet === k ? "actif" : "", onclick: () => { Son.clic(); vueListe.onglet = k; tout(); } }, n));
+  };
   const champ = el("input", { type: "search", placeholder: "Chercher un dragon…", value: vueListe.texte, oninput: (e) => { vueListe.texte = e.target.value; remplir(); } });
   const filtres = el("div", { class: "ld-filtres" });
   const tris = el("select", { onchange: (e) => { vueListe.tri = e.target.value; remplir(); } });
@@ -1390,8 +1452,20 @@ function ouvrirListe() {
     for (const [k, n] of [["tous", "Tous"], ["feu", "Feu"], ["glace", "Glace"], ["eau", "Eau"], ["ko", "K.O."], ["alerte", "À faire évoluer"]])
       filtres.append(el("button", { class: `btn petit ${vueListe.filtre === k ? "actif" : ""}`, onclick: () => { vueListe.filtre = k; majFiltres(); remplir(); } }, n));
   };
-  const remplir = () => {
-    corps.innerHTML = "";
+  const ligne = (d) => {
+    const s = PAR_ID[d.id], v = D.dragons.get(d.uid);
+    const humeur = !v ? "" : v.ko ? "K.O." : HUMEURS[v.etat] || "";
+    const dansEq = equipeActuelle().includes(d.uid), cmp = vueListe.comparer.includes(d.uid);
+    const stop = (f) => (e) => { e.stopPropagation(); f(); tout(); };
+    return el("div", { class: `ld-ligne ${s.element}`, role: "button", onclick: () => { Son.clic(); fermerListe(); voirDragon(d.uid); } },
+      vignette(d),
+      el("span", { class: "ld-nom" }, el("b", {}, s.nom, d.ul ? el("span", { class: "ld-ul" }, " UL") : null), el("small", {}, `${nomStade(stadeEffectif(d))} · ${humeur}`),
+        el("span", { class: "ld-mini" }, barre(d.pv, pvMax(d), "pv"), el("span", { class: "num" }, `Nv ${d.niveau}`))),
+      el("span", { class: "ld-boutons" },
+        el("button", { class: `ld-b ${dansEq ? "on" : ""}`, title: "Équipe de combat", "aria-label": dansEq ? "Retirer de l'équipe" : "Ajouter à l'équipe", onclick: stop(() => basculerEquipe(d)) }, dansEq ? "⚔ Équipe" : "+ Équipe"),
+        el("button", { class: `ld-b ${cmp ? "on" : ""}`, "aria-label": "Comparer", onclick: stop(() => basculerComparer(d)) }, cmp ? "✓ Comparer" : "Comparer")));
+  };
+  const filtrer = () => {
     const t = vueListe.texte.trim().toLowerCase();
     let l = dragonsTries().filter((d) => {
       const s = PAR_ID[d.id];
@@ -1404,24 +1478,70 @@ function ouvrirListe() {
     else if (vueListe.tri === "nom") l.sort((a, b) => PAR_ID[a.id].nom.localeCompare(PAR_ID[b.id].nom));
     else if (vueListe.tri === "pv") l.sort((a, b) => a.pv / pvMax(a) - b.pv / pvMax(b));
     else if (vueListe.tri === "lien") l.sort((a, b) => (b.lien || 0) - (a.lien || 0));
-    if (!l.length) corps.append(el("p", { class: "doux", style: { textAlign: "center" } }, "Aucun dragon ne correspond."));
-    for (const d of l) {
-      const s = PAR_ID[d.id], v = D.dragons.get(d.uid);
-      const humeur = !v ? "" : v.ko ? "K.O." : HUMEURS[v.etat] || "";
-      corps.append(el("button", { class: `ld-ligne ${s.element}`, onclick: () => { Son.clic(); fermerListe(); voirDragon(d.uid); } },
-        el("span", { class: "ld-pastille" }),
-        el("span", { class: "ld-nom" }, el("b", {}, s.nom, d.ul ? el("span", { class: "ld-ul" }, " UL") : null), el("small", {}, `${nomStade(stadeEffectif(d))} · ${humeur}`)),
-        el("span", { class: "ld-droite" }, el("span", { class: "num" }, `Nv ${d.niveau}`), barre(d.pv, pvMax(d), "pv"),
-          evolutionBloquee(d) || attendPercee(d) ? el("small", { class: "ld-alerte" }, "à faire évoluer") : (d.lien ? el("small", { class: "doux" }, `lien ${d.lien}`) : null))));
-    }
+    return l;
   };
+  const remplir = () => {
+    corps.innerHTML = "";
+    const e = E();
+    if (vueListe.onglet === "equipe") {
+      const eq = equipeActuelle().map((u) => e.dragons.find((d) => d.uid === u));
+      const cases = el("div", { class: "ld-equipe" });
+      for (let k = 0; k < 7; k++) {
+        const d = eq[k];
+        cases.append(d ? el("button", { class: `ld-case ${PAR_ID[d.id].element}`, title: "Retirer de l'équipe", onclick: () => { basculerEquipe(d); tout(); } }, vignette(d, 58), el("b", {}, PAR_ID[d.id].nom), el("small", { class: "num" }, `Nv ${d.niveau}`))
+          : el("div", { class: "ld-case vide" }, el("span", {}, "+")));
+      }
+      corps.append(el("p", { class: "doux ld-aide" }, "Ton équipe de combat : touche « + Équipe » sur un dragon pour l'ajouter, ou touche une case pour le retirer. Elle sert pour les duels et les défis."), cases,
+        el("button", { class: "btn principal petit", style: { justifySelf: "start" }, onclick: () => { fermerListe(); ctxJeu.aller("combat"); } }, icone("combat"), "Aller au combat"));
+      for (const d of filtrer()) corps.append(ligne(d));
+      return;
+    }
+    if (vueListe.onglet === "comparer") {
+      const l = vueListe.comparer.map((u) => e.dragons.find((d) => d.uid === u)).filter(Boolean);
+      if (l.length < 2) corps.append(el("p", { class: "doux ld-aide" }, "Touche « Comparer » sur 2 ou 3 dragons dans la liste ci-dessous pour les voir côte à côte."));
+      else corps.append(tableComparaison(l));
+      for (const d of filtrer()) corps.append(ligne(d));
+      return;
+    }
+    const l = filtrer();
+    if (!l.length) corps.append(el("p", { class: "doux", style: { textAlign: "center" } }, "Aucun dragon ne correspond."));
+    for (const d of l) corps.append(ligne(d));
+  };
+  const tout = () => { majOnglets(); remplir(); };
+  outils.append(champ, el("div", { class: "ld-outils" }, filtres, tris));
   p.append(el("header", {}, el("div", {}, el("div", { class: "etiquette" }, `${E().dragons.length} dragons`), el("h3", {}, "Mes dragons")),
     el("button", { class: "fermer-fiche", "aria-label": "Fermer", onclick: () => fermerListe(), html: icone("fermer").innerHTML })),
-    champ, el("div", { class: "ld-outils" }, filtres, tris), corps);
+    onglets, outils, corps);
   racineUI.append(p);
-  majFiltres(); remplir();
+  majFiltres(); tout();
 }
-function fermerListe() { const l = document.getElementById("liste-dragons"); if (l) l.remove(); }
+// Comparaison de 2 ou 3 dragons : le meilleur de chaque ligne est mis en valeur
+function tableComparaison(l) {
+  const st = (d) => { const ps = postures(d); return { atk: Math.max(...ps.map((x) => x.atk)), def: Math.max(...ps.map((x) => x.def)), n: ps.length }; };
+  const lignes = [
+    ["Niveau", (d) => d.niveau],
+    ["PV max", (d) => pvMax(d)],
+    ["PV actuels", (d) => d.pv],
+    ["Meilleure attaque", (d) => st(d).atk],
+    ["Meilleure défense", (d) => st(d).def],
+    ["Postures", (d) => st(d).n],
+    ["Lien", (d) => d.lien || 0],
+  ];
+  const g = el("div", { class: "ld-cmp", style: `grid-template-columns: 92px repeat(${l.length}, 1fr)` });
+  g.append(el("span"));
+  for (const d of l) { const s = PAR_ID[d.id]; g.append(el("div", { class: `ld-cmp-tete ${s.element}` }, vignette(d, 74), el("b", {}, s.nom), el("span", { class: "pil " + s.element }, ELEMENTS[s.element].nom), el("small", { class: "doux" }, nomStade(stadeEffectif(d))))); }
+  for (const [nom, f] of lignes) {
+    const vals = l.map(f), max = Math.max(...vals);
+    g.append(el("span", { class: "ld-cmp-nom" }, nom));
+    vals.forEach((v) => g.append(el("span", { class: `ld-cmp-val num ${v === max && vals.some((x) => x !== max) ? "mieux" : ""}` }, String(v))));
+  }
+  g.append(el("span", { class: "ld-cmp-nom" }, "Bat / craint"));
+  for (const d of l) { const elx = PAR_ID[d.id].element; const bat = ELEMENTS[elx].bat[0]; const craint = Object.keys(ELEMENTS).find((k) => ELEMENTS[k].bat.includes(elx)); g.append(el("span", { class: "ld-cmp-val" }, `${ELEMENTS[bat].nom} / ${ELEMENTS[craint].nom}`)); }
+  g.append(el("span"));
+  for (const d of l) g.append(el("button", { class: "btn petit", onclick: () => { basculerComparer(d); const x = document.getElementById("liste-dragons"); if (x) { ouvrirListe(); } } }, "Retirer"));
+  return g;
+}
+function fermerListe() { const l = document.getElementById("liste-dragons"); if (l) l.remove(); document.body.classList.remove("hud-ligne"); if (ctxJeu && ctxJeu.majHauteurHud) ctxJeu.majHauteurHud(); }
 function flechesFiche(d) {
   const g = el("button", { class: "fleche-fiche g", "aria-label": "Dragon précédent", onclick: () => voisinDragon(d, -1) }, "‹");
   const dr = el("button", { class: "fleche-fiche d", "aria-label": "Dragon suivant", onclick: () => voisinDragon(d, 1) }, "›");
@@ -1555,3 +1675,4 @@ function ficheSource(elx) {
 }
 
 export function rafraichir() { if (D) synchroniser(); }
+export { souffler, particule, fermerFiche, majBoutons };
