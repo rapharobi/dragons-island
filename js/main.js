@@ -62,6 +62,24 @@ function majNav() {
 function codeDuel() { const m = /^#duel-([a-z0-9]{4})$/i.exec(location.hash || ""); return m ? m[1].toUpperCase() : null; }
 
 let dernierChoix = -1;
+let dernieres = null;
+const jaillis = {};
+function jaillir(k, d) {
+  const puce = document.querySelector(`#hud .puce[data-res="${k}"]`);
+  if (!puce || puce.offsetParent === null || document.getElementById("hud").hidden) return;
+  let f = jaillis[k];
+  if (f && f.isConnected) f._v += d; else { f = el("div", { class: "gain" }); document.body.append(f); f._v = d; jaillis[k] = f; }
+  f.textContent = (f._v > 0 ? "+" : "−") + Math.abs(f._v).toLocaleString("fr-FR");
+  f.classList.toggle("perte", f._v < 0);
+  const r = puce.getBoundingClientRect();
+  const colonne = document.body.classList.contains("ecran-iles") && !document.body.classList.contains("hud-ligne");
+  f.classList.toggle("dessous", !colonne);
+  f.style.left = Math.round(colonne ? r.right + 8 : r.left + r.width / 2) + "px";
+  f.style.top = Math.round(colonne ? r.top + r.height / 2 : r.bottom + 2) + "px";
+  f.style.animation = "none"; void f.offsetWidth; f.style.animation = "";
+  puce.animate([{ transform: "scale(1)" }, { transform: "scale(1.12)" }, { transform: "scale(1)" }], { duration: 380 });
+  clearTimeout(f._t); f._t = setTimeout(() => { f.remove(); }, 1900);
+}
 const PUCES = [["rations", "Rations"], ["brindilles", "Brindilles"], ["pierres", "Pierres"], ["obsidienne", "Obsidienne (île de Feu)"], ["givrite", "Givrite (île de Glace)"], ["corail", "Corail (île d'Eau)"], ["coeurs", "Cœurs de dragon"], ["rations_feu", "Piments de lave"], ["rations_glace", "Baies de givre"], ["rations_eau", "Poissons des abysses"], ["braises", "Braises d'éclosion"]];
 // À quoi sert chaque ressource (MATERIAUX dit déjà comment on l'obtient)
 const USAGES = {
@@ -108,11 +126,15 @@ function majHud() {
   hud.append(
     el("div", { class: "logo" }, "Dragon World", el("small", {}, "bêta 0.12")),
     el("div", { class: "ressources" },
-      el("span", { class: "puce energie", title: "Énergie : se recharge de 1 par heure", role: "button", onclick: () => { Son.clic(); infoRessource("energie"); } }, icone("energie"), el("span", { class: "jauge" }, el("i", { style: { width: (en / ENERGIE_MAX) * 100 + "%" } })), `${en}`),
-      vue("gemmes") && el("span", { class: "puce gemmes", title: "Gemmes : touche pour ouvrir la boutique", role: "button", style: { pointerEvents: "auto", cursor: "pointer" }, onclick: () => { Son.clic(); ctx.aller("boutique"); } }, icone("gemmes"), `${(r.gemmes || 0).toLocaleString("fr-FR")}`),
-      ...PUCES.filter(([k]) => vue(k)).map(([k, titre]) => el("span", { class: "puce", title: titre, role: "button", onclick: () => { Son.clic(); infoRessource(k); } }, icone(k), `${r[k] || 0}`)),
+      el("span", { class: "puce energie", "data-res": "energie", title: "Énergie : se recharge de 1 par heure", role: "button", onclick: () => { Son.clic(); infoRessource("energie"); } }, icone("energie"), el("span", { class: "jauge" }, el("i", { style: { width: (en / ENERGIE_MAX) * 100 + "%" } })), `${en}`),
+      vue("gemmes") && el("span", { class: "puce gemmes", "data-res": "gemmes", title: "Gemmes : touche pour ouvrir la boutique", role: "button", style: { pointerEvents: "auto", cursor: "pointer" }, onclick: () => { Son.clic(); ctx.aller("boutique"); } }, icone("gemmes"), `${(r.gemmes || 0).toLocaleString("fr-FR")}`),
+      ...PUCES.filter(([k]) => vue(k)).map(([k, titre]) => el("span", { class: "puce", "data-res": k, title: titre, role: "button", onclick: () => { Son.clic(); infoRessource(k); } }, icone(k), `${r[k] || 0}`)),
     ),
   );
+  // Ce qui a changé depuis la dernière fois : un « +12 » jaillit à côté de la ressource
+  const now = { energie: en, ...r };
+  if (dernieres) for (const [k, v] of Object.entries(now)) { const d = Math.round(v - (dernieres[k] ?? v)); if (d && typeof v === "number") jaillir(k, d); }
+  dernieres = { ...now };
   if (e.oeufs.choix !== dernierChoix) { dernierChoix = e.oeufs.choix; majNav(); }
 }
 

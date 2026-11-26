@@ -60,21 +60,28 @@ export const ICONES = {
 export function icone(nom) { return el("span", { class: "ico", html: ICONES[nom] || "", style: { display: "inline-flex" }, "aria-hidden": "true" }); }
 
 export function toast(texte, type = "") {
+  // « +12 rations » : déjà montré par le chiffre qui monte à côté de la ressource
+  if (/^[+−-]\s?\d/.test(String(texte))) return;
   const boite = document.getElementById("toasts");
+  // En combat (barres cachées) les messages restent en haut, sinon ils se posent en bas au-dessus du menu
+  const nav = document.getElementById("nav");
+  boite.classList.toggle("haut", !!(nav && nav.hidden));
   // Même message qu'un message encore affiché : on le compte au lieu d'en ajouter un
   const cle = String(texte).replace(/\s*·\s*niveau \d+ !$/, "");
   const deja = [...boite.children].find((x) => x._cle === cle && !x._fin);
-  const t = deja || el("div", { class: "toast " + type });
+  const t = deja || el("div", { class: "toast " + type, onclick: () => t.remove() });
   t._cle = cle; t._n = (t._n || 0) + 1;
-  t.textContent = t._n > 1 ? `${texte}  ×${t._n}` : texte;
+  t.innerHTML = "";
+  t.append(el("i", { "aria-hidden": "true" }, type === "bon" ? "✓" : type === "mal" ? "!" : "✦"), el("span", {}, t._n > 1 ? `${texte}  ×${t._n}` : texte));
   if (!deja) boite.append(t);
   else boite.append(t); // remonte en dernier
   t.style.transition = ""; t.style.opacity = "1";
   clearTimeout(t._a); clearTimeout(t._b);
-  t._a = setTimeout(() => { t._fin = true; t.style.transition = "opacity .4s"; t.style.opacity = "0"; }, 2600);
-  t._b = setTimeout(() => t.remove(), 3100);
-  // Jamais plus de 3 messages à l'écran
-  while (boite.children.length > 3) boite.firstElementChild.remove();
+  const duree = Math.min(4200, 1800 + String(texte).length * 30);
+  t._a = setTimeout(() => { t._fin = true; t.style.transition = "opacity .35s, transform .35s"; t.style.opacity = "0"; t.style.transform = "translateY(6px)"; }, duree);
+  t._b = setTimeout(() => t.remove(), duree + 400);
+  // Jamais plus de 2 messages à l'écran
+  while (boite.children.length > 2) boite.firstElementChild.remove();
 }
 
 // Fenêtre par-dessus le jeu. boutons : [{ texte, classe, action }]

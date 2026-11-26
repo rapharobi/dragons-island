@@ -108,10 +108,18 @@ body.ecran-iles:not(.hud-ligne) .puce .jauge { width: 26px; }
 .recette .manque { border-color: rgba(255, 93, 93, 0.6); color: #ffb0b0; }
 
 /* ---------- Toasts et fenêtres ---------- */
-#toasts { position: fixed; z-index: 60; top: calc(var(--hud) + 8px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: min(92vw, 420px); }
-.toast { padding: 9px 14px; border-radius: 10px; background: var(--panneau-plein); border: 1px solid var(--trait-fort); font-size: 13px; animation: entre .25s ease-out; box-shadow: 0 8px 24px rgba(0,0,0,.4); text-align: center; }
-.toast.bon { border-color: rgba(111, 214, 138, .6); }
-.toast.mal { border-color: rgba(255, 93, 93, .6); }
+#toasts { position: fixed; z-index: 60; bottom: calc(var(--bas) + 84px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: min(92vw, 420px); }
+#toasts.haut { bottom: auto; top: calc(var(--haut) + 10px); }
+.toast { pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 7px 14px 7px 8px; border-radius: 999px; background: rgba(16,15,24,.92); border: 1px solid var(--trait-fort); font-size: 12.5px; line-height: 1.35; animation: toast-monte .28s cubic-bezier(.2,.9,.3,1.2); box-shadow: 0 6px 18px rgba(0,0,0,.45); backdrop-filter: blur(8px); }
+.toast i { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800; background: rgba(242,181,68,.18); color: var(--ambre); }
+.toast.bon { border-color: rgba(111, 214, 138, .45); } .toast.bon i { background: rgba(111,214,138,.2); color: #8ee6a6; }
+.toast.mal { border-color: rgba(255, 93, 93, .5); } .toast.mal i { background: rgba(255,93,93,.2); color: #ff9a9a; }
+@keyframes toast-monte { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+/* Gains et pertes de ressources : un chiffre qui jaillit à côté de la ressource */
+.gain { position: fixed; z-index: 61; pointer-events: none; transform: translateY(-50%); font: 800 20px var(--titre); letter-spacing: .02em; color: #ffd27a; text-shadow: 0 2px 0 #7a3a10, 0 0 14px rgba(255,180,80,.75); white-space: nowrap; animation: gain 1.9s ease-out forwards; }
+.gain.perte { color: #ff9a8a; text-shadow: 0 2px 0 #6a1010, 0 0 12px rgba(255,90,90,.6); }
+.gain.dessous { transform: translate(-50%, 0); font-size: 15px; }
+@keyframes gain { 0% { opacity: 0; scale: .5; } 12% { opacity: 1; scale: 1.25; } 24% { scale: 1; } 72% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 -18px; } }
 @keyframes entre { from { opacity: 0; transform: translateY(-6px); } }
 #modale { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(5,5,8,.55); padding: 16px var(--bord-d) 16px var(--bord-g); }
 #modale .boite { width: min(520px, 100%); max-height: 86vh; overflow: auto; padding: 20px; background: var(--panneau-plein); border: 1px solid var(--trait-fort); border-radius: 18px; animation: entre .2s; }

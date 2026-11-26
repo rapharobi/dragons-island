@@ -657,7 +657,7 @@ function finirRecolte(v) {
   v.recolte = null;
   if (!ok) return;
   Son.recolte(SON_RECOLTE[rc.type] || "cristal");
-  toast(`${PAR_ID[v.d.id].nom} rapporte ${Object.entries(gains).map(([k, n]) => `${n} ${(MATERIAUX[k] ? MATERIAUX[k].nom : k).toLowerCase()}`).join(" et ")}.`, "bon");
+  // Le gain s'affiche à côté des ressources (plus de message en haut de l'écran)
   eclater(rc.objet, rc.type, 24, rc.element); rc.objet.scale.setScalar(0.001); rc.objet.visible = false;
   signaler("recolte");
 }
