@@ -258,7 +258,11 @@ export const Musique = {
     pisteVoulue = nom;
     if (!ctx) return;
     if (LISTES[nom]) {
-      if (lecteur && (lecteur.nom === nom || (LISTES[lecteur.nom] === LISTES[nom]))) return;
+      if (lecteur && (lecteur.nom === nom || (LISTES[lecteur.nom] === LISTES[nom]))) {
+        // Lecture refusée plus tôt (pas encore de toucher) : on réessaie
+        if (lecteur.audio.paused) { if (ctx.state === "suspended") ctx.resume(); lecteur.audio.play().catch(() => {}); }
+        return;
+      }
       clearInterval(planif); pisteCourante = nom;
       const fondu = RAPIDES.has(nom) ? 0.6 : 3;
       const ancien = lecteur;

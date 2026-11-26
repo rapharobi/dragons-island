@@ -9,6 +9,7 @@ import { preparer, ouvrirSalon, nouveauCode, codeValide, identifiant, modeReseau
 import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement } from "./ui.js";
 import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } from "./tuto.js";
 import { Son, Musique } from "./son.js";
+import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang } from "./ligues.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null, C = null;
@@ -558,6 +559,7 @@ function rendrePrep() {
       el("input", { type: "range", min: 1, max: 20, value: prep.niveauAmi, id: "niveau-ami", oninput: (ev) => { prep.niveauAmi = +ev.target.value; val.textContent = prep.niveauAmi; } })));
   }
   if (prep.mode === "ligne") gauche.append(...blocNomLigne(), blocLigne());
+  if (prep.mode === "bot" && etapeTuto() !== "mage") gauche.append(blocLigue());
   const nb = prep.equipe.length;
   const cout = coutMode(prep.mode);
   const peut = nb > 0 && energie() >= cout;
@@ -896,11 +898,16 @@ function lancer() {
   if (!moi.length) { toast("Choisis au moins un dragon en forme.", "mal"); return; }
   const niveaux = moi.map((m) => m.niveau);
   const stadeMax = Math.max(...moi.map((m) => m.stade));
-  let lui, nomAdv;
+  let lui, nomAdv, advLigue = null;
   const moyen = Math.round(niveaux.reduce((a, b) => a + b, 0) / niveaux.length);
   if (prep.mode === "bot") {
-    lui = et === "mage" ? equipeBot([3, 3, 3], 0) : equipeBot(niveaux, stadeMax);
-    nomAdv = "Mage " + NOMS_BOT[Math.floor(Math.random() * NOMS_BOT.length)] + (et === "mage" ? "" : " (bot)");
+    if (et === "mage") { lui = equipeBot([3, 3, 3], 0); nomAdv = "Mage " + NOMS_BOT[Math.floor(Math.random() * NOMS_BOT.length)]; }
+    else {
+      // Duel classé : un mage de ta ligue, avec à peu près tes trophées
+      advLigue = adversaire();
+      lui = equipeBot(niveaux.map((n) => Math.min(20, n + bonusNiveau(advLigue.t))), stadeMax);
+      nomAdv = advLigue.nom;
+    }
   } else if (prep.mode === "sauvage") {
     const n = Math.max(1, Math.min(3, moi.length));
     const nv = et === "sauvage1" ? 1 : et === "sauvage2" ? 2 : Math.max(1, moyen - 1);
@@ -917,7 +924,7 @@ function lancer() {
     nomAdv = nomPropre(L.autre.nom);
     if (!lui.length || !moi.length) return;
   } else { lui = equipeBot(new Array(Math.max(3, moi.length)).fill(prep.niveauAmi), 4); nomAdv = "Joueur 2"; }
-  C = { mode: prep.mode, tour: 1, totaux: [0, 0], equipes: [moi, lui], noms: ["Toi", nomAdv], choix: [null, null], fini: false, sel: [null, null], historique: [], etage: run ? run.etage : 0 };
+  C = { mode: prep.mode, tour: 1, totaux: [0, 0], equipes: [moi, lui], noms: ["Toi", nomAdv], choix: [null, null], fini: false, sel: [null, null], historique: [], etage: run ? run.etage : 0, adv: advLigue };
   if (prep.mode === "ligne") {
     C.hote = L.hote;
     C.graine = L.hote ? L.graine : (L.autre.g | 0);
@@ -939,7 +946,7 @@ function lancer() {
       ? ["Les herbes bougent…", "Des dragons sauvages surgissent !", `${lui.length} dragon${lui.length > 1 ? "s" : ""} sauvage${lui.length > 1 ? "s" : ""} de niveau ${nivAdv}.`]
       : et === "mage"
         ? ["Un portail s'ouvre…", `${nomAdv} te défie !`, "Ton premier duel contre un autre mage. Il va essayer de deviner tes choix."]
-        : ["Recherche d'un mage…", "Aucun mage de ton niveau en ligne", `${nomAdv.replace(" (bot)", "")}, mage-bot de niveau ${nivAdv}, accepte le défi.`];
+        : ["Duel classé · recherche d'un adversaire…", `${nomAdv} · ${nomRang(advLigue.t)}`, `🏆 ${advLigue.t} trophées. Ses dragons sont de niveau ${nivAdv} en moyenne.`];
     const m = el("div", { class: "relais" }, el("div", {}, el("div", { class: "etiquette" }, textes[0]), el("h2", {}, textes[1]), el("p", { class: "doux" }, textes[2])));
     ui.append(m);
     setTimeout(() => { m.remove(); debutTour(); }, 1800);
@@ -1402,6 +1409,12 @@ function finCombat(raison) {
       noter(`Combat contre ${C.noms[1]} : ${resultat} (${t0} à ${t1}).`);
     }
   });
+  // Ligue : trophées gagnés ou perdus
+  if (C.mode === "bot" && C.adv) {
+    const r = resultatLigue(resultat, C.adv);
+    gains.unshift(`${r.delta >= 0 ? "+" : ""}${r.delta} trophées 🏆`);
+    if (r.monte) setTimeout(() => toast(`Promotion ! Tu entres en ligue ${r.monte}.`, "bon"), 2600);
+  }
   if (victoire) { Son.victoire(); for (const c of [0]) D.cotes[c] && D.cotes[c].anim.jouer("joie"); } else if (resultat === "defaite") Son.defaite();
   if (D.cotes[1] && !victoire && D.cotes[1].membre.pv > 0) D.cotes[1].anim.jouer("rugir");
   ui.innerHTML = "";

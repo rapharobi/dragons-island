@@ -290,8 +290,7 @@ function blocChantier() {
   b.append(el("b", { style: { marginTop: "4px" } }, `Prochain niveau : ${COUVOIR[n].nom}`),
     el("div", { style: { fontSize: "12px", display: "grid", gap: "3px" } },
       el("span", {}, ok(e.dragons.length >= c.dragons), `${c.dragons} dragons (${e.dragons.length})`),
-      el("span", {}, ok(hauts >= c.nbHaut), `${c.nbHaut} dragon${c.nbHaut > 1 ? "s" : ""} au niveau ${c.haut} (${hauts})`),
-      el("span", {}, ok(e.dragons.every((d) => d.niveau >= c.tous)), `tous au moins au niveau ${c.tous}`)),
+      c.nbHaut ? el("span", {}, ok(hauts >= c.nbHaut), `${c.nbHaut} dragon${c.nbHaut > 1 ? "s" : ""} au niveau ${c.haut} (${hauts})`) : null),
     recette(c.recette, e.ressources, energie()));
   // Bâtisseurs : plus il y en a, plus le chantier va vite (ils ne combattent pas pendant ce temps)
   for (const u of [...batisseurs]) if (!e.dragons.some((d) => d.uid === u)) batisseurs.delete(u);

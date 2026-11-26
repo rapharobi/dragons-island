@@ -198,8 +198,12 @@ async function demarrer() {
     surJouer: () => { initAudio(); Son.portail(); accueil.ouvrir(entrer); },
   });
   document.body.append(accueil.racine);
-  // La musique du portail démarre au premier toucher (les navigateurs l'exigent)
-  accueil.racine.addEventListener("pointerdown", () => { initAudio(); Musique.jouer("portail"); }, { once: true });
+  // La musique du portail démarre au premier toucher : les navigateurs interdisent le son avant.
+  // Sur téléphone, seul le lever du doigt (pas le début du toucher) autorise le son.
+  const indice = el("div", { class: "indice-son" }, "🔊 Touche l'écran pour le son");
+  accueil.racine.querySelector(".petits")?.append(indice);
+  const activerSon = () => { initAudio(); Musique.jouer("portail"); indice.remove(); };
+  for (const ev of ["pointerup", "touchend", "click", "keydown"]) accueil.racine.addEventListener(ev, activerSon);
   window.addEventListener("hashchange", () => {
     if (codeDuel() && !document.querySelector(".accueil") && !E().intro) { ctx.aller("combat", { rejoindre: codeDuel() }); return; }
     const h = location.hash.slice(1);

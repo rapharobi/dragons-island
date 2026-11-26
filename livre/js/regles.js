@@ -144,11 +144,11 @@ export const COUVOIR = [
 // Pour passer au niveau suivant (index = niveau visé) : assez de dragons, assez forts, des ressources, et du temps de chantier
 export const CHANTIER_COUVOIR = [
   null,
-  // Niveau 2 : un dragon de chaque élément, un au niveau 4 (le maximum du couvoir niveau 1). 6 h, 1 h de moins par bâtisseur.
-  { dragons: 3, haut: 4, nbHaut: 1, tous: 3, recette: { brindilles: 40, pierres: 40 }, heures: 6 },
-  { dragons: 6, haut: 8, nbHaut: 2, tous: 5, recette: { brindilles: 120, pierres: 120, obsidienne: 15, givrite: 15, corail: 15 }, heures: 10 },
-  { dragons: 10, haut: 12, nbHaut: 4, tous: 8, recette: { brindilles: 250, pierres: 250, obsidienne: 40, givrite: 40, corail: 40 }, heures: 16 },
-  { dragons: 14, haut: 16, nbHaut: 6, tous: 12, recette: { brindilles: 450, pierres: 450, obsidienne: 80, givrite: 80, corail: 80, coeurs: 2 }, heures: 24 },
+  // Il faut seulement assez de dragons (peu importe leur niveau), des ressources et un chantier de plus en plus long
+  { dragons: 5, haut: 1, nbHaut: 0, tous: 1, recette: { brindilles: 40, pierres: 40 }, heures: 6 },
+  { dragons: 8, haut: 1, nbHaut: 0, tous: 1, recette: { brindilles: 150, pierres: 150, obsidienne: 15, givrite: 15, corail: 15 }, heures: 10 },
+  { dragons: 11, haut: 1, nbHaut: 0, tous: 1, recette: { brindilles: 350, pierres: 350, obsidienne: 40, givrite: 40, corail: 40 }, heures: 16 },
+  { dragons: 14, haut: 1, nbHaut: 0, tous: 1, recette: { brindilles: 700, pierres: 700, obsidienne: 90, givrite: 90, corail: 90, coeurs: 2 }, heures: 24 },
 ];
 export const niveauMaxDragon = (couvoirNiveau) => (COUVOIR[couvoirNiveau] || COUVOIR[0]).nivMax;
 export const CHANCE_OEUF_JOUR = 0.1;

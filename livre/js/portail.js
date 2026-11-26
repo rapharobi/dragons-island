@@ -23,6 +23,8 @@ styles("portail", `
 @keyframes acc-pulse { 50% { box-shadow: 0 0 0 7px rgba(255,200,110,.08), 0 0 44px rgba(255,190,90,.75), 0 0 100px rgba(180,110,255,.6); } }
 .accueil .petits { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .accueil .petits button { font-size: 12px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(220,200,255,.35); background: rgba(20,12,40,.55); color: rgba(240,232,255,.9); backdrop-filter: blur(6px); }
+.accueil .indice-son { flex-basis: 100%; text-align: center; font-size: 12px; color: rgba(236,228,255,.6); animation: acc-pulse-texte 2s ease-in-out infinite; }
+@keyframes acc-pulse-texte { 50% { opacity: .45; } }
 .accueil.ouvre .contenu { animation: acc-sortie .9s ease-in forwards; }
 @keyframes acc-sortie { to { opacity: 0; transform: scale(1.35); filter: blur(6px); } }
 .accueil.fond { animation: acc-fond .8s ease-out forwards; pointer-events: none; }
