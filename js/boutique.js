@@ -5,8 +5,9 @@ import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite, socle } from "./scene.js";
 import { E, changer } from "./etat.js";
 import { PAR_ID, ELEMENTS, ENERGIE_MAX, COUVOIR, stadeEffectif } from "./regles.js";
-import { el, styles, toast, modale, icone } from "./ui.js";
+import { el, styles, toast, modale, icone, fermerModale } from "./ui.js";
 import { Son, Musique } from "./son.js";
+import { utiliserCode } from "./codes.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null;
@@ -41,6 +42,9 @@ styles("boutique", `
 .bq-gemmes button i { position: absolute; top: -7px; right: -4px; font-style: normal; font-size: 10px; font-weight: 700; background: #b45cff; color: #fff; border-radius: 6px; padding: 1px 5px; }
 .article .prix.g { color: #e8c8ff; display: inline-flex; align-items: center; gap: 4px; }
 .article .prix.g svg { width: 16px; height: 16px; }
+.bq-code { display: grid; gap: 4px; }
+.bq-code-ligne { display: flex; gap: 6px; }
+.bq-code-champ { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(190,120,255,.5); background: rgba(255,255,255,.05); color: inherit; font: 13px var(--mono); }
 .bq-ruban { justify-self: start; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1208; background: var(--ambre); border-radius: 6px; padding: 1px 6px; }
 .bq-apercu { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); top: calc(var(--hud) + var(--tuto, 0px) + 10px); padding: 5px 12px; border-radius: 999px; background: rgba(13,14,19,.75); border: 1px solid var(--trait); font-size: 12px; color: var(--doux); white-space: nowrap; }
 @media (max-width: 420px) { .bq-gemmes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -251,12 +255,28 @@ const RESSOURCES = [
 const nb = (n) => n.toLocaleString("fr-FR");
 const prixG = (n) => el("span", { class: "prix g" }, icone("gemmes"), nb(n));
 
-// Achat de gemmes : paiement simulé pendant la bêta
+// Les gemmes s'obtiennent uniquement avec un code à usage unique, donné par le créateur du jeu
+function champCode(apres) {
+  const champ = el("input", { type: "text", placeholder: "DW-…", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", class: "bq-code-champ" });
+  const msg = el("small", { class: "doux" });
+  const bouton = el("button", { class: "btn principal petit", onclick: async () => {
+    bouton.disabled = true; msg.textContent = "Vérification…";
+    const r = await utiliserCode(champ.value);
+    bouton.disabled = false;
+    if (!r.ok) { Son.erreur(); msg.textContent = r.raison; msg.style.color = "#ff9a9a"; return; }
+    Son.achat(); toast(`Code accepté : +${nb(r.gemmes)} gemmes !`, "bon");
+    ctxJeu.majHud(); if (apres) apres(); rendre();
+  } }, "Valider le code");
+  return el("div", { class: "bq-code" }, el("div", { class: "bq-code-ligne" }, champ, bouton), msg);
+}
 function acheterGemmes(g) {
   modale({
-    titre: `${nb(g.n)} gemmes`,
-    contenu: el("div", {}, el("p", {}, `${nb(g.n)} gemmes pour ${g.prix}.`), el("p", { class: "doux" }, "Bêta : le paiement est simulé, rien n'est débité. Dans le vrai jeu, il passera par Google Play ou l'App Store.")),
-    boutons: [{ texte: "Annuler" }, { texte: `Payer ${g.prix} (simulé)`, classe: "principal", action: () => { changer((s) => { s.ressources.gemmes = (s.ressources.gemmes || 0) + g.n; }); Son.achat(); toast(`+${nb(g.n)} gemmes`, "bon"); ctxJeu.majHud(); rendre(); } }],
+    titre: `${nb(g.n)} gemmes · ${g.prix}`,
+    contenu: el("div", { style: { display: "grid", gap: "10px" } },
+      el("p", { style: { margin: 0 } }, `Pour obtenir ${nb(g.n)} gemmes, demande un code au créateur du jeu. Chaque code ne marche qu'une seule fois.`),
+      el("p", { class: "doux", style: { margin: 0, fontSize: "12px" } }, "Tu as déjà ton code ? Colle-le ici :"),
+      champCode(() => fermerModale())),
+    boutons: [{ texte: "Fermer" }],
   });
 }
 // Achat en gemmes : vérifie le solde, demande confirmation, débite puis donne
@@ -310,7 +330,8 @@ function rendre() {
   // Gemmes
   p.append(el("div", { class: "etiquette", id: "bq-gemmes" }, "Acheter des gemmes"));
   p.append(el("div", { class: "bq-gemmes" }, GEMMES.map((g) => el("button", { onclick: () => acheterGemmes(g) }, g.bonus ? el("i", {}, g.bonus) : null, icone("gemmes"), el("b", {}, nb(g.n)), el("span", {}, g.prix)))));
-  p.append(el("div", { class: "bq-note" }, "Bêta : l'achat de gemmes est simulé, aucun paiement n'est demandé. Tout le reste de la boutique se paie en gemmes."));
+  p.append(el("div", { class: "bq-note" }, "Les gemmes s'obtiennent avec un code à usage unique, donné par le créateur du jeu. Tout le reste de la boutique se paie en gemmes."));
+  p.append(el("div", { class: "etiquette" }, "J'ai un code"), champCode());
   // Packs de démarrage
   p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-packs" }, "Packs de démarrage"));
   for (const pk of PACKS) {
