@@ -386,7 +386,10 @@ function choisirEnvie(v) {
   }
 }
 
+const SOL_PAS = { feu: "roche", glace: "neige", eau: "herbe" };
+const grave = (v) => Math.max(0, Math.min(1, (v.taille - 0.8) / 2.2));
 function decoller(v, duree) {
+  if (v.proche) Son.ailes(grave(v));
   const p = v.mobile.position;
   const c = cercleDeVol(v, (v.habitat === "perchoir" ? v.maison : p).clone().setY(0), 2.5 + Math.random() * 3);
   v.etat = "vol"; v.volT = 0; v.volCentre = c.centre; v.volR = c.rayon;
@@ -451,6 +454,8 @@ function vivre(v, dt) {
       p.x += (dx / dist) * vit * dt; p.z += (dz / dist) * vit * dt;
       v.anim.cadence = 5.5 * v.vitesse / Math.max(0.6, v.echelle);
       v.anim.jouer(enEau(v) ? "nage" : "marche");
+      // Bruits de pas du dragon qu'on regarde (neige, roche ou herbe selon l'île)
+      if (D.suivi === v && !enEau(v)) { v.pasT = (v.pasT || 0) + dt * v.anim.cadence; if (v.pasT > Math.PI) { v.pasT -= Math.PI; Son.pas(SOL_PAS[v.element], grave(v)); } }
       break;
     }
     case "attendre": {
@@ -482,6 +487,7 @@ function vivre(v, dt) {
       v.volY = Math.max(voulu, env > 0.05 ? plancher + 0.4 : voulu);
       if (v.volT >= duree) {
         v.anim.jouer("repos");
+        if (v.proche) Son.atterrir(grave(v));
         if (v.habitat === "perchoir") allerVers(v, v.maison.clone(), "nid", 0.8);
         else { v.etat = "pause"; v.minuteur = 1.5; v.anim.jouer("secouer"); }
       }
@@ -514,7 +520,7 @@ function vivre(v, dt) {
       const dx = v.cible.x - p.x, dz = v.cible.z - p.z, dist = Math.hypot(dx, dz);
       if (dist > 0.15) { tourner(v, Math.atan2(dx, dz), dt, 4); const vit = Math.min(dist, 2.2 * dt); p.x += (dx / dist) * vit; p.z += (dz / dist) * vit; }
       const sol = hauteurVoulue(v, p.x, p.z);
-      if (dist <= 0.15 && p.y - sol < 0.1) { v.anim.jouer("repos"); poserRepas(v); }
+      if (dist <= 0.15 && p.y - sol < 0.1) { v.anim.jouer("repos"); if (v.proche) Son.atterrir(grave(v)); poserRepas(v); }
       break;
     }
     case "repas": {
@@ -1197,7 +1203,7 @@ function interagir(d, type) {
   if (["recolte", "versRecolte", "rituel", "rituelPret", "repas", "atterrir"].includes(v.etat)) { toast(`${nom} est occupé.`); return; }
   if (v.etat === "vol" && type !== "souffle" && type !== "rugir") { toast(`${nom} vole : attends qu'il se pose.`); return; }
   const car = caractere(d);
-  if (type === "envol") { decoller(v, 9); Son.ailes(); }
+  if (type === "envol") decoller(v, 9);
   else {
     if (v.etat !== "vol") { v.etat = "action"; v.minuteur = type === "caresser" ? 3.2 : 2.6; }
     if (type === "caresser") { v.anim.jouer(car.caresse[0]); setTimeout(() => { if (v.etat === "action") v.anim.jouer(car.caresse[1]); }, 1250); coeurs(v); Son.ronron(v.element, Math.min(1, v.stade / 4)); }

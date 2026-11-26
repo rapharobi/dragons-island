@@ -1,4 +1,5 @@
-// Sons et musique fabriqués en direct avec l'audio du navigateur (aucun fichier à télécharger).
+// Sons et musique de l'audio du navigateur : des sons enregistrés (pack Kenney, licence CC0, dans sons/)
+// mélangés à des sons fabriqués en direct. Si un navigateur ne lit pas les fichiers OGG, les sons fabriqués prennent le relais.
 let ctx = null, maitre, busEffets, busMusique, reverb, bruitBuf;
 let sonActif = true, musiqueActive = true;
 
@@ -17,6 +18,7 @@ export function initAudio() {
   const n = ctx.sampleRate * 2.6, ir = ctx.createBuffer(2, n, ctx.sampleRate);
   for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.6); }
   reverb.buffer = ir;
+  chargerSons();
   const rg = ctx.createGain(); rg.gain.value = 0.35; reverb.connect(rg); rg.connect(maitre);
   bruitBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
   const b = bruitBuf.getChannelData(0); for (let i = 0; i < b.length; i++) b[i] = Math.random() * 2 - 1;
@@ -60,23 +62,60 @@ function bruit(t, duree, vol, type, f0, f1, dest = busEffets, opts = {}) {
 }
 const T0 = () => (ctx ? ctx.currentTime + 0.01 : 0);
 
+// ---------- Sons enregistrés (Kenney « Impact Sounds » et « RPG Audio », licence CC0) ----------
+// nom : nombre de variantes (sons/nom1.ogg, sons/nom2.ogg…). On en tire une au hasard, avec une petite variation de hauteur.
+const BANQUE = { bois: 5, planche: 5, pierre: 5, verre: 10, coup: 5, doux: 5, neige: 5, roche: 5, herbe: 5, cloche: 3, pieces: 2, tissu: 4, cuir: 1, hache: 1 };
+const tampons = {};
+let chargement = null;
+function chargerSons() {
+  if (chargement || !ctx) return chargement;
+  const base = new URL("../sons/", import.meta.url).href;
+  const decoder = (b) => new Promise((ok, ko) => { const p = ctx.decodeAudioData(b, ok, ko); if (p && p.catch) p.catch(ko); });
+  chargement = Promise.all(Object.entries(BANQUE).flatMap(([k, n]) => Array.from({ length: n }, (_, i) =>
+    fetch(`${base}${k}${i + 1}.ogg`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then(decoder)
+      .then((buf) => { (tampons[k] = tampons[k] || []).push(buf); }).catch(() => { /* format non lu : on garde le son fabriqué */ }))));
+  return chargement;
+}
+export const sonsCharges = () => Object.values(tampons).reduce((s, l) => s + l.length, 0);
+// Joue une variante enregistrée ; renvoie false si elle n'est pas (encore) disponible
+function ech(k, t, o = {}) {
+  const l = tampons[k];
+  if (!ctx || !l || !l.length) return false;
+  const s = ctx.createBufferSource();
+  s.buffer = l[Math.floor(Math.random() * l.length)];
+  s.playbackRate.value = (o.vitesse || 1) * (1 + (Math.random() - 0.5) * 2 * (o.varier ?? 0.07));
+  const g = ctx.createGain(); g.gain.value = o.vol ?? 0.6;
+  let sortie = s;
+  if (o.filtre) { const f = ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = o.filtre; s.connect(f); sortie = f; }
+  sortie.connect(g); g.connect(busEffets);
+  if (o.rev) { const r = ctx.createGain(); r.gain.value = o.rev; g.connect(r); r.connect(reverb); }
+  s.start(t);
+  return true;
+}
+
 export const Son = {
   clic() { const t = T0(); osc("triangle", 900, t, 0.05, 0.12, busEffets, { vers: 600 }); },
   ok() { const t = T0(); osc("triangle", 660, t, 0.08, 0.15); osc("triangle", 990, t + 0.07, 0.12, 0.13, busEffets, { rev: 0.2 }); },
   erreur() { const t = T0(); osc("square", 180, t, 0.12, 0.08, busEffets, { filtre: 900 }); osc("square", 140, t + 0.1, 0.16, 0.08, busEffets, { filtre: 900 }); },
   recolte(type = "bois") {
     const t = T0();
-    if (type === "bois") { bruit(t, 0.08, 0.5, "bandpass", 1800, 600, busEffets, { q: 2 }); bruit(t + 0.05, 0.15, 0.3, "lowpass", 800); }
+    const vrai = type === "bois" ? ech(Math.random() < 0.6 ? "bois" : "planche", t, { vol: 0.75 }) && (Math.random() < 0.3 ? ech("hache", t + 0.02, { vol: 0.35 }) || true : true)
+      : type === "pierre" ? ech("pierre", t, { vol: 0.8, vitesse: 0.9 })
+      : type === "cristal" ? ech("verre", t, { vol: 0.55, rev: 0.25 })
+      : false;
+    if (vrai) { if (type === "pierre") osc("sine", 110, t, 0.15, 0.2, busEffets, { vers: 55 }); }
+    else if (type === "bois") { bruit(t, 0.08, 0.5, "bandpass", 1800, 600, busEffets, { q: 2 }); bruit(t + 0.05, 0.15, 0.3, "lowpass", 800); }
     else if (type === "eau") { bruit(t, 0.35, 0.55, "bandpass", 1400, 260, busEffets, { q: 1.2 }); bruit(t + 0.04, 0.12, 0.3, "bandpass", 500, 200, busEffets, { q: 3 }); osc("sine", 300, t, 0.2, 0.12, busEffets, { vers: 900 }); }
     else if (type === "pierre") { bruit(t, 0.12, 0.6, "bandpass", 500, 200, busEffets, { q: 3 }); osc("sine", 120, t, 0.15, 0.3, busEffets, { vers: 60 }); }
     else { osc("sine", 1800, t, 0.4, 0.12, busEffets, { rev: 0.5 }); osc("sine", 2700, t + 0.05, 0.4, 0.08, busEffets, { rev: 0.5 }); }
-    osc("triangle", 880, t + 0.12, 0.1, 0.08); osc("triangle", 1320, t + 0.2, 0.15, 0.08);
+    osc("triangle", 880, t + 0.12, 0.1, 0.05); osc("triangle", 1320, t + 0.2, 0.15, 0.05);
   },
   seisme() {
     const t = T0();
     bruit(t, 4.2, 0.55, "lowpass", 90, 45, busEffets, { a: 0.4 });
     osc("sine", 38, t, 4.2, 0.35, busEffets, { a: 0.3, vers: 30 });
     for (let i = 0; i < 9; i++) bruit(t + 0.3 + Math.random() * 3.6, 0.12, 0.25, "bandpass", 300 + Math.random() * 500, null, busEffets, { q: 1.2 });
+    for (let i = 0; i < 12; i++) ech("pierre", t + 0.2 + Math.random() * 3.8, { vol: 0.35 + Math.random() * 0.3, vitesse: 0.45 + Math.random() * 0.25, filtre: 1600, rev: 0.2 });
   },
   sifflement() { const t = T0(); bruit(t, 1.5, 0.12, "bandpass", 3200, 600, busEffets, { q: 6, a: 0.3, rev: 0.3 }); },
   eclipse() { const t = T0(); [110, 138.6, 164.8].forEach((f, i) => osc("sine", f, t + i * 0.4, 5, 0.06, busEffets, { a: 1.2, rev: 0.8 })); },
@@ -85,6 +124,7 @@ export const Son = {
     const f = sorte === "rations_glace" ? 3200 : sorte === "rations_eau" ? 1400 : sorte === "rations_feu" ? 2400 : 1100;
     for (let i = 0; i < 4; i++) bruit(t + i * 0.035 + Math.random() * 0.02, 0.05, 0.32, "bandpass", f * (0.7 + Math.random() * 0.6), null, busEffets, { q: 2.5 });
     bruit(t, 0.12, 0.18, "lowpass", 500);
+    ech("doux", t, { vol: 0.3, vitesse: 1.7 });
   },
   ronron(element = "feu", grave = 0.5) {
     const t = T0(); const f0 = 70 + (1 - grave) * 60;
@@ -92,9 +132,19 @@ export const Son = {
     osc("sine", f0 * 2, t + 0.05, 0.8, 0.05);
   },
   joie() { const t = T0(); osc("triangle", 520, t, 0.12, 0.08, busEffets, { vers: 880 }); osc("triangle", 700, t + 0.12, 0.14, 0.07, busEffets, { vers: 1100, rev: 0.2 }); },
-  ailes() { const t = T0(); for (let i = 0; i < 3; i++) bruit(t + i * 0.22, 0.16, 0.22, "lowpass", 700 - i * 80, 260, busEffets, { a: 0.05 }); },
+  ailes(grave = 0.5) {
+    const t = T0();
+    for (let i = 0; i < 3; i++) if (!ech("tissu", t + i * 0.26, { vol: 0.75, vitesse: 0.62 - grave * 0.18, filtre: 2200 })) bruit(t + i * 0.22, 0.16, 0.22, "lowpass", 700 - i * 80, 260, busEffets, { a: 0.05 });
+    bruit(t, 0.8, 0.08, "lowpass", 300, 120, busEffets, { a: 0.1 });
+  },
+  atterrir(grave = 0.5) {
+    const t = T0();
+    ech("cuir", t, { vol: 0.6, vitesse: 0.7 - grave * 0.25 });
+    ech("roche", t + 0.03, { vol: 0.35, vitesse: 0.6 });
+    osc("sine", 90 - grave * 30, t, 0.2, 0.3, busEffets, { vers: 40 });
+  },
   glisse() { const t = T0(); bruit(t, 0.12, 0.12, "bandpass", 1800, 900, busEffets, { q: 1.5 }); },
-  pas() { const t = T0(); bruit(t, 0.06, 0.25, "lowpass", 400); },
+  pas(sol = "roche", grave = 0.5) { const t = T0(); if (!ech(sol, t, { vol: 0.28 + grave * 0.2, vitesse: 0.85 - grave * 0.3, filtre: 3000 - grave * 1500 })) bruit(t, 0.06, 0.25, "lowpass", 400); },
   // Cri d'un dragon : grave = 0 (petit) à 1 (énorme)
   crier(element = "feu", grave = 0.5) {
     if (!ctx) return;
@@ -119,6 +169,8 @@ export const Son = {
   },
   impact(element = "feu", fort = false) {
     const t = T0();
+    ech(fort ? "coup" : "doux", t, { vol: fort ? 0.85 : 0.65, vitesse: fort ? 0.8 : 1 });
+    if (element === "glace") ech("verre", t + 0.02, { vol: 0.4, rev: 0.3 });
     osc("sine", fort ? 110 : 150, t, 0.25, fort ? 0.7 : 0.45, busEffets, { vers: 40 });
     bruit(t, 0.18, fort ? 0.6 : 0.4, "lowpass", 2200, 300);
     if (element === "glace") for (let i = 0; i < 4; i++) osc("triangle", 1800 + i * 700, t + i * 0.02, 0.18, 0.05, busEffets, { rev: 0.5 });
@@ -135,8 +187,8 @@ export const Son = {
   victoire() { const t = T0(); [392, 523, 659, 784, 1047].forEach((f, i) => { osc("sawtooth", f, t + i * 0.12, 0.5, 0.08, busEffets, { filtre: 2500, rev: 0.4 }); osc("triangle", f / 2, t + i * 0.12, 0.6, 0.1); }); },
   defaite() { const t = T0(); [392, 349, 311, 262].forEach((f, i) => osc("triangle", f, t + i * 0.22, 0.6, 0.12, busEffets, { rev: 0.5 })); },
   niveau() { const t = T0(); [659, 880, 1175].forEach((f, i) => osc("square", f, t + i * 0.08, 0.2, 0.06, busEffets, { filtre: 3000, rev: 0.3 })); },
-  evolution() { const t = T0(); for (let i = 0; i < 12; i++) osc("sine", 300 * Math.pow(2, i / 6), t + i * 0.08, 0.5, 0.07, busEffets, { rev: 0.7 }); bruit(t, 1.2, 0.15, "highpass", 2000, 8000, busEffets, { a: 0.6, rev: 0.6 }); },
-  achat() { const t = T0(); [1047, 1319, 1568, 2093].forEach((f, i) => osc("sine", f, t + i * 0.05, 0.35, 0.09, busEffets, { rev: 0.5 })); },
+  evolution() { const t = T0(); ech("cloche", t, { vol: 0.35, vitesse: 0.8, rev: 0.6, varier: 0 }); for (let i = 0; i < 12; i++) osc("sine", 300 * Math.pow(2, i / 6), t + i * 0.08, 0.5, 0.07, busEffets, { rev: 0.7 }); bruit(t, 1.2, 0.15, "highpass", 2000, 8000, busEffets, { a: 0.6, rev: 0.6 }); },
+  achat() { const t = T0(); ech("pieces", t, { vol: 0.7 }); [1047, 1319, 1568, 2093].forEach((f, i) => osc("sine", f, t + 0.08 + i * 0.05, 0.35, 0.06, busEffets, { rev: 0.5 })); },
   portail() {
     if (!ctx) return;
     const t = T0();
