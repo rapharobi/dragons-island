@@ -130,7 +130,7 @@ const ETAPES = {
     entree: (e) => { e.oeufs.choix += 1; demarrerMinuteur(); },
     texte: () => {
       const e = E(), n = e.dragons.length, haut = Math.max(0, ...e.dragons.map((d) => d.niveau));
-      return `Le couvoir est aussi le cœur de ton futur village, et son niveau limite celui de tes dragons (niveau 6 pour l'instant). Pour l'agrandir : 5 dragons (${Math.min(5, n)}/5), dont un au niveau 6 (meilleur : ${haut}), tous au moins au niveau 3. Je t'offre un 5e œuf ! Au début, l'expérience est doublée : combats, puis lance le chantier au couvoir.`;
+      return `Le couvoir est le cœur de ton futur village, et son niveau limite celui de tes dragons : niveau 4 pour l'instant. Pour l'agrandir, il faut un dragon de chaque élément (${Math.min(3, n)}/3), dont un au niveau 4 (meilleur : ${haut}), et 40 brindilles et 40 pierres. Le chantier dure 6 h, une heure de moins par dragon bâtisseur. Au début, l'expérience est doublée : combats un peu, puis lance le chantier au couvoir.`;
     },
     fini: () => E().oeufs.couvoir.niveau >= 1 || !!E().oeufs.couvoir.chantier, suite: "fin",
   },
@@ -246,7 +246,7 @@ export function afficher() {
   // Pendant un combat, seulement la pastille (le conseil du combat s'affiche ailleurs)
   if (reduite || enCombat) {
     bulle = el("aside", { class: "tuto-bulle reduite", role: "button", tabindex: 0, title: "Afficher le conseil", onclick: () => { reduite = false; afficher(); } },
-      el("div", { class: "portrait", html: RUNE }), el("b", {}, `${MENTOR} · ${et.num}/${NB_ETAPES}`));
+      el("div", { class: "portrait", html: RUNE }), el("b", {}, MENTOR));
     document.body.append(bulle);
     reserver();
     if (et.cible && (!ctx || ctx.ecran !== et.cible)) document.querySelector(`#nav a[href="#${et.cible}"]`)?.classList.add("tuto-cible");
@@ -256,7 +256,7 @@ export function afficher() {
     el("button", { class: "reduire", "aria-label": "Réduire le conseil", title: "Réduire", onclick: () => { reduite = true; afficher(); } }, "–"),
     el("div", { class: "portrait", html: RUNE }),
     el("div", {},
-      el("b", {}, MENTOR), el("span", { class: "etape" }, `  ·  étape ${et.num}/${NB_ETAPES}`),
+      el("b", {}, MENTOR),
       el("button", { class: "voix", "aria-label": voixActive() ? "Couper la voix de Lia" : "Activer la voix de Lia", title: "Voix de Lia", onclick: () => { basculerVoix(); afficher(); } }, voixActive() ? "🔊" : "🔇"),
       el("p", {}, et.texte()),
       el("div", { class: "bas" },

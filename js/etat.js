@@ -356,7 +356,8 @@ export function manqueChantier() {
   return null;
 }
 // Durée du chantier : plus il y a de dragons bâtisseurs, plus ça va vite
-export function dureeChantier(n, batisseurs) { return (CHANTIER_COUVOIR[n].heures * H) / Math.max(1, batisseurs); }
+// Une heure de moins par dragon bâtisseur (au moins 1 h, ou un quart du temps pour les gros chantiers)
+export function dureeChantier(n, batisseurs) { const h = CHANTIER_COUVOIR[n].heures; return Math.max(1, h / 4, h - Math.max(1, batisseurs)) * H; }
 export function finirChantier() {
   const ch = etat.oeufs.couvoir.chantier;
   if (!ch) return false;

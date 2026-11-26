@@ -23,6 +23,8 @@ styles("combat", `
 .mode-btn.actif { border-color: var(--ambre); background: rgba(242,181,68,.1); }
 .mode-btn b { font-family: var(--titre); font-size: 17px; }
 .mode-btn span { font-size: 12px; color: var(--doux); }
+.mode-btn.ferme { opacity: .5; }
+.mode-btn.ferme b::after { content: " 🔒"; }
 .cb-ligne { display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(242,181,68,.35); background: rgba(242,181,68,.05); }
 .cb-ligne p { margin: 0; font-size: 13px; }
 .cb-ligne .rang { display: flex; gap: 6px; align-items: center; }
@@ -544,8 +546,12 @@ function rendrePrep() {
   if (et === "sauvage1" || et === "sauvage2") modes = modes.filter((m) => m[0] === "sauvage" || m[0] === "ligne");
   if (et === "mage") modes = modes.filter((m) => m[0] === "bot" || m[0] === "ligne");
   if (et !== "sauvage1" && et !== "sauvage2") modes = modes.filter((m) => m[0] !== "sauvage");
+  // Le classé contre les mages s'ouvre avec 7 dragons, dont un au niveau 5 (sauf le duel de l'apprentissage)
+  const classeOuvert = et === "mage" || (e.dragons.length >= 7 && e.dragons.some((d) => d.niveau >= 5));
+  if (!classeOuvert) modes = modes.map((m) => m[0] === "bot" ? ["bot_ferme", m[1], `Il te faut 7 dragons, dont au moins un au niveau 5 (tu en as ${e.dragons.length}). En attendant : la tour du nid et les défis entre amis.`] : m);
   if (!modes.some((m) => m[0] === prep.mode)) prep.mode = modes[0][0];
-  for (const [id, nom, desc] of modes) gauche.append(el("button", { class: "mode-btn" + (prep.mode === id ? " actif" : ""), onclick: () => { Son.clic(); prep.mode = id; rendrePrep(); if (id === "ligne") montrerBlocLigne(); } }, el("b", {}, nom), el("span", {}, desc)));
+  if (prep.mode === "bot" && !classeOuvert) prep.mode = modes.find((m) => m[0] !== "bot_ferme")[0];
+  for (const [id, nom, desc] of modes) gauche.append(el("button", { class: "mode-btn" + (prep.mode === id ? " actif" : "") + (id === "bot_ferme" ? " ferme" : ""), disabled: id === "bot_ferme", onclick: () => { Son.clic(); prep.mode = id; rendrePrep(); if (id === "ligne") montrerBlocLigne(); } }, el("b", {}, nom), el("span", {}, desc)));
   if (prep.mode === "ami") {
     const val = el("b", { class: "num" }, prep.niveauAmi);
     gauche.append(el("label", { style: { display: "grid", gap: "6px", fontSize: "13px" } }, el("span", {}, "Niveau des dragons de ton ami : ", val),

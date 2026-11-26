@@ -23,6 +23,10 @@ styles("couvoir", `
 .couv-panneau .chaine span.ici { background: rgba(242,181,68,.2); color: var(--ambre); }
 .choix-oeufs { position: fixed; z-index: 16; left: 50%; transform: translateX(-50%); bottom: calc(var(--bas) + 90px); display: flex; gap: 10px; width: min(640px, calc(100vw - 32px)); }
 .choix-oeufs button { flex: 1; padding: 12px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--el) 50%, transparent); background: color-mix(in srgb, var(--el) 14%, var(--panneau-plein)); text-align: left; display: grid; gap: 4px; min-width: 0; }
+.choix-oeufs button.choisi { border-color: var(--el); background: color-mix(in srgb, var(--el) 34%, var(--panneau-plein)); box-shadow: 0 0 0 2px var(--el), 0 0 24px color-mix(in srgb, var(--el) 50%, transparent); }
+.choix-oeufs { flex-wrap: wrap; }
+.oeuf-confirmer { flex: 1 0 100%; display: grid; animation: entre .25s; }
+.oeuf-confirmer .btn { width: 100%; }
 .choix-oeufs button:hover { background: color-mix(in srgb, var(--el) 26%, var(--panneau-plein)); }
 .choix-oeufs b { font-family: var(--titre); font-size: 18px; color: var(--el); }
 .choix-oeufs small { color: var(--doux); font-size: 11px; }
@@ -53,6 +57,7 @@ function construireDecor() {
   }
   const camera = new T.PerspectiveCamera(40, 1, 0.1, 200);
   const orbite = new Orbite(camera, document.getElementById("scene3d"));
+  installerToucherOeufs();
   orbite.min = 3; orbite.max = 14;
   orbite.viser(new T.Vector3(0, 0.9, 0), 6.5, 0.0, 1.2);
   const zone = new T.Group(); scene.add(zone);
@@ -62,7 +67,7 @@ function construireDecor() {
       D.t += dt;
       orbite.update(dt);
       for (const l of lucioles) { const u = l.userData; u.a += u.v * dt; l.position.set(Math.cos(u.a) * u.r, u.h + Math.sin(D.t * 1.3 + u.a) * 0.3, Math.sin(u.a) * u.r); }
-      for (const o of D.oeufsChoix) { o.rotation.y += dt * 0.5; o.position.y = Math.sin(D.t * 2 + o.position.x) * 0.06 + 0.5; }
+      for (const o of D.oeufsChoix) { o.rotation.y += dt * (o.userData.choisi ? 2 : 0.5); o.position.y = Math.sin(D.t * 2 + o.position.x) * 0.06 + (o.userData.choisi ? 0.85 : 0.5); const s = o.userData.choisi ? 1.18 : 1; o.scale.x += (s - o.scale.x) * Math.min(1, dt * 6); o.scale.y = o.scale.z = o.scale.x; }
       if (D.couvoir) for (const o of D.couvoir.userData.oeufs || []) {
         const pret = o.userData.pret;
         o.rotation.z = pret ? Math.sin(D.t * 18) * 0.06 * (Math.sin(D.t * 2) > 0.3 ? 1 : 0) : 0;
@@ -99,6 +104,33 @@ function afficherCouvoir() {
   D.orbite.viser(new T.Vector3(0, 0.9, 0), 6.2, D.orbite.thetaV, 1.15);
 }
 
+// Choisir un œuf : on le touche (le bouton ou l'œuf en 3D), il s'illumine, puis « Choisir cet œuf » confirme
+let selection = null, valider = null;
+function selectionner(elx, confirmer) {
+  selection = elx; valider = confirmer;
+  Son.clic();
+  for (const o of D.oeufsChoix) o.userData.choisi = o.userData.element === elx;
+  document.querySelectorAll(".choix-oeufs > button").forEach((b) => b.classList.toggle("choisi", b.classList.contains(elx)));
+  let barre = document.getElementById("oeuf-confirmer");
+  if (!barre) { barre = el("div", { id: "oeuf-confirmer", class: "oeuf-confirmer" }); (document.querySelector(".choix-oeufs") || ui).prepend(barre); }
+  barre.innerHTML = "";
+  barre.append(el("button", { class: "btn principal", style: { padding: "13px 26px", fontSize: "16px" }, onclick: () => { const f = valider; selection = null; valider = null; barre.remove(); if (f) f(); } }, `Choisir l'œuf ${elx === "eau" ? "d'Eau" : elx === "feu" ? "de Feu" : "de Glace"}`));
+}
+function installerToucherOeufs() {
+  const canvas = document.getElementById("scene3d"), ray = new T.Raycaster();
+  let d0 = null;
+  canvas.addEventListener("pointerdown", (e) => { d0 = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener("pointerup", (e) => {
+    if (!d0 || !ctxJeu || ctxJeu.ecran !== "couvoir" || !D || !D.oeufsChoix.length) return;
+    if (Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > 8) return;
+    ray.setFromCamera(new T.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), D.camera);
+    const h = ray.intersectObjects(D.oeufsChoix, true)[0];
+    if (!h) return;
+    let o = h.object; while (o && !o.userData.element) o = o.parent;
+    const bouton = o && document.querySelector(`.choix-oeufs > button.${o.userData.element}`);
+    if (bouton) bouton.click();
+  });
+}
 function afficherChoix(starters) {
   viderZone();
   ["feu", "glace", "eau"].forEach((elx, i) => {
@@ -111,7 +143,7 @@ function afficherChoix(starters) {
     o.userData.element = elx;
     D.oeufsChoix.push(o);
   });
-  D.orbite.viser(new T.Vector3(0, 1.0, 0.6), 7.0, 0, 1.25);
+  D.orbite.viser(new T.Vector3(0, 1.0, 0.6), window.innerWidth / window.innerHeight < 0.8 ? 12 : 7.0, 0, 1.25);
 }
 
 // ---------- Éclosion animée ----------
@@ -197,7 +229,7 @@ function ecranIntro() {
   const starters = { feu: "braisil", glace: "givrelin", eau: "ondin" };
   const z = el("div", { class: "choix-oeufs" });
   for (const elx of ["feu", "glace", "eau"]) {
-    z.append(el("button", { class: elx, onclick: () => {
+    z.append(el("button", { class: `${elx} ${selection === elx ? "choisi" : ""}`, onclick: () => selectionner(elx, () => {
       Son.ok();
       z.remove(); ui.querySelector(".titre-intro")?.remove();
       animerEclosion(elx, starters[elx], false, () => {
@@ -222,7 +254,7 @@ function ecranIntro() {
           fermable: false,
         });
       });
-    } }, el("b", {}, ELEMENTS[elx].nom), el("span", {}, PAR_ID[starters[elx]].nom), el("small", {}, `Bat ${ELEMENTS[ELEMENTS[elx].bat[0]].nom}`)));
+    }) }, el("b", {}, ELEMENTS[elx].nom), el("span", {}, PAR_ID[starters[elx]].nom), el("small", {}, `Bat ${ELEMENTS[ELEMENTS[elx].bat[0]].nom}`)));
   }
   ui.append(z);
 }
@@ -269,7 +301,7 @@ function blocChantier() {
     choix.append(el("button", { class: "btn petit" + (on ? " principal" : ""), disabled: d.pv <= 0, onclick: () => { on ? batisseurs.delete(d.uid) : batisseurs.add(d.uid); Son.clic(); rendre(); } }, `${PAR_ID[d.id].nom} · ${d.niveau}`));
   }
   const nb = batisseurs.size;
-  b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, `Choisis tes bâtisseurs : ${nb ? `chantier de ${fmtDuree(dureeChantier(n, nb))} avec ${nb} dragon${nb > 1 ? "s" : ""}` : `${c.heures} h avec un seul dragon, moins avec plusieurs`}.`), choix);
+  b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, `Choisis tes bâtisseurs : ${nb ? `chantier de ${fmtDuree(dureeChantier(n, nb))} avec ${nb} dragon${nb > 1 ? "s" : ""}` : `${c.heures - 1} h avec un seul dragon, une heure de moins par dragon en plus`}.`), choix);
   if (manque) b.append(el("div", { class: "alerte", style: { fontSize: "12px" } }, manque));
   b.append(el("button", { class: "btn" + (!manque && nb && assez(c.recette) ? " principal" : ""), disabled: !!manque || !nb || !assez(c.recette), onclick: () => {
     let lance = false;
@@ -412,13 +444,13 @@ function rendreChoix() {
   const z = el("div", { class: "choix-oeufs" });
   for (const elx of ["feu", "glace", "eau"]) {
     const complet = elementComplet(elx);
-    z.append(el("button", { class: elx, onclick: () => {
+    z.append(el("button", { class: `${elx} ${selection === elx ? "choisi" : ""}`, onclick: () => selectionner(elx, () => {
       Son.ok();
       changer(() => choisirOeuf(elx));
       toast(`Œuf ${elx === "eau" ? "d'" : "de "}${ELEMENTS[elx].nom} ajouté au couvoir.`, "bon");
       mode = E().oeufs.choix > 0 ? "choix" : "couvoir";
       rendre();
-    } }, el("b", {}, ELEMENTS[elx].nom), el("small", {}, complet ? "Tu les as déjà tous : ce sera un double au hasard." : `${7 - E().dragons.filter((d) => PAR_ID[d.id].element === elx && true).map((d) => d.id).filter((v, i, a) => a.indexOf(v) === i).length} dragon(s) encore à découvrir`)));
+    }) }, el("b", {}, ELEMENTS[elx].nom), el("small", {}, complet ? "Tu les as déjà tous : ce sera un double au hasard." : `${7 - E().dragons.filter((d) => PAR_ID[d.id].element === elx && true).map((d) => d.id).filter((v, i, a) => a.indexOf(v) === i).length} dragon(s) encore à découvrir`)));
   }
   z.append(el("button", { style: { "--el": "var(--doux)", flex: "0 0 auto" }, onclick: () => { mode = "couvoir"; rendre(); } }, el("b", {}, "Plus tard")));
   ui.append(z);

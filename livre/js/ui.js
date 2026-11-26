@@ -120,7 +120,7 @@ export function recette(rec, ressources, energie) {
   const r = el("div", { class: "recette" });
   for (const [k, v] of Object.entries(rec)) {
     const dispo = k === "energie" ? energie : ressources[k] || 0;
-    r.append(puceRessource(k, `${v}`, k, dispo < v));
+    r.append(puceRessource(k, `${Math.floor(dispo)}/${v}`, k, dispo < v));
   }
   return r;
 }
