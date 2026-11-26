@@ -196,6 +196,7 @@ let dernierProd = 0;
 function update(dt) {
   if (!E()) return;
   V.t += dt;
+  garderBandeau();
   synchro();
   for (const [, o] of V.objets) {
     if (o.g.userData.anim) o.g.userData.anim(V.t);
@@ -227,7 +228,9 @@ styles("village", `
 .vl-art .cout { grid-column: 1 / -1; font-size: 11px; color: var(--ambre); }
 .vl-art.non { opacity: .55; }
 .vl-alerte { padding: 9px 11px; border-radius: 10px; background: rgba(255,80,60,.14); border: 1px solid rgba(255,110,90,.5); color: #ffc8c0; font-size: 13px; }
-.vl-bandeau { position: fixed; z-index: 18; top: calc(var(--hud) + var(--tuto, 0px) + 6px); left: 50%; transform: translateX(-50%); padding: 8px 14px; display: flex; gap: 10px; align-items: center; white-space: nowrap; font-size: 13px; }
+.vl-bandeau { position: fixed; z-index: 22; top: calc(var(--hud) + var(--tuto, 0px) + 6px); left: 50%; transform: translateX(-50%); padding: 8px 14px; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; align-items: center; font-size: 13px; width: max-content; max-width: calc(100vw - 24px); }
+.vl-bandeau > * { white-space: nowrap; }
+body.en-bataille .iles-choix, body.en-bataille .fiche-ile, body.en-bataille .vl-p { display: none !important; }
 .vl-bandeau b { font-family: var(--titre); color: #ff9a7a; }
 .vl-fin { display: grid; gap: 8px; }
 `);
@@ -473,11 +476,26 @@ function lancerBataille(elxIgnore, auto) {
   V.bataille = { auto, vitesse: auto ? 2 : 1, n, bats, couvoir, ennemis, dragons, groupe, t: 0, tirs: [], fini: false, coupDeMain: 0 };
   Son.crier("eau", 1);
   Musique.jouer("attaque");
-  const bandeau = el("div", { class: "vl-bandeau panneau", id: "vl-bandeau" });
-  document.getElementById("ecran").append(bandeau);
-  majBandeau();
+  // Pendant l'attaque : ressources en ligne en haut, bandeau juste dessous, boutons des îles cachés
+  garderBandeau();
   if (!auto) toast("Touche les pillards : ta tablette les frappe, et tes dragons foncent dessus.", "bon");
 }
+// Le bandeau suit la bataille : recréé si l'écran a été reconstruit, retiré dès qu'elle est finie ou qu'on quitte les îles
+function garderBandeau() {
+  const enCours = !!(V.bataille && !V.bataille.fini) && (!window.__jeu || window.__jeu.ecran === "iles");
+  const b = document.getElementById("vl-bandeau");
+  if (enCours && !b) {
+    document.body.classList.add("hud-ligne", "en-bataille");
+    document.getElementById("ecran").append(el("div", { class: "vl-bandeau panneau", id: "vl-bandeau" }));
+    majBandeau();
+    window.__jeu && window.__jeu.majHauteurHud && window.__jeu.majHauteurHud();
+  } else if (!enCours && document.body.classList.contains("en-bataille")) {
+    if (b) b.remove();
+    document.body.classList.remove("hud-ligne", "en-bataille");
+    window.__jeu && window.__jeu.majHauteurHud && window.__jeu.majHauteurHud();
+  }
+}
+window.addEventListener("hashchange", () => setTimeout(garderBandeau, 0));
 function majBandeau() {
   const B = V.bataille, b = document.getElementById("vl-bandeau");
   if (!B || !b) return;
@@ -675,7 +693,7 @@ function finBataille(victoire) {
     Musique.jouer("iles");
     for (const [, o] of V.objets) { o.g.parent && o.g.parent.remove(o.g); }
     V.objets.clear(); synchro();
-    const bd = document.getElementById("vl-bandeau"); if (bd) bd.remove();
+    garderBandeau();
     modale({ titre: victoire ? `Vague ${n} repoussée !` : `Les pillards ont gagné`, contenu: el("div", { class: "vl-fin" },
       el("p", { style: { margin: 0 } }, victoire ? "Tes tours et tes dragons ont protégé le village." : `Ils ont atteint le couvoir et pillé les fermes${protection() ? `, mais tes entrepôts ont protégé ${Math.round(protection() * 100)} % de tes réserves` : ""}. Construis des tours et améliore-les !`),
       gains.length ? el("p", { class: "doux", style: { margin: 0 } }, gains.join(" · ")) : null),

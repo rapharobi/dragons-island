@@ -37,7 +37,7 @@ function rendre() {
   const p = el("section", { class: "rg panneau" });
   p.append(el("div", {}, el("div", { class: "etiquette" }, "Préférences"), el("h2", {}, "Réglages")));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Faire éclore les œufs"),
-    el("p", {}, `Les œufs éclosent avec le temps : ${COUVOIR[0].heures} h par œuf, ${COUVOIR[1].heures} h pour les deux œufs du grand couvoir. Les braises d'éclosion de la boutique les font avancer plus vite.`)));
+    el("p", {}, `Un nouvel œuf arrive avec le temps (1 h, puis 2 h, 4 h… jusqu'à 24 h), puis il éclôt dans le couvoir : ${COUVOIR[0].heures} h, ou ${COUVOIR[1].heures} h pour deux œufs à la fois dans le grand couvoir. Les braises d'éclosion de la boutique font tout avancer plus vite.`)));
   // Volumes séparés : musique, bruitages, voix de Lia
   const curseur = (cle, nom, appliquer) => {
     const val = Math.round((r[cle] ?? 1) * 100);

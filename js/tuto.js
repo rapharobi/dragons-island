@@ -26,7 +26,7 @@ styles("tuto", `
 .tuto-bulle .etape { font-size: 10px; color: var(--doux); font-family: var(--mono); }
 #nav a.tuto-cible { animation: pulse 1.2s infinite; color: #cdb4ff; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(190,150,255,.0); } 50% { box-shadow: 0 0 0 4px rgba(190,150,255,.55); } }
-.histoire { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, rgba(60, 30, 110, .55), rgba(8, 6, 14, .96) 70%); padding: 24px var(--bord-d) 24px var(--bord-g); text-align: center; }
+.histoire { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, rgba(40, 20, 80, .97), rgba(8, 6, 14, .99) 70%); padding: 24px var(--bord-d) 24px var(--bord-g); text-align: center; }
 .histoire .carte { max-width: 560px; display: grid; gap: 18px; justify-items: center; }
 .histoire .fenetre { width: 140px; height: 200px; border-radius: 18px; border: 6px solid #2a2238; outline: 2px solid #b896ff; box-shadow: 0 0 60px rgba(170, 120, 255, .6), inset 0 0 50px rgba(170, 120, 255, .45); background: radial-gradient(circle at 50% 45%, #ffd6a0 0, #b05aff 18%, #3a1a7a 45%, #120c26 75%); position: relative; overflow: hidden; }
 .histoire .fenetre::before { content: ""; position: absolute; inset: -40%; background: conic-gradient(from 0deg, transparent, rgba(255,255,255,.35), transparent 30%, rgba(170,120,255,.5), transparent 60%); animation: tourne 6s linear infinite; }

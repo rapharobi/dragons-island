@@ -188,6 +188,8 @@ export function mettreAJour() {
   if (etat.oeufs.couvoir.chantier && t >= etat.oeufs.couvoir.chantier.fin) { finirChantier(); etat.chantierFini = true; }
   // Minuteur des œufs
   const mi = etat.oeufs.minuteur;
+  // Dès que l'on a ses trois premiers dragons, le minuteur des œufs tourne (même pendant le guide)
+  if (!mi.prochain && etat.dragons.length >= 3) mi.prochain = t + attenteOeuf(2) * H;
   while (mi.prochain && t >= mi.prochain) {
     etat.oeufs.choix += 1;
     mi.compte += 1;

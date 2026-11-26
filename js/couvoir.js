@@ -353,7 +353,7 @@ function rendre() {
   const chaine = el("div", { class: "chaine" });
   for (let k = mi.compte + 1; k <= mi.compte + 6; k++) chaine.append(el("span", { class: k === mi.compte + 1 ? "ici" : "" }, `${attenteOeuf(k)} h`));
   p.append(el("div", { class: "carte" },
-    el("div", { class: "ligne" }, el("span", {}, "Prochain œuf"), el("b", { class: "num", id: "couv-minuteur" }, mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "—")),
+    el("div", { class: "ligne" }, el("span", {}, "Prochain œuf"), el("b", { class: "num", id: "couv-minuteur" }, mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "dès ton 3e dragon")),
     el("div", { class: "doux", style: { fontSize: "12px" } }, "Les attentes suivantes :"), chaine,
     el("div", { class: "doux", style: { fontSize: "12px" } }, `Œufs reçus : ${mi.compte}. Il y a aussi une petite chance chaque jour d'un œuf gratuit.`),
   ));
@@ -378,13 +378,14 @@ function rendre() {
   // Expéditions pour trouver des œufs (rapides pendant le guide)
   p.append(blocExpedition(rendre, E().tuto && E().tuto.etape === "expedition"));
   ui.append(p);
+  majProgression();
   p.scrollTop = defile;
 }
 
 function majProgression() {
   const e = E();
   const m = document.getElementById("couv-minuteur");
-  if (m) { const mi = e.oeufs.minuteur; m.textContent = mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "—"; }
+  if (m) { const mi = e.oeufs.minuteur; m.textContent = mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "dès ton 3e dragon"; }
   if (!blocProgression || !blocProgression.isConnected) return;
   const def = defCouvoir();
   const b = blocProgression;
