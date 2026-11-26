@@ -107,6 +107,8 @@ const THEMES = {
   eau: { dessus: [0x4aa860, 0x58b468, 0x3c9a54, 0x6ab870], roche: 0x7a7468, cote: 0x7a6248, dessous: 0x4a3c30, haut: 0x8ac878, sable: 0xe8dca4, fond: 0x58c4bc },
 };
 
+// Une île plate pour les villages ennemis (attaques)
+export function construireIleEnnemie(element, rayon, graine) { return socleIle(rayon, THEMES[element], graine, true); }
 function socleIle(rayon, theme, graine, plat = false) {
   const r = rng(graine);
   const g = new T.Group();

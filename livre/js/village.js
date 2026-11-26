@@ -697,3 +697,5 @@ extensions.boutons.push(() => ouvert() && el("button", { class: "btn petit", sty
 export function lancerVagueTest(elx) { const v = vil(); const iles = [...new Set(v.batiments.map((b) => b.ile))]; lancerBataille(elx && iles.includes(elx) ? elx : iles[0], false); }
 
 export const _places = (elx) => places(elx).length;
+
+export { modele as modeleBatiment };

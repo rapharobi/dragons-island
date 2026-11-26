@@ -10,6 +10,7 @@ import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement }
 import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } from "./tuto.js";
 import { Son, Musique } from "./son.js";
 import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang } from "./ligues.js";
+import { lancerAttaque, niveauVillage } from "./attaque.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null, C = null;
@@ -540,6 +541,7 @@ function rendrePrep() {
   let modes = [
     ["bot", "Duel de mage (classé)", et === "mage" ? "Un mage rival a ouvert un portail et te défie. Gratuit pendant l'apprentissage." : `Un autre mage de ton niveau. Si aucun n'est en ligne, un mage-bot du même niveau te défie. Coûte ${COUT.combat} d'énergie.`],
     ["ligne", "Défi en ligne (code ami)", "Chacun sur son téléphone : crée une partie et envoie le code à ton ami, ou entre le sien. Combat amical : gratuit, sans expérience, et tes dragons ne perdent pas de PV."],
+    ["village", "Attaquer un village", `Tes dragons partent à l'assaut d'un village ennemi : ses tours tirent, toi tu choisis les cibles. Détruis son couvoir pour gagner du butin (et parfois un œuf). Village niveau ${niveauVillage()}. Coûte 3 d'énergie.`],
     ["tour", "La tour du nid", `Mode roguelite : tu entres sans dragon, tu choisis 3 œufs, et tu grimpes ${ETAGES} étages contre une IA de plus en plus forte. Au sommet : un œuf et un œuf mystère UL. Coûte ${COUT_TOUR} d'énergie par ascension.`],
     ["sauvage", "Dragons sauvages", "Des dragons sauvages rôdent autour des îles. Idéal pour apprendre. Gratuit pendant l'apprentissage."],
     ["ami", "Défi entre amis", "Sur le même appareil : chacun choisit à son tour, sans regarder. L'écart de niveau est permis. Gratuit."],
@@ -876,7 +878,7 @@ function essayerReveler() {
 function coutMode(mode) {
   const et = etapeTuto();
   if (et !== "fini") return 0;
-  return mode === "bot" ? COUT.combat : mode === "sauvage" ? 2 : 0; // la tour se paie à l'entrée
+  return mode === "bot" ? COUT.combat : mode === "sauvage" ? 2 : mode === "village" ? 3 : 0; // la tour se paie à l'entrée
 }
 
 function membreJoueur(d) {
@@ -892,6 +894,13 @@ function lancer() {
     if (!ok) { toast("Pas assez d'énergie.", "mal"); return; }
   }
   const et = etapeTuto();
+  // Attaque d'un village : une autre scène, avec l'équipe choisie
+  if (prep.mode === "village") {
+    const eq = dragonsPrets();
+    if (!eq.length) { toast("Choisis au moins un dragon en forme.", "mal"); return; }
+    lancerAttaque(ctxJeu, eq, { oeufGaranti: et === "attaque", apres: (v) => { ctxJeu.aller("combat"); signaler("attaque_finie", { victoire: v }); } });
+    return;
+  }
   const run = prep.mode === "tour" ? e.tourNid.run : null;
   if (prep.mode === "tour" && (!run || run.attente)) return;
   const moi = run ? run.dragons.map((x) => membreBot(x.id, x.niveau, 4)) : (prep.mode === "ligne" ? dragonsPrets() : prep.equipe.map((u) => e.dragons.find((d) => d.uid === u)).filter(Boolean)).map(membreJoueur);
