@@ -35,6 +35,7 @@ export const MATERIAUX = {
   givrite: { nom: "Givrite", desc: "Cristal bleu de l'île de Glace." },
   corail: { nom: "Corail", desc: "Branches roses de l'île d'Eau, et morceaux des récifs du lagon que cassent les dragons nageurs." },
   coeurs: { nom: "Cœurs de dragon", desc: "Gagnés en remportant un duel de mage classé (+1 par victoire), ou dans le pack Seigneur des dragons. Servent aux nids uniques." },
+  gemmes: { nom: "Gemmes", desc: "La monnaie de la boutique : tout s'y achète en gemmes. Les gemmes s'achètent de 1 € à 100 €." },
   braises: { nom: "Braises d'éclosion", desc: "Réchauffent un œuf du couvoir : chaque braise le fait avancer d'un quart. S'achètent à la boutique." },
   rations: { nom: "Rations", desc: "Nourriture de base, gagnée en combat et sur les buissons. Rend des PV." },
   rations_feu: { nom: "Piments de lave", desc: "Nourriture de feu, donnée par le volcan. Donne de l'expérience et permet aux dragons de feu de dépasser le niveau 10." },

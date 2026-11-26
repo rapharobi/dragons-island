@@ -9,14 +9,13 @@ import * as Iles from "./iles.js";
 import * as Couvoir from "./couvoir.js";
 import * as Combat from "./combat.js";
 import * as Boutique from "./boutique.js";
-import * as Labo from "./labo.js";
 import * as Reglages from "./reglages.js";
 import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto } from "./tuto.js";
 
 enregistrerElements(DRAGONS);
 
-const ECRANS = { iles: Iles, couvoir: Couvoir, combat: Combat, boutique: Boutique, labo: Labo, reglages: Reglages };
-const NAV = [["iles", "Îles"], ["couvoir", "Couvoir"], ["combat", "Combat"], ["boutique", "Boutique"], ["labo", "Labo"], ["reglages", "Réglages"]];
+const ECRANS = { iles: Iles, couvoir: Couvoir, combat: Combat, boutique: Boutique, reglages: Reglages };
+const NAV = [["iles", "Îles"], ["couvoir", "Couvoir"], ["combat", "Combat"], ["boutique", "Boutique"], ["reglages", "Réglages"]];
 
 const ctx = {
   moteur: null,
@@ -66,9 +65,10 @@ function majHud() {
   const en = energie();
   hud.innerHTML = "";
   hud.append(
-    el("div", { class: "logo" }, "Dragons Island", el("small", {}, "bêta 0.10")),
+    el("div", { class: "logo" }, "Dragons Island", el("small", {}, "bêta 0.11")),
     el("div", { class: "ressources" },
       el("span", { class: "puce energie", title: "Énergie : se recharge de 1 par heure" }, icone("energie"), el("span", { class: "jauge" }, el("i", { style: { width: (en / ENERGIE_MAX) * 100 + "%" } })), `${en}`),
+      el("span", { class: "puce gemmes", title: "Gemmes : touche pour ouvrir la boutique", role: "button", style: { pointerEvents: "auto", cursor: "pointer" }, onclick: () => { Son.clic(); ctx.aller("boutique"); } }, icone("gemmes"), `${(r.gemmes || 0).toLocaleString("fr-FR")}`),
       el("span", { class: "puce", title: "Rations" }, icone("rations"), `${r.rations}`),
       el("span", { class: "puce", title: "Brindilles" }, icone("brindilles"), `${r.brindilles}`),
       el("span", { class: "puce", title: "Pierres" }, icone("pierres"), `${r.pierres}`),

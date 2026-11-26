@@ -20,7 +20,7 @@ export function nouvellePartie() {
   return {
     version: 1, cree: t, decalage: 0, compteur: 0,
     energie: { val: ENERGIE_MAX, maj: t },
-    ressources: { brindilles: 10, pierres: 5, obsidienne: 0, givrite: 0, corail: 0, coeurs: 0, rations: 10, rations_feu: 0, rations_glace: 0, rations_eau: 0, braises: 0 },
+    ressources: { brindilles: 10, pierres: 5, obsidienne: 0, givrite: 0, corail: 0, coeurs: 0, rations: 10, rations_feu: 0, rations_glace: 0, rations_eau: 0, braises: 0, gemmes: 0 },
     achats: {},
     dragons: [],
     oeufs: { choix: 0, reserve: [], couvoir: { niveau: 0, slots: [] }, minuteur: { compte: 1, prochain: null }, dernierJour: null },

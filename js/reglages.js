@@ -1,13 +1,13 @@
-// Réglages : mode d'éclosion (podomètre ou temps), son, chrono des combats.
-import { E, changer, lieuSauvegarde } from "./etat.js";
+// Réglages : son, chrono des combats, sauvegarde.
+import { E, changer, lieuSauvegarde, reinitialiser } from "./etat.js";
 import { COUVOIR } from "./regles.js";
-import { el, styles, toast } from "./ui.js";
+import { el, styles, toast, modale } from "./ui.js";
 import { Son, Musique, reglerSon, initAudio } from "./son.js";
 
 let ctxJeu = null, ui = null;
 
 styles("reglages", `
-.rg { position: fixed; z-index: 15; top: calc(var(--hud) + 8px); left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 170px); overflow: auto; padding: 18px; display: grid; gap: 14px; background: rgba(13,14,19,.92); }
+.rg { position: fixed; z-index: 15; top: calc(var(--hud) + var(--tuto, 0px) + 8px); left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 170px); overflow: auto; padding: 18px; display: grid; gap: 14px; background: rgba(13,14,19,.92); }
 .rg h2 { font-size: 26px; }
 .rg .opt { display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--trait); background: rgba(255,255,255,.03); }
 .rg .opt h3 { font-size: 15px; }
@@ -40,7 +40,11 @@ function rendre() {
   p.append(el("div", { class: "opt" }, el("h3", {}, "Temps pour choisir en combat"),
     el("p", {}, "20 secondes dans le jeu final. Tu peux l'enlever pour tester tranquillement."),
     seg([[20, "20 secondes"], [40, "40 secondes"], [0, "Sans limite"]], r.chrono, (v) => changer((s) => { s.reglages.chrono = v; }))));
-  p.append(el("div", { class: "opt" }, el("h3", {}, "Sauvegarde"), el("p", {}, lieuSauvegarde() === "compte" ? "Ta partie est enregistrée avec ton compte : tu la retrouves sur tes autres appareils en ouvrant ce lien." : "Ta partie est enregistrée dans ce navigateur. Si tu effaces les données du site, elle sera perdue.")));
-  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.10 : jeu complet, avec des bots à la place des vrais adversaires et le défi en ligne entre amis. Le GPS et les nids NFC arriveront avec l'appli mobile.")));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Sauvegarde"),
+    el("p", {}, lieuSauvegarde() === "compte" ? "Ta partie est enregistrée avec ton compte : tu la retrouves sur tes autres appareils en ouvrant ce lien." : "Ta partie est enregistrée dans ce navigateur. Si tu effaces les données du site, elle sera perdue."),
+    el("div", { class: "seg" },
+      el("button", { onclick: () => { const t = JSON.stringify(E()); navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast("Sauvegarde copiée.", "bon"), () => toast("Copie refusée par le navigateur.", "mal")); } }, "Copier la sauvegarde"),
+      el("button", { onclick: () => modale({ titre: "Recommencer à zéro ?", contenu: "Toute la partie sera effacée : dragons, ressources, œufs et gemmes.", boutons: [{ texte: "Annuler" }, { texte: "Tout effacer", classe: "danger", action: () => { reinitialiser(); location.hash = ""; location.reload(); } }] }) }, "Recommencer à zéro"))));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.11 : jeu complet, avec des bots à la place des vrais adversaires et le défi en ligne entre amis. Le GPS et les nids NFC arriveront avec l'appli mobile.")));
   ui.append(p);
 }

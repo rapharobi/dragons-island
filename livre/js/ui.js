@@ -39,6 +39,7 @@ export const ICONES = {
   givrite: P('<path d="m12 2 5 9-5 11-5-11z" fill="#bfeaff" stroke="#7fd6ff"/>'),
   corail: P('<path d="M12 21v-8M12 13 7 8M7 8V4M12 13l5-4M17 9V5M9 10 6 11" stroke="#ff7aa8" stroke-width="2.2"/>'),
   braises: P('<path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-7z" fill="#ff8a3c" stroke="#ffd27a"/><path d="M6 20h12" stroke="#c8703a"/>'),
+  gemmes: P('<path d="M7 4h10l4 6-9 11L3 10z" fill="#b45cff" stroke="#f0c8ff"/><path d="M3 10h18M10 4l2 6 2-6M12 21l-3-11M12 21l3-11" stroke="#f0c8ff" stroke-width="1"/>'),
   coeurs: P('<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" fill="#e8405a" stroke="#ff8a9a"/>'),
   pas: P('<path d="M8 3c2 0 3 2 3 5s-1 5-3 5-3-2-3-5 1-5 3-5zM16 10c2 0 3 2 3 5s-1 5-3 5-3-2-3-5 1-5 3-5z" fill="#a7a196" stroke="none"/>'),
   oeuf: P('<path d="M12 3c4 0 7 6 7 11a7 7 0 0 1-14 0c0-5 3-11 7-11z" fill="#f2e6cc" stroke="#f2b544"/>'),
