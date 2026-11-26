@@ -4,8 +4,8 @@ import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite } from "./scene.js";
 import { construireCouvoir, construireOeuf } from "./monde.js";
 import { mat, mesh, bloc } from "./outils3d.js";
-import { E, changer, choisirOeuf, avancement, tempsRestant, eclore, defCouvoir, maintenant, elementComplet, nouveauDragon, demarrerMinuteur, payer, assez, energie, noter, livreComplet, chaufferOeuf, braisesPourFinir } from "./etat.js";
-import { PAR_ID, ELEMENTS, COUVOIR, RECETTE_COUVOIR, attenteOeuf, fmtDuree, STADES } from "./regles.js";
+import { E, changer, choisirOeuf, avancement, tempsRestant, eclore, defCouvoir, maintenant, elementComplet, nouveauDragon, demarrerMinuteur, payer, assez, energie, noter, livreComplet, chaufferOeuf, braisesPourFinir, manqueChantier, dureeChantier, finirChantier } from "./etat.js";
+import { PAR_ID, ELEMENTS, COUVOIR, RECETTE_COUVOIR, attenteOeuf, fmtDuree, STADES, CHANTIER_COUVOIR } from "./regles.js";
 import { el, styles, toast, modale, barre, recette, icone } from "./ui.js";
 import { signaler, apresPremierOeuf, enApprentissage, MENTOR } from "./tuto.js";
 import { Son, Musique } from "./son.js";
@@ -228,6 +228,62 @@ function ecranIntro() {
 }
 
 let blocProgression = null;
+const batisseurs = new Set();
+function blocChantier() {
+  const e = E();
+  const niv = e.oeufs.couvoir.niveau;
+  const def = COUVOIR[niv];
+  const b = el("div", { class: "carte", style: { display: "grid", gap: "8px" } },
+    el("div", { class: "ligne" }, el("b", {}, `Niveau ${niv + 1}/5 · hôtel du village`)),
+    el("div", { class: "doux", style: { fontSize: "12px" } }, `Tes dragons peuvent monter jusqu'au niveau ${def.nivMax}, et les bâtiments du village jusqu'au niveau ${niv + 1}. ${def.places} œuf${def.places > 1 ? "s" : ""} à la fois.`));
+  const ch = e.oeufs.couvoir.chantier;
+  if (ch) {
+    const reste = Math.max(0, ch.fin - maintenant()), total = ch.fin - ch.debut;
+    const gem = Math.max(1, Math.ceil(reste / 60000 / 4));
+    const noms = e.dragons.filter((d) => d.chantier).map((d) => PAR_ID[d.id].nom);
+    b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, `Chantier en cours vers « ${COUVOIR[ch.niveau].nom} » : ${noms.join(", ")} y travaillent (ils ne peuvent pas combattre).`),
+      barre(total - reste, total, "xp"), el("div", { class: "num", style: { fontSize: "13px" } }, `Encore ${fmtDuree(reste)}`),
+      el("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" } },
+        el("button", { class: "btn petit principal", disabled: (e.ressources.gemmes || 0) < gem, onclick: () => {
+          let ok = false; changer((s) => { if ((s.ressources.gemmes || 0) >= gem) { s.ressources.gemmes -= gem; finirChantier(); ok = true; } });
+          if (ok) { Son.evolution(); toast(`${COUVOIR[ch.niveau].nom} terminé !`, "bon"); rendre(); }
+        } }, icone("gemmes"), `Finir maintenant · ${gem}`)));
+    return b;
+  }
+  const n = niv + 1, c = CHANTIER_COUVOIR[n];
+  if (!c) { b.append(el("div", { class: "doux" }, "Ton couvoir est au niveau maximum.")); return b; }
+  const manque = manqueChantier();
+  const hauts = e.dragons.filter((d) => d.niveau >= c.haut).length;
+  const ok = (v) => el("span", { style: { color: v ? "#8ee6a6" : "#ff9a9a" } }, v ? "✓ " : "✗ ");
+  b.append(el("b", { style: { marginTop: "4px" } }, `Prochain niveau : ${COUVOIR[n].nom}`),
+    el("div", { style: { fontSize: "12px", display: "grid", gap: "3px" } },
+      el("span", {}, ok(e.dragons.length >= c.dragons), `${c.dragons} dragons (${e.dragons.length})`),
+      el("span", {}, ok(hauts >= c.nbHaut), `${c.nbHaut} dragon${c.nbHaut > 1 ? "s" : ""} au niveau ${c.haut} (${hauts})`),
+      el("span", {}, ok(e.dragons.every((d) => d.niveau >= c.tous)), `tous au moins au niveau ${c.tous}`)),
+    recette(c.recette, e.ressources, energie()));
+  // Bâtisseurs : plus il y en a, plus le chantier va vite (ils ne combattent pas pendant ce temps)
+  for (const u of [...batisseurs]) if (!e.dragons.some((d) => d.uid === u)) batisseurs.delete(u);
+  const choix = el("div", { style: { display: "flex", gap: "5px", flexWrap: "wrap" } });
+  for (const d of [...e.dragons].sort((x, y) => y.niveau - x.niveau)) {
+    const on = batisseurs.has(d.uid);
+    choix.append(el("button", { class: "btn petit" + (on ? " principal" : ""), disabled: d.pv <= 0, onclick: () => { on ? batisseurs.delete(d.uid) : batisseurs.add(d.uid); Son.clic(); rendre(); } }, `${PAR_ID[d.id].nom} · ${d.niveau}`));
+  }
+  const nb = batisseurs.size;
+  b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, `Choisis tes bâtisseurs : ${nb ? `chantier de ${fmtDuree(dureeChantier(n, nb))} avec ${nb} dragon${nb > 1 ? "s" : ""}` : `${c.heures} h avec un seul dragon, moins avec plusieurs`}.`), choix);
+  if (manque) b.append(el("div", { class: "alerte", style: { fontSize: "12px" } }, manque));
+  b.append(el("button", { class: "btn" + (!manque && nb && assez(c.recette) ? " principal" : ""), disabled: !!manque || !nb || !assez(c.recette), onclick: () => {
+    let lance = false;
+    changer((s) => {
+      if (manqueChantier() || !payer(c.recette)) return;
+      const t0 = maintenant();
+      s.oeufs.couvoir.chantier = { niveau: n, debut: t0, fin: t0 + dureeChantier(n, nb) };
+      for (const d of s.dragons) if (batisseurs.has(d.uid)) d.chantier = true;
+      lance = true;
+    });
+    if (lance) { batisseurs.clear(); Son.recolte("bois"); toast("Le chantier commence !", "bon"); rendre(); }
+  } }, "Lancer le chantier"));
+  return b;
+}
 function rendre() {
   ui.innerHTML = "";
   const e = E();
@@ -273,19 +329,8 @@ function rendre() {
     modale({ titre: "Choisis ton dragon UL", contenu: el("div", {}, el("p", { class: "doux" }, "Tu as complété le Livre ! Un de tes dragons reçoit une robe Ultime, rare. Seule l'apparence change."), liste), boutons: [{ texte: "Plus tard" }] });
   } }, "Choisir mon dragon UL"));
   p.append(coll);
-  // Amélioration
-  if (e.oeufs.couvoir.niveau === 0) {
-    p.append(el("div", { class: "carte" },
-      el("b", {}, "Grand couvoir"),
-      el("div", { class: "doux", style: { fontSize: "12px" } }, `2 œufs en même temps, qui éclosent ensemble après ${COUVOIR[1].heures} h (au lieu de ${COUVOIR[0].heures} h pour un seul).`),
-      recette(RECETTE_COUVOIR, e.ressources, energie()),
-      el("button", { class: "btn" + (assez(RECETTE_COUVOIR) ? " principal" : ""), disabled: !assez(RECETTE_COUVOIR), onclick: () => {
-        let ok = false;
-        changer((s) => { ok = payer(RECETTE_COUVOIR); if (ok) { s.oeufs.couvoir.niveau = 1; for (const sl of s.oeufs.couvoir.slots) { sl.debut = maintenant(); } } });
-        if (ok) { Son.ok(); toast("Grand couvoir construit : 2 places !", "bon"); rendre(); }
-      } }, "Améliorer le couvoir"),
-    ));
-  }
+  // Le couvoir est aussi l'hôtel du village : on l'agrandit par un chantier
+  p.append(blocChantier());
   ui.append(p);
 }
 

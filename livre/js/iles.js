@@ -26,7 +26,7 @@ const T = window.THREE;
 let D = null;
 let ctxJeu = null;
 // Accroches pour d'autres modules (le village) : mise à jour à chaque image, actions au toucher, bouton dans la barre
-export const extensions = { update: [], action: {}, boutons: [] };
+export const extensions = { update: [], action: {}, boutons: [], sol: null };
 export function moteurIles() { return D; }
 export const LIEN_LIVRE = window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM";
 
@@ -145,7 +145,7 @@ function construireDecor() {
   const orbite = new Orbite(camera, document.getElementById("scene3d"));
   orbite.min = 2; orbite.max = 140; orbite.phiMax = 1.45;
   orbite.deplacement = true;
-  orbite.limite = { centre: new T.Vector3(0, 0, 0), rayon: 55 };
+  orbite.limite = { centre: new T.Vector3(0, 0, 0), rayon: 40 };
   orbite.viser(new T.Vector3(0, 0, 0), 90, 0.3, 0.95);
   orbite.surDeplacement = () => { if (D && D.suivi) { D.suivi = null; majBoutons(); } };
 
@@ -278,7 +278,7 @@ export function decor(ctx) {
   ctxJeu = ctx;
   if (!D) construireDecor();
   return {
-    afficherFond() { synchroniser(); D.fond = true; D.orbite.viser(new T.Vector3(0, 0, 0), 84, 0.3, 1.08); ctx.moteur.montrer(D); },
+    afficherFond() { synchroniser(); D.fond = true; D.orbite.viser(new T.Vector3(0, 0, 0), 64, 0.3, 1.08); ctx.moteur.montrer(D); },
     // Arrivée par le portail : la caméra part de très haut dans le ciel et plonge vers les îles
     plongee() { D.orbite.dist = 210; D.orbite.phi = 0.28; D.orbite.theta = D.orbite.thetaV + 1.4; D.orbite.cible.set(0, 30, 0); D.orbite.douceur = 0.9; },
   };
@@ -400,7 +400,7 @@ function allerVers(v, cible, etat, vitesse = 1) { v.cible = cible; v.etat = etat
 // ---------- La vie des dragons ----------
 const ACTIONS_SEUL = ["renifler", "regarder", "secouer", "etirer", "bailler", "joie", "jouer", "rugir"];
 const ACTIONS_EAU = ["regarder", "joie", "secouer", "rugir"];
-const HUMEURS = { marche: "se promène", pause: "observe", dort: "fait la sieste", vol: "vole", rejoindre: "va voir un ami", attendre: "attend un ami", jeu: "joue", action: "s'amuse", nid: "rentre au nid", ko: "K.O.", versRecolte: "part récolter", recolte: "récolte", rituel: "rejoint la source", rituelPret: "attend", repas: "mange", nage: "nage", plonge: "nage au fond" };
+const HUMEURS = { marche: "se promène", pause: "observe", dort: "fait la sieste", vol: "vole", rejoindre: "va voir un ami", attendre: "attend un ami", jeu: "joue", action: "s'amuse", nid: "rentre au nid", ko: "K.O.", versRecolte: "part récolter", recolte: "récolte", rituel: "rejoint la source", rituelPret: "attend", repas: "mange", nage: "nage", plonge: "nage au fond", chantier: "construit le couvoir", bataille: "défend le village" };
 
 function choisirEnvie(v) {
   const p = v.mobile.position;
@@ -959,6 +959,8 @@ function installerClics() {
     for (const h of hits) for (const [elx, ile] of Object.entries(D.iles)) {
       let o = h.object; while (o && o !== ile.groupe) o = o.parent;
       if (o && D.focus !== elx) { focaliser(elx); return; }
+      // Toucher le sol de l'île regardée : le village propose de construire là
+      if (o && extensions.sol && extensions.sol(elx, ile.groupe.worldToLocal(h.point.clone()))) return;
     }
   });
 }
@@ -1031,7 +1033,7 @@ export function focaliser(elx, rapproche = true) {
   const z = elx === "tout" ? 55 : 18;
   Object.assign(s.shadow.camera, { left: -z, right: z, top: z, bottom: -z });
   s.shadow.camera.updateProjectionMatrix();
-  if (elx === "tout") D.orbite.viser(new T.Vector3(0, 0, 0), 88, D.orbite.thetaV, 0.95);
+  if (elx === "tout") D.orbite.viser(new T.Vector3(0, 0, 0), 64, D.orbite.thetaV, 0.95);
   else if (elx === "centre") D.orbite.viser(new T.Vector3(0, 0.8, 0), 11, D.orbite.thetaV, 1.1);
   else {
     const p = POS_ILES[elx];
@@ -1059,7 +1061,7 @@ function majEtiquettes() {
     const d = info.d;
     if (!lab) { lab = el("div", { class: "etiq" }); calqueEtiq.append(lab); etiquettes.set(uid, lab); lab.dataset.k = ""; }
     const enRecolte = info.etat === "recolte" && info.recolte;
-    const humeur = info.ko ? "ko" : nage(info) && (info.etat === "pause" || info.etat === "nage") ? (info.habitat === "fond" ? "plonge" : "nage") : info.etat;
+    const humeur = info.ko ? "ko" : d.chantier ? "chantier" : nage(info) && (info.etat === "pause" || info.etat === "nage") ? (info.habitat === "fond" ? "plonge" : "nage") : info.etat;
     const k = `${d.niveau}|${d.pv}|${evolutionBloquee(d)}|${attendPercee(d)}|${humeur}|${enRecolte ? Math.ceil(info.recolte.duree - info.recolte.t) : ""}`;
     if (lab.dataset.k !== k) {
       lab.dataset.k = k; lab.innerHTML = "";

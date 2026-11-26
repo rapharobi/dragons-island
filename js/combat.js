@@ -492,7 +492,7 @@ export function ouvrir(ctx, params = {}) {
   if (L) { L.pret = 0; L.recu = {}; publierLigne(); }
   if (params.rejoindre && codeValide(params.rejoindre)) prep.mode = "ligne";
   const e = E();
-  const dispo = e.dragons.filter((d) => d.pv > 0);
+  const dispo = e.dragons.filter((d) => d.pv > 0 && !d.chantier);
   if (Array.isArray(e.equipe) && e.equipe.length) prep.equipe = [...e.equipe];
   prep.equipe = prep.equipe.filter((uid) => dispo.some((d) => d.uid === uid));
   if (!prep.equipe.length) {
@@ -719,7 +719,7 @@ let L = null;
 const NOM_MAX = 18;
 function nomMage() { return String(E().reglages.nomMage || "").trim().slice(0, NOM_MAX) || "Mage"; }
 function nomPropre(x) { return String(x || "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, "").trim().slice(0, NOM_MAX) || "Ton ami"; }
-function dragonsPrets() { const e = E(); return prep.equipe.map((u) => e.dragons.find((d) => d.uid === u)).filter((d) => d && d.pv > 0); }
+function dragonsPrets() { const e = E(); return prep.equipe.map((u) => e.dragons.find((d) => d.uid === u)).filter((d) => d && d.pv > 0 && !d.chantier); }
 function equipeCompacte() { return dragonsPrets().map((d) => [d.id, d.niveau, d.nid || 0, d.armure || "", d.ul ? 1 : 0, Math.round(d.pv)]); }
 function publierLigne() {
   if (!L || !L.salon) return;
@@ -1158,10 +1158,16 @@ function ficheCoup(k, sa, sd) {
   const total = el("div", { class: "fc-total" }, el("span", {}, "Dégâts"), valeur);
   const f = el("section", { class: `fiche-coup panneau ${k === 0 ? "nous" : "eux"}` },
     el("div", { class: "fc-tete" }, el("div", {}, el("b", {}, titre), sous ? el("span", { class: "doux", style: { fontSize: "12px", marginLeft: "8px" } }, sous) : null), el("div", { class: "fc-outils" }, auto, bouton)),
-    el("div", { class: "fc-duel" },
-      cote(att.m, att.p, `Attaque · ${NOMS_STYLE[sa]}`, att.p.atk, "epee", false),
-      el("span", { class: "fc-fleche" }, "→"),
-      cote(def.m, def.p, `Défense · ${NOMS_DEFENSE[sd]}`, def.p.def, "bouclier", true)),
+    // Ton dragon est toujours à gauche : quand on t'attaque, ta défense à gauche et la flèche vient de l'attaquant
+    k === 1 && C.mode !== "ami"
+      ? el("div", { class: "fc-duel" },
+        cote(def.m, def.p, `Défense · ${NOMS_DEFENSE[sd]}`, def.p.def, "bouclier", false),
+        el("span", { class: "fc-fleche" }, "←"),
+        cote(att.m, att.p, `Attaque · ${NOMS_STYLE[sa]}`, att.p.atk, "epee", true))
+      : el("div", { class: "fc-duel" },
+        cote(att.m, att.p, `Attaque · ${NOMS_STYLE[sa]}`, att.p.atk, "epee", false),
+        el("span", { class: "fc-fleche" }, "→"),
+        cote(def.m, def.p, `Défense · ${NOMS_DEFENSE[sd]}`, def.p.def, "bouclier", true)),
     el("div", { class: "fc-calc" },
       ligne(0, `Force : attaque ${att.p.atk} contre défense ${def.p.def}`, "", nombre(cp.base, 1)),
       lElem,

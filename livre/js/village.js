@@ -28,9 +28,10 @@ export const BATIMENTS = {
   tourGivre: { nom: "Tour de givre", desc: "Tire des éclats de glace qui ralentissent l'ennemi.", pv: 300, base: { brindilles: 20, pierres: 45 }, mat: "givrite", tour: { portee: 5, cadence: 1.1, degats: 9, couleur: 0x9fe8ff } },
   tourEau: { nom: "Tour à jets d'eau", desc: "Un jet puissant qui repousse l'ennemi loin des bâtiments.", pv: 300, base: { brindilles: 20, pierres: 45 }, mat: "corail", tour: { portee: 4.2, cadence: 1.3, degats: 11, couleur: 0x48c8e0 } },
 };
-const ORDRE = ["hotel", "entrepot", "verger", "scierie", "carriere", "tourLave", "tourGivre", "tourEau"];
+const ORDRE = ["entrepot", "verger", "scierie", "carriere", "tourLave", "tourGivre", "tourEau"];
 function vil() { const e = E(); if (!e.village) e.village = { batiments: [], vague: { numero: 1, prochaine: null, enAttente: null }, compteur: 0 }; return e.village; }
-export function niveauHotel() { const h = vil().batiments.find((b) => b.type === "hotel"); return h ? h.niveau : 0; }
+// L'hôtel du village, c'est le couvoir : son niveau (1 à 5) fixe le nombre et le niveau des bâtiments
+export function niveauHotel() { return E().oeufs.couvoir.niveau + 1; }
 function cout(type, niveau) {
   const b = BATIMENTS[type], c = {};
   const k = type === "hotel" ? niveau * niveau : niveau;
@@ -139,7 +140,7 @@ function modele(type, niveau, elx) {
 }
 
 // ---------- État 3D ----------
-const V = { cle: null, objets: new Map(), marqueurs: [], bataille: null, t: 0, panneau: null, ile: "feu" };
+const V = { cle: null, objets: new Map(), marqueurs: [], libres: [], bataille: null, t: 0, panneau: null, ile: "feu" };
 function synchro() {
   const D = moteurIles();
   if (!D || !E()) return;
@@ -169,6 +170,23 @@ function synchro() {
     V.objets.set(b.uid, { g, niveau: b.niveau, b });
   }
   for (const [uid, o] of V.objets) if (!vus.has(uid)) { o.g.parent && o.g.parent.remove(o.g); V.objets.delete(uid); }
+  // Cercles dorés sur les emplacements libres : on les touche pour construire
+  for (const m of V.libres) m.parent && m.parent.remove(m);
+  V.libres = [];
+  const prises = new Set(vil().batiments.map((b) => b.place));
+  for (const elx of ["feu", "glace", "eau"]) for (const p of places(elx)) {
+    if (prises.has(p.id)) continue;
+    const m = new T.Group();
+    const anneau = new T.Mesh(new T.RingGeometry(0.55, 0.68, 20), new T.MeshBasicMaterial({ color: 0xf2b544, transparent: true, opacity: 0.32, side: T.DoubleSide, depthWrite: false }));
+    anneau.rotation.x = -Math.PI / 2; m.add(anneau);
+    const plus = new T.Mesh(new T.PlaneGeometry(0.34, 0.07), anneau.material); plus.rotation.x = -Math.PI / 2; m.add(plus);
+    const plus2 = plus.clone(); plus2.rotation.z = Math.PI / 2; m.add(plus2);
+    const zone = new T.Mesh(new T.CylinderGeometry(0.9, 0.9, 0.6, 8), new T.MeshBasicMaterial({ visible: false })); zone.position.y = 0.3; m.add(zone);
+    m.position.set(p.x, p.y + 0.05, p.z);
+    m.userData.action = { type: "vlibre", place: p.id, ile: elx };
+    D.iles[elx].groupe.add(m);
+    V.libres.push(m);
+  }
 }
 let dernierProd = 0;
 function update(dt) {
@@ -186,6 +204,9 @@ function update(dt) {
     verifierVague();
   }
   for (const m of V.marqueurs) { m.rotation.y += dt; m.children[0].material.opacity = 0.45 + Math.sin(V.t * 4) * 0.25; }
+  const D = moteurIles();
+  const voirLibres = !V.bataille && !(D && D.placement) && D && D.focus && D.focus !== "tout" && D.focus !== "centre";
+  for (const m of V.libres) { m.visible = voirLibres && m.userData.action.ile === D.focus; m.children[0].material.opacity = 0.22 + Math.sin(V.t * 2) * 0.1; }
   if (V.bataille) majBataille(dt * V.bataille.vitesse);
 }
 
@@ -226,11 +247,10 @@ export function ouvrirVillage(elx) {
   const sur = v.batiments.filter((b) => b.ile === elx);
   const vg = v.vague;
   const contenu = [];
-  if (!nh) contenu.push(el("p", { class: "info" }, "Commence par l'hôtel du village : il débloque tous les autres bâtiments. Tu peux le poser sur n'importe laquelle de tes trois îles."));
-  else {
+  {
     const attente = vg.enAttente ? el("div", { class: "vl-alerte" }, `Des pillards approchent de l'${NOM_ILE[vg.enAttente]} ! Vague ${vg.numero}.`) : null;
     if (attente) contenu.push(attente);
-    contenu.push(el("p", { class: "info" }, `Hôtel niveau ${nh} : jusqu'à ${nh} bâtiment${nh > 1 ? "s" : ""} de chaque sorte, niveau ${nh} maximum. ${vg.prochaine && !vg.enAttente ? `Prochaine attaque dans ${duree(vg.prochaine - maintenant())}.` : ""}`));
+    contenu.push(el("p", { class: "info" }, `Couvoir niveau ${nh} : jusqu'à ${nh} bâtiment${nh > 1 ? "s" : ""} de chaque sorte, niveau ${nh} maximum. ${vg.prochaine && !vg.enAttente ? `Prochaine attaque dans ${duree(vg.prochaine - maintenant())}.` : ""}`));
     contenu.push(el("div", { class: "actions", style: { display: "flex", gap: "6px", flexWrap: "wrap" } },
       el("button", { class: "btn principal petit", onclick: () => lancerBataille(vg.enAttente || elx, false) }, `Défendre la vague ${vg.numero} (en direct)`),
       el("button", { class: "btn petit", onclick: () => lancerBataille(vg.enAttente || elx, true) }, "Laisser mes dragons défendre")));
@@ -245,7 +265,7 @@ export function ouvrirVillage(elx) {
     liste.append(el("div", { class: `vl-art ${bloque || plein ? "non" : ""}` },
       el("b", {}, d.nom), el("span", { class: "num doux", style: { fontSize: "12px" } }, `${n}/${max || 1}`),
       el("small", {}, d.desc),
-      bloque ? el("small", {}, "Construis d'abord l'hôtel du village.") : plein ? el("small", {}, type === "hotel" ? "Déjà construit : touche-le pour l'améliorer." : "Améliore l'hôtel pour en construire plus.") : el("span", { class: "cout" }, `Coût : ${texteCout(c)}`),
+      bloque ? null : plein ? el("small", {}, "Améliore le couvoir pour en construire plus.") : el("span", { class: "cout" }, `Coût : ${texteCout(c)}`),
       !bloque && !plein ? el("button", { class: "btn petit" + (assez(c) ? " principal" : ""), style: { gridColumn: "1 / -1", justifySelf: "start" }, disabled: !assez(c), onclick: () => placer(type) }, `Construire sur l'${NOM_ILE[elx]}`) : null));
   }
   panneau(`Village · ${NOM_ILE[elx]}`, `${sur.length} bâtiment${sur.length > 1 ? "s" : ""} sur cette île`, ...contenu, el("div", { class: "etiquette" }, "Construire"), liste);
@@ -283,6 +303,23 @@ function placer(type) {
     el("button", { class: "btn petit", onclick: () => { arreterPlacement(); ouvrirVillage(elx); } }, "Annuler")));
   focaliser(elx);
 }
+function construireSur(elx, place) {
+  V.ile = elx;
+  const nh = niveauHotel();
+  const liste = el("div", { class: "vl-liste" });
+  for (const type of ORDRE) {
+    const d = BATIMENTS[type];
+    const n = combien(type), max = maxDe(type);
+    const c = cout(type, 1);
+    const plein = n >= max;
+    liste.append(el("div", { class: `vl-art ${plein ? "non" : ""}` },
+      el("b", {}, d.nom), el("span", { class: "num doux", style: { fontSize: "12px" } }, `${n}/${max}`),
+      el("small", {}, d.desc),
+      plein ? el("small", {}, "Améliore le couvoir pour en construire plus.") : el("span", { class: "cout" }, `Coût : ${texteCout(c)}`),
+      !plein ? el("button", { class: "btn petit" + (assez(c) ? " principal" : ""), style: { gridColumn: "1 / -1", justifySelf: "start" }, disabled: !assez(c), onclick: () => construireIci({ bat: type, place }) }, "Construire ici") : null));
+  }
+  panneau("Construire ici", `${NOM_ILE[elx]} · couvoir niveau ${nh}`, liste);
+}
 function construireIci(a) {
   const c = cout(a.bat, 1);
   let ok = false;
@@ -291,7 +328,7 @@ function construireIci(a) {
     payer(s, c);
     const v = s.village;
     v.batiments.push({ uid: "b" + (++v.compteur), type: a.bat, ile: V.ile, place: a.place, niveau: 1, stock: 0, maj: maintenant() });
-    if (a.bat === "hotel" && !v.vague.prochaine) v.vague.prochaine = maintenant() + 4 * H;
+    if (!v.vague.prochaine) v.vague.prochaine = maintenant() + 4 * H;
     noter(`${BATIMENTS[a.bat].nom} construit sur l'${NOM_ILE[V.ile]}.`);
     ok = true;
   });
@@ -332,7 +369,7 @@ function ficheBatiment(uid) {
     const c = cout(b.type, b.niveau + 1);
     contenu.push(el("div", { class: "vl-art" }, el("b", {}, `Niveau ${b.niveau + 1}`), el("span"), el("span", { class: "cout" }, `Coût : ${texteCout(c)}`),
       el("button", { class: "btn petit" + (assez(c) ? " principal" : ""), style: { gridColumn: "1 / -1", justifySelf: "start" }, disabled: !assez(c), onclick: () => ameliorer(b.uid) }, "Améliorer")));
-  } else contenu.push(el("p", { class: "info" }, b.type === "hotel" ? "Niveau maximum." : `Niveau maximum pour l'instant : améliore l'hôtel du village (niveau ${nh}).`));
+  } else contenu.push(el("p", { class: "info" }, b.type === "hotel" ? "Niveau maximum." : `Niveau maximum pour l'instant : améliore le couvoir (niveau ${nh}).`));
   contenu.push(el("button", { class: "btn petit", onclick: () => ouvrirVillage(b.ile) }, "Tout le village"));
   panneau(d.nom, `${NOM_ILE[b.ile]} · niveau ${b.niveau}`, ...contenu);
 }
@@ -593,6 +630,17 @@ function finBataille(victoire) {
 extensions.update.push(update);
 extensions.action.batiment = (a) => { if (V.bataille) return; Son.clic(); ficheBatiment(a.uid); };
 extensions.action.vplace = (a) => construireIci(a);
+extensions.action.vlibre = (a) => { if (V.bataille) return; Son.clic(); construireSur(a.ile, a.place); };
+// Toucher le sol près d'un emplacement libre ouvre aussi « Construire ici »
+extensions.sol = (elx, p) => {
+  if (V.bataille || !E()) return false;
+  const prises = new Set(vil().batiments.map((b) => b.place));
+  let best = null, dm = 1.6;
+  for (const q of places(elx)) { if (prises.has(q.id)) continue; const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < dm) { dm = d; best = q; } }
+  if (!best) return false;
+  Son.clic(); construireSur(elx, best.id);
+  return true;
+};
 extensions.action.ennemi = (a) => toucherEnnemi(a);
 extensions.boutons.push(() => el("button", { class: "btn petit", style: { borderColor: "rgba(111,214,138,.55)", color: "#b8f0c8" }, onclick: () => { Son.clic(); ouvrirVillage(); } }, "Village"));
 export function lancerVagueTest(elx) { const v = vil(); const iles = [...new Set(v.batiments.map((b) => b.ile))]; lancerBataille(elx && iles.includes(elx) ? elx : iles[0], false); }

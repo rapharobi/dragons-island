@@ -133,10 +133,23 @@ export function attenteOeuf(k) {
   for (let i = 2; i < k; i++) attente = attente < 24 ? Math.min(attente * 2, 24) : attente + 1;
   return attente;
 }
+// Le couvoir est aussi l'hôtel du village : son niveau limite le niveau des dragons et des bâtiments.
 export const COUVOIR = [
-  { places: 1, pas: 2500, heures: 2, nom: "Couvoir" },
-  { places: 2, pas: 3500, heures: 3, nom: "Grand couvoir" },
+  { places: 1, pas: 2500, heures: 2, nom: "Couvoir", nivMax: 6 },
+  { places: 2, pas: 3500, heures: 3, nom: "Grand couvoir", nivMax: 10 },
+  { places: 2, pas: 3500, heures: 3, nom: "Couvoir des anciens", nivMax: 14 },
+  { places: 3, pas: 3500, heures: 3, nom: "Couvoir royal", nivMax: 18 },
+  { places: 3, pas: 3500, heures: 3, nom: "Couvoir céleste", nivMax: 20 },
 ];
+// Pour passer au niveau suivant (index = niveau visé) : assez de dragons, assez forts, des ressources, et du temps de chantier
+export const CHANTIER_COUVOIR = [
+  null,
+  { dragons: 5, haut: 6, nbHaut: 1, tous: 3, recette: { brindilles: 40, pierres: 40 }, heures: 1 },
+  { dragons: 8, haut: 10, nbHaut: 3, tous: 5, recette: { brindilles: 120, pierres: 120, obsidienne: 15, givrite: 15, corail: 15 }, heures: 3 },
+  { dragons: 12, haut: 14, nbHaut: 5, tous: 8, recette: { brindilles: 250, pierres: 250, obsidienne: 40, givrite: 40, corail: 40 }, heures: 6 },
+  { dragons: 16, haut: 18, nbHaut: 8, tous: 10, recette: { brindilles: 450, pierres: 450, obsidienne: 80, givrite: 80, corail: 80, coeurs: 2 }, heures: 12 },
+];
+export const niveauMaxDragon = (couvoirNiveau) => (COUVOIR[couvoirNiveau] || COUVOIR[0]).nivMax;
 export const CHANCE_OEUF_JOUR = 0.1;
 
 // ---------- Recettes ----------

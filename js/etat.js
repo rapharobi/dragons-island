@@ -1,7 +1,7 @@
 // La partie du joueur : ce qu'il possède, ses minuteurs, et la sauvegarde.
 // Dans la bêta, tout tourne dans le navigateur. Dans le vrai jeu, ces calculs iront sur le serveur (anti-triche).
 import {
-  DRAGONS, PAR_ID, ELEMENTS, pvMax, xpSuivant, NIVEAU_MAX, stadeEffectif, stadeDuNiveau, attenteOeuf, COUVOIR,
+  DRAGONS, PAR_ID, ELEMENTS, pvMax, xpSuivant, NIVEAU_MAX, stadeEffectif, stadeDuNiveau, attenteOeuf, COUVOIR, niveauMaxDragon, CHANTIER_COUVOIR,
   ENERGIE_MAX, ENERGIE_PAR_HEURE, FERMES, SOIN_RATION, CHANCE_OEUF_JOUR,
   PRODUCTION_SOURCE, SOURCES, XP_RATION_ELEMENT, NIVEAU_PERCEE, CONDITIONS_SOURCE,
 } from "./regles.js";
@@ -179,6 +179,7 @@ export function mettreAJour() {
       d.faimComptee = jours;
     }
   }
+  if (etat.oeufs.couvoir.chantier && t >= etat.oeufs.couvoir.chantier.fin) { finirChantier(); etat.chantierFini = true; }
   // Minuteur des œufs
   const mi = etat.oeufs.minuteur;
   while (mi.prochain && t >= mi.prochain) {
@@ -235,11 +236,15 @@ export const dragon = (uid) => etat.dragons.find((d) => d.uid === uid);
 export const possede = (id) => etat.dragons.some((d) => d.id === id);
 
 // Au-delà du niveau 10, l'XP des combats remplit la barre mais il faut une ration de l'élément (percee) pour monter.
+export function plafondNiveau() { return niveauMaxDragon(etat.oeufs.couvoir.niveau); }
 export function gagnerXp(d, xp, percee = false) {
   const avant = { niveau: d.niveau, stade: stadeEffectif(d) };
   d.xp += xp;
   let percees = percee ? 1 : 0;
-  while (d.niveau < NIVEAU_MAX && d.xp >= xpSuivant(d.niveau)) {
+  // Le couvoir fixe le niveau maximum : au-delà, l'expérience attend qu'on l'améliore
+  const plafond = Math.max(plafondNiveau(), d.niveau);
+  if (d.niveau >= plafond && plafond < NIVEAU_MAX) { d.xp = Math.min(d.xp, xpSuivant(d.niveau)); return { niveaux: 0, evolution: false, plafond: true }; }
+  while (d.niveau < plafond && d.xp >= xpSuivant(d.niveau)) {
     if (d.niveau >= NIVEAU_PERCEE) { if (percees <= 0) { d.xp = xpSuivant(d.niveau); break; } percees--; }
     d.xp -= xpSuivant(d.niveau);
     const ancien = pvMax(d);
@@ -337,6 +342,30 @@ export function choisirOeuf(element) {
   return true;
 }
 export function defCouvoir() { return COUVOIR[etat.oeufs.couvoir.niveau]; }
+// Chantier du couvoir : ce qui manque pour lancer le niveau suivant (null si tout est prêt)
+export function manqueChantier() {
+  const n = etat.oeufs.couvoir.niveau + 1;
+  const c = CHANTIER_COUVOIR[n];
+  if (!c) return "Le couvoir est au niveau maximum.";
+  const l = etat.dragons;
+  if (l.length < c.dragons) return `Il faut ${c.dragons} dragons (tu en as ${l.length}).`;
+  const hauts = l.filter((d) => d.niveau >= c.haut).length;
+  if (hauts < c.nbHaut) return `Il faut ${c.nbHaut} dragon${c.nbHaut > 1 ? "s" : ""} au niveau ${c.haut} (tu en as ${hauts}).`;
+  const faibles = l.filter((d) => d.niveau < c.tous).length;
+  if (faibles) return `Tous tes dragons doivent être au moins au niveau ${c.tous} (${faibles} en dessous).`;
+  return null;
+}
+// Durée du chantier : plus il y a de dragons bâtisseurs, plus ça va vite
+export function dureeChantier(n, batisseurs) { return (CHANTIER_COUVOIR[n].heures * H) / Math.max(1, batisseurs); }
+export function finirChantier() {
+  const ch = etat.oeufs.couvoir.chantier;
+  if (!ch) return false;
+  etat.oeufs.couvoir.niveau = ch.niveau;
+  for (const d of etat.dragons) if (d.chantier) delete d.chantier;
+  etat.oeufs.couvoir.chantier = null;
+  noter(`${COUVOIR[ch.niveau].nom} terminé !`);
+  return true;
+}
 export function remplirCouvoir() {
   const c = etat.oeufs.couvoir, def = COUVOIR[c.niveau];
   while (c.slots.length < def.places && etat.oeufs.reserve.length) {

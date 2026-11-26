@@ -2,7 +2,7 @@
 import { rng, mat, bloc, peindre, mesh, cone, bosseler, geoOeuf } from "./outils3d.js";
 
 const T = window.THREE;
-export const DIST_ILES = 30;
+export const DIST_ILES = 20;
 export const POS_ILES = {
   feu: new T.Vector3(Math.cos(Math.PI / 2) * DIST_ILES, 0, -Math.sin(Math.PI / 2) * DIST_ILES),
   glace: new T.Vector3(Math.cos(Math.PI / 2 + 2.094) * DIST_ILES, -0.8, -Math.sin(Math.PI / 2 + 2.094) * DIST_ILES),
@@ -477,10 +477,10 @@ export function construireCouvoir(niveau, oeufs) {
     const rune = mesh(new T.BoxGeometry(0.1, 0.25, 0.02), mat(0xf2b544, { e: 0xf2b544, ei: 1.2 }), false);
     rune.position.set(Math.cos(a) * 1.43, 0.75, Math.sin(a) * 1.43); rune.rotation.y = -a + Math.PI / 2; g.add(rune);
   }
-  const places = niveau >= 1 ? 2 : 1;
+  const places = niveau >= 3 ? 3 : niveau >= 1 ? 2 : 1;
   const nids = [];
   for (let k = 0; k < places; k++) {
-    const x = places === 1 ? 0 : (k - 0.5) * 0.85;
+    const x = places === 1 ? 0 : (k - (places - 1) / 2) * (places === 3 ? 0.75 : 0.85);
     const nid = new T.Group(); nid.position.set(x, 0.6, 0);
     const paille = mat(0xc8a04a, { r: 1 });
     for (let i = 0; i < 12; i++) { const b = mesh(new T.CylinderGeometry(0.03, 0.03, 0.5, 4), paille); const a = (i / 12) * Math.PI * 2; b.position.set(Math.cos(a) * 0.3, 0.06, Math.sin(a) * 0.3); b.rotation.set(Math.PI / 2, 0, -a + 0.4); nid.add(b); }

@@ -44,7 +44,7 @@ styles("boutique", `
 .bq-ruban { justify-self: start; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1208; background: var(--ambre); border-radius: 6px; padding: 1px 6px; }
 .bq-apercu { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); top: calc(var(--hud) + var(--tuto, 0px) + 10px); padding: 5px 12px; border-radius: 999px; background: rgba(13,14,19,.75); border: 1px solid var(--trait); font-size: 12px; color: var(--doux); white-space: nowrap; }
 @media (max-width: 420px) { .bq-gemmes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .bq-panneau { left: var(--bord-g); right: var(--bord-d); width: auto; top: 50vh; bottom: calc(var(--bas) + 78px); } }
+@media (max-width: 760px) { .bq-panneau { left: var(--bord-g); right: var(--bord-d); width: auto; top: calc(var(--hud) + var(--tuto, 0px) + 25vh); bottom: calc(var(--bas) + 78px); } }
 `);
 
 function construireVitrine() {
@@ -302,7 +302,7 @@ function rendre() {
   ui.innerHTML = "";
   const e = E();
   const large = window.innerWidth > 760;
-  ctxJeu.moteur.montrer(D, large ? { x: 0, y: 0, l: 1 - Math.min(450, window.innerWidth * 0.42) / window.innerWidth, h: 1 } : { x: 0, y: 0.08, l: 1, h: 0.42 });
+  ctxJeu.moteur.montrer(D, large ? { x: 0, y: 0, l: 1 - Math.min(450, window.innerWidth * 0.42) / window.innerWidth, h: 1 } : { x: 0, y: 0.08, l: 1, h: 0.26 });
   const p = el("section", { class: "bq-panneau panneau" });
   p.append(el("div", {}, el("div", { class: "etiquette" }, "Marché des dragonniers"), el("h2", {}, "Boutique")));
   // Solde
