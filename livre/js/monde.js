@@ -618,6 +618,20 @@ export function construireNoeud(type, element, seed) {
     }
     if (element === "glace") { const n = mesh(bloc(0.3, 0.12, 0.3, 0, 0.2), mat(0xffffff)); n.position.y = 0.5; g.add(n); }
     if (element === "eau") for (let k = 0; k < 3; k++) { const fr = mesh(new T.IcosahedronGeometry(0.05, 0), mat(0xff5a6a)); fr.position.set((r() - 0.5) * 0.5, 0.35 + r() * 0.15, (r() - 0.5) * 0.5); g.add(fr); }
+  } else if (type === "arbre_mort") {
+    g.add(arbreMort(r));
+  } else if (type === "basalte") {
+    const c = colonneBasalte(r); c.scale.setScalar(0.45); g.add(c);
+    const braise = mesh(new T.IcosahedronGeometry(0.09, 0), mat(0xff6a1a, { e: 0xff4a0a, ei: 1.1 })); braise.position.set(0.2, 0.08, 0.25); g.add(braise);
+  } else if (type === "sapin") {
+    g.add(sapin(r));
+  } else if (type === "bloc_glace") {
+    const glace = mat(0xbfe6ff, { e: 0x4aa0e0, ei: 0.2, o: 0.88, r: 0.1 });
+    for (let k = 0; k < 3; k++) { const b = mesh(bloc(0.32 + r() * 0.12, 0.3 + r() * 0.2, 0.3, 0, 0.12, seed + k), glace); b.position.set((r() - 0.5) * 0.6, 0.25 + k * 0.12, (r() - 0.5) * 0.5); b.rotation.y = r() * 3; g.add(b); }
+    const n = mesh(bloc(0.3, 0.1, 0.28, 0, 0.2, seed), mat(0xffffff, { r: 0.8 })); n.position.y = 0.62; g.add(n);
+    const pic = piqueGlace(r); pic.scale.setScalar(0.3); pic.position.set(0.3, 0, -0.2); g.add(pic);
+  } else if (type === "palmier") {
+    g.add(palmier(r));
   } else if (type === "epave") {
     // Débris d'épave qui flottent : une caisse, un tonneau et des planches
     const bois = mat(0x8a5a32, { r: 0.9 }), fonce = mat(0x5a3a22, { r: 0.9 }), cercle = mat(0x3a3a40, { r: 0.5, m: 0.5 });

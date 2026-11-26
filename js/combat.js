@@ -14,8 +14,10 @@ const T = window.THREE;
 let D = null, ctxJeu = null, ui = null, C = null;
 
 styles("combat", `
-.cb-prep { position: fixed; z-index: 15; inset: calc(var(--hud) + 8px) var(--bord-d) calc(var(--bas) + 84px) var(--bord-g); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; max-width: 1100px; margin: 0 auto; }
-.cb-prep > section { padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
+.cb-prep { position: fixed; z-index: 15; inset: calc(var(--hud) + var(--tuto, 0px) + 8px) var(--bord-d) calc(var(--bas) + 84px) var(--bord-g); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; max-width: 1100px; margin: 0 auto; }
+.cb-prep > section { padding: 16px; overflow: auto; overflow-x: hidden; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.cb-prep > section > * { min-width: 0; max-width: 100%; }
+.cb-prep .mode-btn, .cb-ligne, .cb-ligne * { min-width: 0; overflow-wrap: anywhere; }
 .cb-prep h2 { font-size: 24px; }
 .mode-btn { display: grid; gap: 4px; padding: 14px; border-radius: 14px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); text-align: left; }
 .mode-btn.actif { border-color: var(--ambre); background: rgba(242,181,68,.1); }
@@ -115,7 +117,7 @@ styles("combat", `
   .fc-cote .val { font-size: 16px; }
   .fc-calc { font-size: 12px; }
   .fc-total b { font-size: 22px; }
-  .cb-prep { grid-template-columns: 1fr; overflow: auto; inset: calc(var(--hud) + 8px) var(--bord-d) calc(var(--bas) + 80px) var(--bord-g); display: block; }
+  .cb-prep { grid-template-columns: 1fr; overflow: auto; inset: calc(var(--hud) + var(--tuto, 0px) + 8px) var(--bord-d) calc(var(--bas) + 80px) var(--bord-g); display: block; }
   .cb-prep > section { margin-bottom: 10px; }
   .cb-bas .carte-dr { width: 116px; padding: 7px; }
   .posture { width: 140px; padding: 8px; }
@@ -595,7 +597,14 @@ function decoderEquipe(eq) {
 }
 function nouveauLien(code, hote) { return { code, hote, salon: null, autre: null, vuAutre: false, pret: 0, manche: 0, graine: 0, recu: {}, envoi: {}, statut: "connexion", absentDepuis: 0 }; }
 // Sur téléphone, le bloc du défi est sous les modes : on le fait défiler jusqu'à lui
-function montrerBlocLigne() { setTimeout(() => { const b = document.getElementById("cb-ligne"); if (b) b.scrollIntoView({ block: "center", behavior: "smooth" }); }, 60); }
+function montrerBlocLigne() { setTimeout(() => { const b = document.getElementById("cb-ligne"); if (b) {
+    // Défile seulement verticalement, dans le panneau qui défile (jamais sur le côté)
+    let boite = b.parentElement;
+    while (boite && !(boite.scrollHeight > boite.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(boite).overflowY))) boite = boite.parentElement;
+    if (!boite) return;
+    const haut = b.getBoundingClientRect().top - boite.getBoundingClientRect().top + boite.scrollTop;
+    boite.scrollTo({ top: Math.max(0, haut - 12), left: 0, behavior: "smooth" });
+  } }, 60); }
 function creerLigne() { quitterLigne(); L = nouveauLien(nouveauCode(), true); Son.ok(); rendrePrep(); montrerBlocLigne(); brancher(L); }
 function rejoindreLigne(code) { quitterLigne(); L = nouveauLien(code, false); rendrePrep(); montrerBlocLigne(); brancher(L); }
 function quitterLigne() { if (L && L.salon) L.salon.fermer(); L = null; }

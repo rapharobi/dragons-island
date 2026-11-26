@@ -14,7 +14,7 @@ let D = null, ctxJeu = null, ui = null;
 const vue = { onglet: "dragons", filtre: "tous", id: "braisil", stade: 3, armure: null, ul: false, niveau: 10, sous: "fiche", anim: "repos", auto: true };
 
 styles("livre", `
-.lv-gauche { position: fixed; z-index: 15; left: var(--bord-g); top: calc(var(--hud) + 8px); bottom: calc(var(--bas) + 84px); width: 250px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.lv-gauche { position: fixed; z-index: 15; left: var(--bord-g); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: 250px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .lv-onglets { display: flex; gap: 4px; flex-wrap: wrap; }
 .lv-onglets button { flex: 1; padding: 7px 6px; border-radius: 8px; border: 1px solid var(--trait); background: none; font-size: 12px; font-weight: 600; color: var(--doux); }
 .lv-onglets button.actif { color: var(--ambre); border-color: var(--ambre); background: rgba(242,181,68,.1); }
@@ -26,7 +26,7 @@ styles("livre", `
 .lv-item b { font-family: var(--titre); font-size: 14px; font-weight: 600; }
 .lv-item small { font-size: 10px; color: var(--doux); }
 .lv-item .possede { color: var(--bon); font-size: 10px; font-weight: 700; }
-.lv-droite { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + 8px); bottom: calc(var(--bas) + 84px); width: min(400px, 34vw); padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
+.lv-droite { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: min(400px, 34vw); padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
 .lv-droite h2 { font-size: 30px; line-height: 1; }
 .lv-droite h3 { font-size: 15px; }
 .lv-droite p { margin: 0; line-height: 1.5; color: #d8d2c6; }
@@ -43,7 +43,7 @@ styles("livre", `
 .tbl tr.bloque td { color: #6a665e; }
 .tbl tr.ici td { background: rgba(242,181,68,.08); }
 .defile { overflow-x: auto; }
-.lv-plein { position: fixed; z-index: 15; left: calc(var(--bord-g) + 262px); right: var(--bord-d); top: calc(var(--hud) + 8px); bottom: calc(var(--bas) + 84px); padding: 18px 20px; overflow: auto; display: grid; gap: 16px; align-content: start; }
+.lv-plein { position: fixed; z-index: 15; left: calc(var(--bord-g) + 262px); right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); padding: 18px 20px; overflow: auto; display: grid; gap: 16px; align-content: start; }
 .lv-plein h2 { font-size: 26px; }
 .lv-plein section { display: grid; gap: 8px; max-width: 900px; }
 .lv-plein p { margin: 0; line-height: 1.55; color: #d8d2c6; max-width: 70ch; }
@@ -352,8 +352,8 @@ function pageRegles() {
   let cumul = 0;
   for (let k = 2; k <= 21; k++) { cumul += attenteOeuf(k); oe.append(el("tr", { class: k === 7 || k === 21 ? "ici" : "" }, el("td", { class: "num" }, k), el("td", { class: "num" }, `${attenteOeuf(k)} h`), el("td", { class: "num" }, cumul < 48 ? `${cumul} h` : `${(cumul / 24).toFixed(1)} j`))); }
   p.append(el("section", {}, el("div", { class: "etiquette" }, "Œufs"), el("h2", {}, "Minuteur et couvoir"),
-    el("p", {}, "Au début, on choisit un œuf parmi trois (Feu, Glace, Eau). Ensuite, le minuteur double à chaque œuf jusqu'à 24 h, puis ajoute 1 h à chaque œuf. Chaque œuf obtenu est choisi parmi les trois mêmes œufs ; le dragon qui sort est un de ceux qu'on n'a pas encore. Quand on les a tous, l'œuf donne un double. Il y a aussi une chance sur 10 chaque jour d'un œuf gratuit, des œufs trouvés en marchant, et des œufs dans les nids NFC."),
-    el("p", {}, `Tous les œufs passent par le couvoir : 1 œuf à la fois, qui éclot après ${COUVOIR[0].pas.toLocaleString("fr-FR")} pas. Le grand couvoir accueille 2 œufs qui éclosent ensemble après ${COUVOIR[1].pas.toLocaleString("fr-FR")} pas. Dans les réglages, on peut remplacer les pas par du temps (${COUVOIR[0].heures} h, ou ${COUVOIR[1].heures} h pour le grand couvoir).`),
+    el("p", {}, "Au début, on choisit un œuf parmi trois (Feu, Glace, Eau). Ensuite, le minuteur double à chaque œuf jusqu'à 24 h, puis ajoute 1 h à chaque œuf. Chaque œuf obtenu est choisi parmi les trois mêmes œufs ; le dragon qui sort est un de ceux qu'on n'a pas encore. Quand on les a tous, l'œuf donne un double. Il y a aussi une chance sur 10 chaque jour d'un œuf gratuit, et des œufs dans les nids NFC."),
+    el("p", {}, `Tous les œufs passent par le couvoir : 1 œuf à la fois, qui éclot après ${COUVOIR[0].heures} h. Le grand couvoir accueille 2 œufs qui éclosent ensemble après ${COUVOIR[1].heures} h. Chaque braise d'éclosion fait avancer un œuf d'un quart.`),
     el("div", { class: "defile" }, oe)));
   p.append(el("section", {}, el("div", { class: "etiquette" }, "Îles"), el("h2", {}, "Nourriture, fermes, énergie"),
     el("p", {}, `Une ration rend 20 % des PV. On en gagne en combat et sur les buissons. Un dragon doit manger chaque jour : chaque jour sans repas lui coûte 5 % de ses PV, sans jamais descendre sous 1. L'énergie va jusqu'à ${ENERGIE_MAX} et remonte de 1 par heure. Un combat classé coûte ${COUT.combat} d'énergie.`),

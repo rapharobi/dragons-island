@@ -59,10 +59,21 @@ export const ICONES = {
 export function icone(nom) { return el("span", { class: "ico", html: ICONES[nom] || "", style: { display: "inline-flex" }, "aria-hidden": "true" }); }
 
 export function toast(texte, type = "") {
-  const t = el("div", { class: "toast " + type }, texte);
-  document.getElementById("toasts").append(t);
-  setTimeout(() => { t.style.transition = "opacity .4s"; t.style.opacity = "0"; }, 2600);
-  setTimeout(() => t.remove(), 3100);
+  const boite = document.getElementById("toasts");
+  // Même message qu'un message encore affiché : on le compte au lieu d'en ajouter un
+  const cle = String(texte).replace(/\s*·\s*niveau \d+ !$/, "");
+  const deja = [...boite.children].find((x) => x._cle === cle && !x._fin);
+  const t = deja || el("div", { class: "toast " + type });
+  t._cle = cle; t._n = (t._n || 0) + 1;
+  t.textContent = t._n > 1 ? `${texte}  ×${t._n}` : texte;
+  if (!deja) boite.append(t);
+  else boite.append(t); // remonte en dernier
+  t.style.transition = ""; t.style.opacity = "1";
+  clearTimeout(t._a); clearTimeout(t._b);
+  t._a = setTimeout(() => { t._fin = true; t.style.transition = "opacity .4s"; t.style.opacity = "0"; }, 2600);
+  t._b = setTimeout(() => t.remove(), 3100);
+  // Jamais plus de 3 messages à l'écran
+  while (boite.children.length > 3) boite.firstElementChild.remove();
 }
 
 // Fenêtre par-dessus le jeu. boutons : [{ texte, classe, action }]

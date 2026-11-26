@@ -10,9 +10,9 @@ let ctx = null, bulle = null, reduite = false;
 export const MENTOR = "Maëlis";
 
 styles("tuto", `
-.tuto-bulle { position: fixed; z-index: 30; left: var(--bord-g); bottom: calc(var(--bas) + 86px); width: min(420px, calc(100vw - 32px)); padding: 14px 16px; display: grid; grid-template-columns: 46px 1fr; gap: 12px; background: rgba(20, 16, 30, .94); border: 1px solid rgba(190, 150, 255, .45); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); animation: entre .3s; }
+.tuto-bulle { position: fixed; z-index: 30; top: calc(var(--hud) + 6px); left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); padding: 14px 16px; display: grid; grid-template-columns: 46px 1fr; gap: 12px; background: rgba(20, 16, 30, .94); border: 1px solid rgba(190, 150, 255, .45); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); animation: entre .3s; }
 .tuto-bulle.haut { bottom: auto; top: calc(var(--hud) + 46px); left: 50%; transform: translateX(-50%); }
-.tuto-bulle.reduite { grid-template-columns: 30px auto; padding: 6px 12px 6px 6px; width: auto; bottom: auto; top: calc(var(--hud) + 54px); left: auto; right: var(--bord-d); transform: none; cursor: pointer; align-items: center; gap: 8px; }
+.tuto-bulle.reduite { grid-template-columns: 30px auto; padding: 4px 12px 4px 4px; width: auto; bottom: auto; top: calc(var(--hud) + 6px); left: auto; right: var(--bord-d); transform: none; cursor: pointer; align-items: center; gap: 8px; }
 .tuto-bulle.reduite .portrait { width: 30px; height: 30px; }
 .tuto-bulle.reduite .portrait svg { width: 20px; height: 20px; }
 .tuto-bulle .reduire { position: absolute; top: 6px; right: 8px; background: none; border: 0; color: var(--doux); font-size: 18px; line-height: 1; padding: 2px 6px; }
@@ -40,7 +40,7 @@ styles("tuto", `
 .choix-4 button:hover { background: color-mix(in srgb, var(--el) 16%, transparent); }
 .choix-4 button b { font-family: var(--titre); }
 .choix-4 button small { color: var(--doux); font-size: 11px; }
-@media (max-width: 560px) { .tuto-bulle { left: var(--bord-g); right: var(--bord-d); width: auto; bottom: calc(var(--bas) + 80px); grid-template-columns: 36px 1fr; padding: 10px 12px; } .tuto-bulle .portrait { width: 36px; height: 36px; } .tuto-bulle p { font-size: 12px; } .tuto-bulle.haut { top: calc(var(--hud) + 34px); left: var(--bord-g); right: var(--bord-d); transform: none; } .tuto-bulle.haut2 { bottom: auto; top: calc(var(--hud) + 100px); } .tuto-bulle.reduite { left: auto; right: var(--bord-d); top: calc(var(--hud) + 54px); } }
+@media (max-width: 560px) { .tuto-bulle { left: var(--bord-g); right: var(--bord-d); width: auto; transform: none; grid-template-columns: 30px 1fr; gap: 10px; padding: 8px 12px; max-height: 34vh; overflow: auto; } .tuto-bulle .portrait { width: 30px !important; height: 30px !important; } .tuto-bulle .portrait svg { width: 20px; height: 20px; } .tuto-bulle .bas { margin-top: 4px; } .tuto-bulle .portrait { width: 36px; height: 36px; } .tuto-bulle p { font-size: 12px; } .tuto-bulle.haut { top: calc(var(--hud) + 34px); left: var(--bord-g); right: var(--bord-d); transform: none; } .tuto-bulle.haut2 { bottom: auto; top: calc(var(--hud) + 100px); } .tuto-bulle.reduite { left: auto; right: var(--bord-d); top: calc(var(--hud) + 54px); } }
 `);
 
 const RUNE = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M12 3v18M7 7l10 10M17 7 7 17"/><circle cx="12" cy="12" r="8" stroke-opacity=".6"/></svg>';
@@ -78,7 +78,7 @@ const ETAPES = {
   },
   eclore: {
     num: 5, cible: "couvoir",
-    texte: () => "Les œufs éclosent quand tu marches avec ton téléphone : 2 500 pas d'habitude. Ces deux-là sont pressés, 300 pas suffisent. Dans la bêta, appuie sur « Marcher », puis « Faire éclore ».",
+    texte: () => "Les œufs éclosent avec le temps : 2 h d'habitude. Ces deux-là sont pressés, une minute suffit (ou une braise, si tu en as). Quand la barre est pleine, appuie sur « Faire éclore ».",
     fini: () => tous3(), suite: "ferme",
   },
   ferme: {
@@ -145,23 +145,30 @@ function aller(id) {
   if (et && et.fini && et.fini()) aller(et.suite);
 }
 
+// Le conseil se pose en haut de l'écran et réserve sa hauteur (variable --tuto) : les panneaux
+// et les boutons se placent en dessous au lieu d'être recouverts.
+function reserver() {
+  const h = bulle && !bulle.hidden ? Math.ceil(bulle.getBoundingClientRect().height) + 8 : 0;
+  document.documentElement.style.setProperty("--tuto", h + "px");
+}
 export function afficher() {
   if (bulle) { bulle.remove(); bulle = null; }
+  reserver();
   document.querySelectorAll("#nav a.tuto-cible").forEach((a) => a.classList.remove("tuto-cible"));
   if (!tutoActif()) return;
   const id = etape(), et = ETAPES[id];
   if (!et) return;
   const enCombat = ctx && ctx.ecran === "combat" && document.querySelector(".cb-haut");
-  const etroit = window.innerWidth <= 560;
-  const ficheOuverte = etroit && document.querySelector(".fiche-ile, .couv-panneau");
-  if (reduite) {
+  // Pendant un combat, seulement la pastille (le conseil du combat s'affiche ailleurs)
+  if (reduite || enCombat) {
     bulle = el("aside", { class: "tuto-bulle reduite", role: "button", tabindex: 0, title: "Afficher le conseil", onclick: () => { reduite = false; afficher(); } },
       el("div", { class: "portrait", html: RUNE }), el("b", {}, `${MENTOR} · ${et.num}/11`));
     document.body.append(bulle);
+    reserver();
     if (et.cible && (!ctx || ctx.ecran !== et.cible)) document.querySelector(`#nav a[href="#${et.cible}"]`)?.classList.add("tuto-cible");
     return;
   }
-  bulle = el("aside", { class: "tuto-bulle" + (enCombat ? " haut" : ficheOuverte ? " haut2" : ""), role: "status" },
+  bulle = el("aside", { class: "tuto-bulle", role: "status" },
     el("button", { class: "reduire", "aria-label": "Réduire le conseil", title: "Réduire", onclick: () => { reduite = true; afficher(); } }, "–"),
     el("div", { class: "portrait", html: RUNE }),
     el("div", {},
@@ -173,9 +180,10 @@ export function afficher() {
     ),
   );
   document.body.append(bulle);
+  reserver();
   if (et.cible && (!ctx || ctx.ecran !== et.cible)) document.querySelector(`#nav a[href="#${et.cible}"]`)?.classList.add("tuto-cible");
 }
-export function cacherBulle(c) { if (bulle) bulle.hidden = c; }
+export function cacherBulle(c) { if (bulle) bulle.hidden = c; reserver(); }
 
 // Bulle d'aide pendant un combat (premier tour)
 export function conseilCombat() {

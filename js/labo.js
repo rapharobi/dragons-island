@@ -1,5 +1,5 @@
 // Labo : les triches pour tester le jeu comme on veut (bêta uniquement).
-import { E, changer, nouveauDragon, fixerNiveau, soignerTout, ajouterPas, maintenant, reinitialiser, lieuSauvegarde, mettreAJour } from "./etat.js";
+import { E, changer, nouveauDragon, fixerNiveau, soignerTout, maintenant, reinitialiser, lieuSauvegarde, mettreAJour } from "./etat.js";
 import { DRAGONS, PAR_ID, ELEMENTS, ENERGIE_MAX, stadeDuNiveau, NIDS } from "./regles.js";
 import { el, styles, toast, modale } from "./ui.js";
 import { Son, Musique } from "./son.js";
@@ -8,7 +8,7 @@ let ctxJeu = null, ui = null;
 const H = 3600 * 1000;
 
 styles("labo", `
-.lb { position: fixed; z-index: 15; inset: calc(var(--hud) + 8px) var(--bord-d) calc(var(--bas) + 84px) var(--bord-g); max-width: 1100px; margin: 0 auto; padding: 18px; overflow: auto; display: grid; gap: 16px; align-content: start; background: rgba(13,14,19,.92); }
+.lb { position: fixed; z-index: 15; inset: calc(var(--hud) + var(--tuto, 0px) + 8px) var(--bord-d) calc(var(--bas) + 84px) var(--bord-g); max-width: 1100px; margin: 0 auto; padding: 18px; overflow: auto; display: grid; gap: 16px; align-content: start; background: rgba(13,14,19,.92); }
 .lb h2 { font-size: 26px; }
 .lb .groupes { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .lb .g { padding: 12px; border-radius: 12px; border: 1px solid var(--trait); background: rgba(255,255,255,.03); display: grid; gap: 8px; align-content: start; }
@@ -16,7 +16,7 @@ styles("labo", `
 .lb .g .b { display: flex; gap: 6px; flex-wrap: wrap; }
 .lb select, .lb input[type=number] { padding: 7px; border-radius: 8px; background: #1a1a22; color: var(--texte); border: 1px solid var(--trait-fort); font: inherit; }
 .lb .avert { font-size: 12px; color: #ffd98a; }
-@media (max-width: 560px) { .lb { inset: calc(var(--hud) + 8px) var(--bord-d) calc(var(--bas) + 78px) var(--bord-g); padding: 12px; } }
+@media (max-width: 560px) { .lb { inset: calc(var(--hud) + var(--tuto, 0px) + 8px) var(--bord-d) calc(var(--bas) + 78px) var(--bord-g); padding: 12px; } }
 `);
 
 export function ouvrir(ctx) {
@@ -51,7 +51,6 @@ function rendre() {
   gr.append(el("div", { class: "g" }, el("h3", {}, "Œufs et couvoir"), el("div", { class: "b" },
     act("+1 œuf à choisir", (s) => { s.oeufs.choix += 1; }),
     act("+5 œufs à choisir", (s) => { s.oeufs.choix += 5; }),
-    act("+2 500 pas", () => { ajouterPas(2500); }),
     act("Œufs du couvoir prêts", (s) => { for (const sl of s.oeufs.couvoir.slots) { sl.pasDepart = -1e9; sl.debut = 0; } }),
     act("Minuteur : œuf maintenant", (s) => { if (s.oeufs.minuteur.prochain) s.oeufs.minuteur.prochain = maintenant(); }),
     act("Grand couvoir", (s) => { s.oeufs.couvoir.niveau = 1; }),
@@ -87,7 +86,7 @@ function rendre() {
   gr.append(el("div", { class: "g" }, el("h3", {}, "Partie"), el("div", { class: "b" },
     el("button", { class: "btn petit", onclick: () => { const t = JSON.stringify(E()); navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast("Sauvegarde copiée.", "bon"), () => toast("Copie refusée par le navigateur.", "mal")); } }, "Copier la sauvegarde"),
     el("button", { class: "btn petit danger", onclick: () => modale({ titre: "Recommencer à zéro ?", contenu: "Toute la partie sera effacée : dragons, ressources, œufs.", boutons: [{ texte: "Annuler" }, { texte: "Tout effacer", classe: "danger", action: () => { reinitialiser(); location.hash = ""; location.reload(); } }] }) }, "Recommencer à zéro"),
-  ), el("p", { class: "avert", style: { margin: 0 } }, `Combats : ${e.combats.gagnes} gagnés, ${e.combats.perdus} perdus, ${e.combats.nuls} nuls. Pas : ${e.pas.total.toLocaleString("fr-FR")}.`)));
+  ), el("p", { class: "avert", style: { margin: 0 } }, `Combats : ${e.combats.gagnes} gagnés, ${e.combats.perdus} perdus, ${e.combats.nuls} nuls.`)));
 
   p.append(gr);
   if (e.journal.length) p.append(el("div", { class: "g" }, el("h3", {}, "Journal"), ...e.journal.slice(0, 12).map((j) => el("div", { class: "doux", style: { fontSize: "12px" } }, new Date(j.t).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }), " · ", j.texte))));

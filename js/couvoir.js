@@ -1,10 +1,10 @@
-// Le couvoir : choisir ses œufs, les faire éclore en marchant (ou avec le temps), voir le minuteur.
+// Le couvoir : choisir ses œufs, les faire éclore avec le temps (ou des braises), voir le minuteur.
 import { construireDragon } from "./modele.js";
 import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite } from "./scene.js";
 import { construireCouvoir, construireOeuf } from "./monde.js";
 import { mat, mesh, bloc } from "./outils3d.js";
-import { E, changer, choisirOeuf, avancement, pasRestants, tempsRestant, ajouterPas, eclore, defCouvoir, maintenant, elementComplet, nouveauDragon, demarrerMinuteur, payer, assez, energie, noter, livreComplet, chaufferOeuf, braisesPourFinir } from "./etat.js";
+import { E, changer, choisirOeuf, avancement, tempsRestant, eclore, defCouvoir, maintenant, elementComplet, nouveauDragon, demarrerMinuteur, payer, assez, energie, noter, livreComplet, chaufferOeuf, braisesPourFinir } from "./etat.js";
 import { PAR_ID, ELEMENTS, COUVOIR, RECETTE_COUVOIR, attenteOeuf, fmtDuree, STADES } from "./regles.js";
 import { el, styles, toast, modale, barre, recette, icone } from "./ui.js";
 import { signaler, apresPremierOeuf, enApprentissage, MENTOR } from "./tuto.js";
@@ -14,7 +14,7 @@ const T = window.THREE;
 let D = null, ctxJeu = null, ui = null, mode = "couvoir", intro = false, minuteurUI = null;
 
 styles("couvoir", `
-.couv-panneau { position: fixed; z-index: 15; left: var(--bord-g); top: calc(var(--hud) + 8px); width: min(400px, calc(100vw - 32px)); padding: 16px; display: grid; gap: 12px; max-height: calc(100vh - 170px); overflow: auto; }
+.couv-panneau { position: fixed; z-index: 15; left: var(--bord-g); top: calc(var(--hud) + var(--tuto, 0px) + 8px); width: min(400px, calc(100vw - 32px)); padding: 16px; display: grid; gap: 12px; max-height: calc(100vh - 170px); overflow: auto; }
 .couv-panneau h2 { font-size: 24px; }
 .couv-panneau .carte { padding: 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--trait); display: grid; gap: 8px; }
 .couv-panneau .ligne { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
@@ -26,7 +26,7 @@ styles("couvoir", `
 .choix-oeufs button:hover { background: color-mix(in srgb, var(--el) 26%, var(--panneau-plein)); }
 .choix-oeufs b { font-family: var(--titre); font-size: 18px; color: var(--el); }
 .choix-oeufs small { color: var(--doux); font-size: 11px; }
-.titre-intro { position: fixed; z-index: 16; top: calc(var(--hud) + 20px); left: 0; right: 0; text-align: center; padding: 0 var(--bord-d) 0 var(--bord-g); pointer-events: none; }
+.titre-intro { position: fixed; z-index: 16; top: calc(var(--hud) + var(--tuto, 0px) + 20px); left: 0; right: 0; text-align: center; padding: 0 var(--bord-d) 0 var(--bord-g); pointer-events: none; }
 .titre-intro h2 { font-size: clamp(26px, 5vw, 44px); }
 .titre-intro p { color: var(--doux); margin: 6px auto 0; max-width: 46ch; }
 @media (max-width: 560px) { .couv-panneau { left: var(--bord-g); right: var(--bord-d); width: auto; top: auto; bottom: calc(var(--bas) + 78px); max-height: 46vh; } .choix-oeufs { flex-direction: column; bottom: calc(var(--bas) + 80px); } .choix-oeufs button { padding: 9px 12px; } }
@@ -255,7 +255,7 @@ function rendre() {
   p.append(el("div", { class: "carte" },
     el("div", { class: "ligne" }, el("span", {}, "Prochain œuf"), el("b", { class: "num", id: "couv-minuteur" }, mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "—")),
     el("div", { class: "doux", style: { fontSize: "12px" } }, "Les attentes suivantes :"), chaine,
-    el("div", { class: "doux", style: { fontSize: "12px" } }, `Œufs reçus : ${mi.compte}. Il y a aussi une petite chance chaque jour d'un œuf gratuit, et des œufs à trouver en marchant (appli mobile).`),
+    el("div", { class: "doux", style: { fontSize: "12px" } }, `Œufs reçus : ${mi.compte}. Il y a aussi une petite chance chaque jour d'un œuf gratuit.`),
   ));
   // Réserve
   if (e.oeufs.reserve.length) {
@@ -277,11 +277,11 @@ function rendre() {
   if (e.oeufs.couvoir.niveau === 0) {
     p.append(el("div", { class: "carte" },
       el("b", {}, "Grand couvoir"),
-      el("div", { class: "doux", style: { fontSize: "12px" } }, "2 œufs en même temps, qui éclosent ensemble après 3 500 pas (au lieu de 2 500 pour un seul)."),
+      el("div", { class: "doux", style: { fontSize: "12px" } }, `2 œufs en même temps, qui éclosent ensemble après ${COUVOIR[1].heures} h (au lieu de ${COUVOIR[0].heures} h pour un seul).`),
       recette(RECETTE_COUVOIR, e.ressources, energie()),
       el("button", { class: "btn" + (assez(RECETTE_COUVOIR) ? " principal" : ""), disabled: !assez(RECETTE_COUVOIR), onclick: () => {
         let ok = false;
-        changer((s) => { ok = payer(RECETTE_COUVOIR); if (ok) { s.oeufs.couvoir.niveau = 1; for (const sl of s.oeufs.couvoir.slots) { sl.pasDepart = s.pas.total; sl.debut = maintenant(); } } });
+        changer((s) => { ok = payer(RECETTE_COUVOIR); if (ok) { s.oeufs.couvoir.niveau = 1; for (const sl of s.oeufs.couvoir.slots) { sl.debut = maintenant(); } } });
         if (ok) { Son.ok(); toast("Grand couvoir construit : 2 places !", "bon"); rendre(); }
       } }, "Améliorer le couvoir"),
     ));
@@ -297,8 +297,7 @@ function majProgression() {
   const def = defCouvoir();
   const b = blocProgression;
   b.innerHTML = "";
-  const modeTemps = e.reglages.mode === "temps";
-  b.append(el("div", { class: "ligne" }, el("b", {}, `Dans le couvoir (${e.oeufs.couvoir.slots.length}/${def.places})`), el("span", { class: "pil" }, modeTemps ? "Mode temps" : "Mode podomètre")));
+  b.append(el("div", { class: "ligne" }, el("b", {}, `Dans le couvoir (${e.oeufs.couvoir.slots.length}/${def.places})`)));
   if (!e.oeufs.couvoir.slots.length) b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, "Vide. Les œufs choisis viennent se placer ici."));
   let unPret = false;
   e.oeufs.couvoir.slots.forEach((s, i) => {
@@ -307,7 +306,7 @@ function majProgression() {
     unPret = unPret || pret;
     b.append(
       el("div", { class: "ligne" }, el("span", { style: { color: ELEMENTS[s.oeuf.element].couleur, fontWeight: 600 } }, `Œuf ${s.oeuf.element === "eau" ? "d'" : "de "}${ELEMENTS[s.oeuf.element].nom}`),
-        el("span", { class: "num doux" }, pret ? "prêt !" : modeTemps ? fmtDuree(tempsRestant(s)) : `${pasRestants(s).toLocaleString("fr-FR")} pas`)),
+        el("span", { class: "num doux" }, pret ? "prêt !" : fmtDuree(tempsRestant(s)))),
       barre(av, 1, ""),
     );
     if (!pret) {
@@ -324,13 +323,6 @@ function majProgression() {
     if (D.couvoir && D.couvoir.userData.oeufs[i]) { D.couvoir.userData.oeufs[i].userData.av = av; D.couvoir.userData.oeufs[i].userData.pret = pret; }
   });
   if (unPret) b.append(el("button", { class: "btn principal", onclick: () => faireEclore() }, def.places > 1 ? "Faire éclore les œufs prêts" : "Faire éclore"));
-  if (!modeTemps && e.oeufs.couvoir.slots.length) {
-    b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, `Tu as fait ${e.pas.total.toLocaleString("fr-FR")} pas en tout. Dans la bêta, le navigateur ne peut pas compter tes pas : simule ta marche ici, ou passe en mode « temps » dans les réglages.`));
-    b.append(el("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" } },
-      el("button", { class: "btn petit", onclick: () => { changer(() => ajouterPas(250)); Son.pas(); majProgression(); } }, icone("pas"), "Marcher 250 pas"),
-      el("button", { class: "btn petit", onclick: () => { changer(() => ajouterPas(1000)); Son.pas(); majProgression(); } }, "1 000 pas"),
-    ));
-  }
 }
 
 function faireEclore() {

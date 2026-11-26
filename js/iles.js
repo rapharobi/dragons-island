@@ -7,7 +7,7 @@ import {
   POS_ILES, NIVEAU_EAU, rayonBord, solIle, dansLEau, emplacements, construireIle, construireCentre, construireCouvoir,
   pont, construireNid, construireNoeud, construireOeuf, construireSource,
 } from "./monde.js";
-import { mat, mesh } from "./outils3d.js";
+import { mat, mesh, rng } from "./outils3d.js";
 import {
   E, changer, nourrir, nourrirElement, payer, assez, energie, recolter, noeudDispo, maintenant, noter, recolterSource, manqueSource,
   attendPercee, depenserEnergie,
@@ -27,7 +27,7 @@ let ctxJeu = null;
 export const LIEN_LIVRE = window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM";
 
 styles("iles", `
-.iles-choix { position: fixed; top: calc(var(--hud) + 6px); left: var(--bord-g); display: flex; gap: 6px; flex-wrap: wrap; z-index: 15; }
+.iles-choix { position: fixed; top: calc(var(--hud) + var(--tuto, 0px) + 6px); left: var(--bord-g); display: flex; gap: 6px; flex-wrap: wrap; z-index: 15; }
 .iles-choix .btn.actif { border-color: var(--ambre); color: var(--ambre); }
 .iles-aide { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bas) + 86px); z-index: 12; font-size: 12px; color: var(--doux); background: var(--panneau); border: 1px solid var(--trait); padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
 .fiche-ile { position: fixed; z-index: 16; right: var(--bord-d); bottom: calc(var(--bas) + 84px); width: min(380px, calc(100vw - 32px)); padding: 14px 16px 16px; max-height: calc(100vh - 220px); overflow: auto; }
@@ -48,8 +48,8 @@ styles("iles", `
 .etiq.alerte { border-color: var(--ambre); }
 .etiq .humeur { font-size: 10px; color: var(--doux); }
 .etiq .recolte { font-size: 11px; color: var(--ambre); font-weight: 600; }
-.bandeau-placement { position: fixed; z-index: 18; top: calc(var(--hud) + 54px); left: 50%; transform: translateX(-50%); padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; width: min(560px, calc(100vw - 32px)); text-align: center; }
-@media (max-width: 560px) { .fiche-ile { left: var(--bord-g); right: var(--bord-d); width: auto; bottom: calc(var(--bas) + 78px); max-height: 52vh; } .iles-aide { display: none; } .etiq .humeur { display: none; } }
+.bandeau-placement { position: fixed; z-index: 18; top: calc(var(--hud) + var(--tuto, 0px) + 54px); left: 50%; transform: translateX(-50%); padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; width: min(560px, calc(100vw - 32px)); text-align: center; }
+@media (max-width: 560px) { .fiche-ile { left: var(--bord-g); right: var(--bord-d); width: auto; bottom: calc(var(--bas) + 76px); max-height: min(40vh, calc(100vh - var(--hud) - var(--tuto, 0px) - var(--bas) - 240px)); padding: 12px 14px 14px; } .fiche-ile h3 { font-size: 19px; } body.avec-fiche .iles-choix { display: none; } .iles-aide { display: none; } .etiq .humeur { display: none; } }
 `);
 
 // Ressources à récolter : [type, angle]
@@ -61,8 +61,13 @@ const NOEUDS = {
 // Objets cassables du lagon de l'île d'Eau : [type, angle, distance du centre]. Seuls les dragons nageurs y vont.
 const LAGON = [["epave", 1.4, 4.6], ["epave", 2.45, 3.6], ["epave", 4.2, 4.4], ["epave", 5.25, 4.6], ["epave", 0.35, 2.6], ["recif", 1.25, 6.0], ["recif", 3.15, 6.2], ["recif", 4.95, 6.0], ["recif", 6.0, 2.6]];
 const AQUA = (type) => type === "epave" || type === "recif";
+// Décor cassable en plus sur chaque île (placé au hasard, toujours au même endroit)
+const DECORS = { feu: [["arbre_mort", 4], ["basalte", 4]], glace: [["sapin", 4], ["bloc_glace", 4]], eau: [["palmier", 4]] };
 // Récolte plus généreuse : les buissons donnent aussi des rations
-const GAINS = { buisson: { brindilles: 7, rations: 2 }, rocher: { pierres: 5 }, gisement: null, epave: { brindilles: 6, rations: 3 }, recif: { corail: 3, pierres: 4 } };
+const GAINS = {
+  buisson: { brindilles: 7, rations: 2 }, rocher: { pierres: 5 }, gisement: null, epave: { brindilles: 6, rations: 3 }, recif: { corail: 3, pierres: 4 },
+  arbre_mort: { brindilles: 8 }, basalte: { pierres: 4, obsidienne: 2 }, sapin: { brindilles: 6, rations: 1 }, bloc_glace: { pierres: 3, givrite: 2 }, palmier: { brindilles: 5, rations: 3 },
+};
 const CENTRE = { feu: [-0.8, -1.2, 3.6], glace: [0.4, 0.6, 2.8], eau: [0, 0, 1.4] };
 const POS_SOURCE = { feu: [-0.8, -1.2], glace: [0.4, 0.6], eau: [0, 0] };
 
@@ -85,7 +90,7 @@ function construireDecor() {
 
   const camera = new T.PerspectiveCamera(42, 1, 0.1, 760);
   const orbite = new Orbite(camera, document.getElementById("scene3d"));
-  orbite.min = 4; orbite.max = 140; orbite.phiMax = 1.45;
+  orbite.min = 2; orbite.max = 140; orbite.phiMax = 1.45;
   orbite.deplacement = true;
   orbite.limite = { centre: new T.Vector3(0, 0, 0), rayon: 55 };
   orbite.viser(new T.Vector3(0, 0, 0), 90, 0.3, 0.95);
@@ -115,12 +120,40 @@ function construireDecor() {
       const x = Math.cos(ang) * rb, z = Math.sin(ang) * rb;
       n.position.set(x, iles[elx].sol(x, z), z);
       n.scale.setScalar(1.3);
-      n.userData.base = 1.3;
+      n.userData.base = 1.3; n.userData.cassable = true; n.userData.y = n.position.y;
       const cle = `${elx}-${i}`;
       n.userData.action = { type: "noeud", cle, noeud: type, element: elx };
       iles[elx].groupe.add(n);
       iles[elx].noeuds.push({ objet: n, cle });
     });
+  }
+  // Arbres, roches et blocs de glace cassables, posés là où il y a de la place
+  for (const elx of ["feu", "glace", "eau"]) {
+    const r = rng(elx.length * 97 + 5);
+    const nids = emplacements(elx);
+    const [cx, cz, cr] = CENTRE[elx];
+    const pris = iles[elx].noeuds.map((n) => n.objet.position);
+    let i = 0;
+    for (const [type, nb] of DECORS[elx]) for (let k = 0; k < nb; k++, i++) {
+      for (let essai = 0; essai < 250; essai++) {
+        const a = r() * Math.PI * 2, d = rayonBord(elx, a) * (elx === "eau" ? 0.7 + r() * 0.22 : 0.3 + r() * 0.52);
+        const x = Math.cos(a) * d, z = Math.sin(a) * d, y = iles[elx].sol(x, z);
+        if ((elx === "eau" && y < 0.12) || (elx === "glace" && y > 1.9)) continue;
+        if (Math.hypot(x - cx, z - cz) < cr + 1.3) continue;
+        if (nids.some((e) => Math.hypot(e.x - x, e.z - z) < 2.1) || pris.some((p) => Math.hypot(p.x - x, p.z - z) < 1.7)) continue;
+        const n = construireNoeud(type, elx, 300 + i * 13 + elx.length);
+        n.position.set(x, y, z); n.rotation.y = r() * 6;
+        const base = type === "basalte" || type === "bloc_glace" ? 1.3 : 1.05;
+        n.scale.setScalar(base);
+        n.userData.base = base; n.userData.cassable = true; n.userData.y = y;
+        const cle = `${elx}-d${i}`;
+        n.userData.action = { type: "noeud", cle, noeud: type, element: elx };
+        iles[elx].groupe.add(n);
+        iles[elx].noeuds.push({ objet: n, cle });
+        pris.push(n.position);
+        break;
+      }
+    }
   }
   // Le lagon : épaves qui flottent et récifs au fond, à casser
   {
@@ -146,6 +179,7 @@ function construireDecor() {
     focus: null, t: 0, fond: false, suivi: null, placement: null, marqueurs: [], repas: [], rituel: null, eclats: [],
     update(dt) {
       D.t += dt;
+      if (D.suivi && orbite.distV > (D.suiviDist || 1e9) * 1.6) { D.suivi = null; majBoutons(); }
       if (D.suivi) { const v = new T.Vector3(); D.suivi.mobile.getWorldPosition(v); v.y += D.suivi.hauteur * 0.45; orbite.cibleVoulue.copy(v); }
       orbite.update(dt);
       for (const ile of Object.values(iles)) {
@@ -165,7 +199,7 @@ function construireDecor() {
       for (const m of D.marqueurs) { m.rotation.y += dt; m.children[0].material.opacity = 0.5 + Math.sin(D.t * 4) * 0.25; }
       if (E()) for (const ile of Object.values(iles)) for (const n of ile.noeuds) {
         const u = n.objet.userData;
-        const k = (noeudDispo(n.cle) ? 1 : u.cassable ? 0.001 : 0.25) * u.base;
+        const k = (noeudDispo(n.cle) ? 1 : 0.001) * u.base;
         n.objet.scale.setScalar(n.objet.scale.x + (k - n.objet.scale.x) * Math.min(1, dt * (u.cassable && k > n.objet.scale.x ? 1.5 : 4)));
         if (u.cassable) {
           n.objet.visible = n.objet.scale.x > 0.03;
@@ -265,12 +299,20 @@ function tourner(v, angle, dt, vitesse = 5) {
   return Math.abs(d);
 }
 
+// v.libre : le dragon est en mission hors de son milieu (un terrestre dans le lagon, un nageur sur la plage)
+const enEau = (v) => (v.libre ? dansLEau(v.element, v.mobile.position.x, v.mobile.position.z) : nage(v));
 function hauteurVoulue(v, x, z) {
   const sol = solIle(v.element, x, z);
-  if (!nage(v)) return sol;
   const surface = NIVEAU_EAU - v.hauteur * 0.35;
-  // Pour casser un récif, même un dragon de surface plonge jusqu'en bas
-  if (v.recolte && v.recolte.type === "recif" && (v.etat === "recolte" || v.etat === "versRecolte")) return Math.min(surface, v.recolte.objet.position.y + 0.35);
+  // Pour casser un récif, le dragon plonge jusqu'en bas
+  const plonge = v.recolte && v.recolte.type === "recif" && (v.etat === "recolte" || v.etat === "versRecolte");
+  if (v.libre) {
+    if (!dansLEau(v.element, x, z)) return sol;
+    if (plonge) return Math.max(sol + 0.1, Math.min(surface, v.recolte.objet.position.y + 0.35));
+    if (!nage(v)) return Math.max(sol, surface);
+  }
+  if (!nage(v)) return sol;
+  if (plonge) return Math.min(surface, v.recolte.objet.position.y + 0.35);
   if (v.habitat === "surface") return Math.max(sol + 0.1, surface);
   // Au fond, mais pas collé au sable : on les voit nager à travers l'eau
   const fond = sol + 0.25;
@@ -288,11 +330,12 @@ function vivre(v, dt) {
     case "marche": case "nid": case "rejoindre": case "versRecolte": case "nage": case "rituel": {
       const dx = v.cible.x - p.x, dz = v.cible.z - p.z, dist = Math.hypot(dx, dz);
       if (dist < 0.25) {
-        v.anim.jouer(nage(v) ? "nage" : "repos");
+        v.anim.jouer(enEau(v) ? "nage" : "repos");
         if (v.etapes && v.etapes.length) { v.cible = v.etapes.shift(); break; }
         if (v.etat === "versRecolte") { v.etat = "recolte"; v.recolte.t = 0; v.prochainCoup = 0; break; }
         if (v.etat === "rituel") { v.etat = "rituelPret"; break; }
         if (v.etat === "nid") {
+          v.libre = false;
           if (!nage(v) && (v.fatigue > 30 || Math.random() < 0.4)) { v.etat = "dort"; v.anim.jouer("dormir"); v.minuteur = 14 + Math.random() * 14; }
           else { v.etat = "pause"; v.minuteur = 1 + Math.random() * 2; }
         } else if (v.etat === "rejoindre") { v.etat = "attendre"; v.minuteur = 4; }
@@ -303,7 +346,7 @@ function vivre(v, dt) {
       const vit = 1.0 * v.vitesse * Math.max(0.6, v.echelle) * (ecart > 1 ? 0.3 : 1);
       p.x += (dx / dist) * vit * dt; p.z += (dz / dist) * vit * dt;
       v.anim.cadence = 5.5 * v.vitesse / Math.max(0.6, v.echelle);
-      v.anim.jouer(nage(v) ? "nage" : "marche");
+      v.anim.jouer(enEau(v) ? "nage" : "marche");
       break;
     }
     case "attendre": {
@@ -342,7 +385,7 @@ function vivre(v, dt) {
         v.prochainCoup = aqua ? 1.2 : 0.95;
         v.anim.jouer(aqua ? "attaque" : "creuser");
         rc.objet.scale.setScalar(rc.objet.userData.base * (0.9 + Math.random() * 0.12));
-        if (aqua) eclater(rc.objet, rc.type, 4);
+        eclater(rc.objet, rc.type, 4, rc.element);
         if (v.proche) Son.recolte(SON_RECOLTE[rc.type] || "cristal");
       }
       if (rc.t >= rc.duree) finirRecolte(v);
@@ -364,6 +407,8 @@ function vivre(v, dt) {
     default: {
       if (v.etat === "pause" && Math.random() < dt * 0.3) tourner(v, v.mobile.rotation.y + (Math.random() - 0.5), dt, 1);
       if (nage(v) && v.etat === "pause") v.anim.jouer("nage");
+      // Mission finie : le dragon rentre chez lui
+      if (v.libre && v.minuteur <= 0 && !v.anim.action) { allerVers(v, v.maison.clone(), "nid", 1.1); break; }
       if (v.minuteur <= 0 && !v.anim.action && D.suivi !== v) choisirEnvie(v);
     }
   }
@@ -372,36 +417,37 @@ function vivre(v, dt) {
 }
 
 // ---------- Récolte : un dragon de l'île va chercher la ressource ----------
-const DUREE_RECOLTE = { buisson: 3, rocher: 4, gisement: 5, epave: 3.5, recif: 4.5 };
-const SON_RECOLTE = { buisson: "bois", rocher: "pierre", epave: "eau", recif: "eau" };
+const DUREE_RECOLTE = { buisson: 3, rocher: 4, gisement: 5, epave: 3.5, recif: 4.5, arbre_mort: 3.5, basalte: 4.5, sapin: 3.5, bloc_glace: 4, palmier: 3.5 };
+const SON_RECOLTE = { buisson: "bois", rocher: "pierre", epave: "eau", recif: "eau", arbre_mort: "bois", sapin: "bois", palmier: "bois", basalte: "pierre", bloc_glace: "pierre" };
 function nomIle(elx) { return elx === "eau" ? "d'Eau" : elx === "feu" ? "de Feu" : "de Glace"; }
 const occupe = (v) => ["recolte", "versRecolte", "rituel", "rituelPret"].includes(v.etat);
 function lancerRecolte(a, objet) {
   if ([...D.dragons.values()].some((v) => v.recolte && v.recolte.cle === a.cle && (v.etat === "recolte" || v.etat === "versRecolte"))) { toast("Un dragon s'en occupe déjà."); return; }
   const o = objet.position;
   const aqua = AQUA(a.noeud);
-  const bon = (v) => v.element === a.element && !v.ko && (aqua ? nage(v) : !nage(v));
+  // Tous les dragons de l'île peuvent y aller, qu'ils nagent ou marchent
+  const bon = (v) => v.element === a.element && !v.ko;
   const libres = [...D.dragons.values()].filter((v) => bon(v) && !occupe(v));
   if (!libres.length) {
     const tous = [...D.dragons.values()].some(bon);
     Son.erreur();
-    if (aqua) toast(tous ? "Tous les dragons nageurs sont déjà au travail." : "Il faut un dragon qui nage dans le lagon (nid en surface ou au fond) pour casser ça.", "mal");
-    else toast(tous ? "Tous les dragons terrestres de cette île sont déjà au travail." : `Il faut un dragon qui vit sur la terre ferme de l'île ${nomIle(a.element)}.`, "mal");
+    toast(tous ? "Tous les dragons de cette île sont déjà au travail." : `Il faut un dragon sur l'île ${nomIle(a.element)}.`, "mal");
     return;
   }
   // Dans le lagon, on préfère un plongeur pour un récif et un dragon de surface pour une épave
-  const malus = (v) => (aqua && v.habitat !== (a.noeud === "recif" ? "fond" : "surface") ? 4 : 0);
+  const malus = (v) => (aqua ? (v.habitat === (a.noeud === "recif" ? "fond" : "surface") ? 0 : nage(v) ? 2 : 4) : nage(v) ? 4 : 0);
   libres.sort((x, y) => x.mobile.position.distanceTo(o) + malus(x) - y.mobile.position.distanceTo(o) - malus(y));
   const v = libres[0];
   if (v.ami) { const ami = v.ami; ami.ami = null; if (ami.etat === "rejoindre" || ami.etat === "attendre") { ami.etat = "pause"; ami.minuteur = 1; } v.ami = null; }
-  if (aqua) {
-    // Les nageurs y vont tout droit, en surface pour une épave, au fond pour un récif
+  v.libre = aqua !== nage(v);
+  if (aqua || nage(v)) {
+    // Tout droit : en surface pour une épave, au fond pour un récif, ou de l'eau jusqu'à la plage
     const dir = o.clone().sub(v.mobile.position).setY(0).normalize();
     const fin = o.clone().sub(dir.multiplyScalar(0.8 + v.taille * 0.4)); fin.y = 0;
     v.etapes = [];
     v.profondeurVoulue = a.noeud === "recif" ? 1 : 0;
     allerVers(v, fin, "versRecolte", 1.7);
-    v.anim.jouer("nage");
+    v.anim.jouer(enEau(v) ? "nage" : "marche");
   } else envoyer(v, o, "versRecolte", 2.2, 0.9 + v.taille * 0.45);
   v.recolte = { cle: a.cle, type: a.noeud, element: a.element, objet, duree: DUREE_RECOLTE[a.noeud] || 4, t: 0 };
   Son.clic();
@@ -433,21 +479,21 @@ function finirRecolte(v) {
   if (!ok) return;
   Son.recolte(SON_RECOLTE[rc.type] || "cristal");
   toast(`${PAR_ID[v.d.id].nom} rapporte ${Object.entries(gains).map(([k, n]) => `${n} ${(MATERIAUX[k] ? MATERIAUX[k].nom : k).toLowerCase()}`).join(" et ")}.`, "bon");
-  if (AQUA(rc.type)) { eclater(rc.objet, rc.type, 26); rc.objet.scale.setScalar(0.001); rc.objet.visible = false; }
-  else rc.objet.scale.setScalar(rc.objet.userData.base * 1.3);
+  eclater(rc.objet, rc.type, 24, rc.element); rc.objet.scale.setScalar(0.001); rc.objet.visible = false;
   signaler("recolte");
 }
 
 // ---------- Éclats : l'objet cassé vole en morceaux (bois qui flotte, corail qui coule, bulles) ----------
 const GEO_ECLAT = [new T.BoxGeometry(0.16, 0.05, 0.08), new T.TetrahedronGeometry(0.08, 0), new T.IcosahedronGeometry(0.05, 0)];
 const GEO_BULLE = new T.IcosahedronGeometry(0.045, 1);
-function eclater(objet, type, n) {
+function eclater(objet, type, n, elx = "eau") {
   const parent = objet.parent;
   if (!parent || D.eclats.length > 160) return;
   const couleurs = [];
   objet.traverse((o) => { if (o.isMesh && o.material && o.material.color) couleurs.push(o.material.color.getHex()); });
-  const flotte = type === "epave";
-  const c = objet.position.clone(); c.y += flotte ? 0.1 : 0.35;
+  const flotte = type === "epave", terre = !AQUA(type);
+  const sol = (x, z) => D.iles[elx].sol(x, z);
+  const c = objet.position.clone(); c.y += flotte ? 0.1 : terre ? 0.5 : 0.35;
   for (let i = 0; i < n; i++) {
     const coul = couleurs[Math.floor(Math.random() * couleurs.length)] || 0x8a5a32;
     const m = new T.Mesh(GEO_ECLAT[i % 3], mat(coul, { unique: true, o: 0.999, r: 0.8 }));
@@ -455,7 +501,19 @@ function eclater(objet, type, n) {
     m.scale.setScalar(0.8 + Math.random() * 0.9);
     const a = Math.random() * 6.28, f = (flotte ? 1.6 : 1.0) * (0.5 + Math.random());
     parent.add(m);
-    D.eclats.push({ o: m, v: new T.Vector3(Math.cos(a) * f, (flotte ? 2.4 : 1.2) * (0.4 + Math.random()), Math.sin(a) * f), rot: new T.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), t: 0, vie: flotte ? 4 + Math.random() * 2 : 2.5 + Math.random(), flotte, sol: flotte ? NIVEAU_EAU : D.iles.eau.sol(m.position.x, m.position.z) + 0.04 });
+    D.eclats.push({ o: m, v: new T.Vector3(Math.cos(a) * f, (flotte || terre ? 2.6 : 1.2) * (0.4 + Math.random()), Math.sin(a) * f), rot: new T.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), t: 0, vie: flotte ? 4 + Math.random() * 2 : 2.5 + Math.random(), flotte, terre, sol: flotte ? NIVEAU_EAU : sol(m.position.x, m.position.z) + 0.04, elx });
+  }
+  if (terre) {
+    // Un petit nuage de poussière (de neige sur l'île de Glace)
+    const coul = elx === "glace" ? 0xffffff : elx === "feu" ? 0x6a5a52 : 0xe8dcb0;
+    for (let i = 0; i < Math.ceil(n / 3); i++) {
+      const m = new T.Mesh(GEO_BULLE, mat(coul, { unique: true, o: 0.7, r: 1 }));
+      m.position.copy(objet.position).add(new T.Vector3((Math.random() - 0.5) * 0.8, 0.1, (Math.random() - 0.5) * 0.8));
+      m.scale.setScalar(2 + Math.random() * 2.5);
+      parent.add(m);
+      D.eclats.push({ o: m, v: new T.Vector3((Math.random() - 0.5) * 0.6, 0.4 + Math.random() * 0.4, (Math.random() - 0.5) * 0.6), rot: new T.Vector3(), t: 0, vie: 1.1, bulle: true, poussiere: true });
+    }
+    return;
   }
   // Des bulles (récif) ou des gerbes d'écume (épave)
   for (let i = 0; i < Math.ceil(n / 2); i++) {
@@ -470,7 +528,15 @@ function majEclats(dt) {
   for (let i = D.eclats.length - 1; i >= 0; i--) {
     const e = D.eclats[i], p = e.o.position;
     e.t += dt;
-    if (e.bulle) {
+    if (e.poussiere) {
+      p.addScaledVector(e.v, dt); e.o.scale.multiplyScalar(1 + dt * 0.8);
+    } else if (e.terre) {
+      // Morceaux qui retombent et rebondissent sur le sol
+      e.v.y -= 9 * dt; p.addScaledVector(e.v, dt);
+      e.o.rotation.x += e.rot.x * dt; e.o.rotation.z += e.rot.z * dt;
+      const s = D.iles[e.elx].sol(p.x, p.z) + 0.04;
+      if (p.y < s) { p.y = s; e.v.y = Math.abs(e.v.y) * 0.3; e.v.x *= 0.5; e.v.z *= 0.5; e.rot.multiplyScalar(0.5); }
+    } else if (e.bulle) {
       if (e.flotte) e.v.y -= 9 * dt; // écume : retombe
       else { e.v.x += (Math.random() - 0.5) * dt * 2; if (p.y > NIVEAU_EAU) e.t = Math.max(e.t, e.vie - 0.2); }
       p.addScaledVector(e.v, dt);
@@ -740,9 +806,26 @@ function suivre(v) {
   D.fond = false;
   D.focus = v.element;
   D.suivi = v;
-  D.orbite.distV = Math.max(5, v.taille * 2.6 + 2.5) * (window.innerWidth / window.innerHeight < 0.8 ? 1.5 : 1);
+  const z = ficheUI ? zoneVisible() : null;
+  if (z) ctxJeu.moteur.definirZone(z);
+  D.orbite.distV = D.suiviDist = distanceSuivi(v, z);
   D.orbite.phiV = 1.12;
   majBoutons();
+}
+// Distance de caméra pour que le dragon remplisse bien la partie visible de l'écran
+function distanceSuivi(v, z) {
+  const t = Math.tan((D.camera.fov * Math.PI) / 360);
+  const zh = z ? z.h : 0.8, zl = z ? z.l : 1;
+  const haut = v.hauteur * 1.5 + 0.6, large = v.hauteur * 2.2 + 0.8;
+  const d = Math.max(haut / (2 * t * zh * 0.85), large / (2 * t * zl * D.camera.aspect * 0.85));
+  return Math.max(2.2, Math.min(60, d));
+}
+// Recalcule la zone visible (au-dessus de la fiche) et le cadrage du dragon suivi
+function majCadrage() {
+  if (!D || !ficheUI || !ctxJeu || ctxJeu.ecran !== "iles") return;
+  const z = zoneVisible();
+  ctxJeu.moteur.definirZone(z);
+  if (D.suivi) D.orbite.distV = D.suiviDist = distanceSuivi(D.suivi, z);
 }
 
 // ---------- Caméra ----------
@@ -817,7 +900,7 @@ export function ouvrir(ctx) {
   calqueEtiq = el("div", { class: "etiquettes-3d" });
   racineUI.append(calqueEtiq);
   etiquettes.clear();
-  racineUI.append(el("div", { class: "iles-aide" }, "Touche une ressource : un dragon ira la récolter (dans le lagon, ce sont les nageurs qui cassent épaves et récifs). Deux doigts (ou clic droit) pour te déplacer."));
+  racineUI.append(el("div", { class: "iles-aide" }, "Touche un arbre, un rocher, une épave ou un récif : un dragon de l'île ira le casser. Deux doigts (ou clic droit) pour te déplacer."));
   if (!D.focus) { const premier = E().dragons[0]; focaliser(premier ? PAR_ID[premier.id].element : "tout"); } else focaliser(D.focus);
   ctx.majHud();
   signaler("ecran", "iles");
@@ -834,19 +917,31 @@ function majBoutons() {
   }
 }
 
-function fermerFiche() { if (ficheUI) { ficheUI.remove(); ficheUI = null; afficherTuto(); ctxJeu.moteur.definirZone(null); } if (D && D.suivi) { D.suivi = null; majBoutons(); } }
+function fermerFiche() { document.body.classList.remove("avec-fiche"); if (ficheUI) { if (ficheUI._ro) ficheUI._ro.disconnect(); ficheUI.remove(); ficheUI = null; afficherTuto(); ctxJeu.moteur.definirZone(null); } if (D && D.suivi) { D.suivi = null; majBoutons(); } }
 function zoneVisible() {
   const l = window.innerWidth, h = window.innerHeight;
-  const hud = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--hud")) || 50;
-  if (l <= 560) { const haut = (hud + 90) / h; return { x: 0, y: haut, l: 1, h: Math.max(0.18, 0.46 - haut) }; }
+  if (l <= 560) {
+    // Entre le bas de l'interface du haut (barre, conseil de Maëlis) et le haut de la fiche
+    let haut = 50;
+    for (const sel of ["#hud", ".tuto-bulle", "#iles-choix"]) {
+      const e = document.querySelector(sel);
+      if (!e || e.hidden) continue;
+      const r = e.getBoundingClientRect();
+      if (r.height > 0 && r.top < h * 0.5) haut = Math.max(haut, r.bottom);
+    }
+    const bas = ficheUI ? ficheUI.getBoundingClientRect().top : h * 0.62;
+    return { x: 0, y: haut / h, l: 1, h: Math.max(0.12, (bas - haut - 6) / h) };
+  }
   return { x: 0, y: 0, l: 1 - Math.min(400, l * 0.4) / l, h: 1 };
 }
 function nouvelleFiche() {
   if (ficheUI) { ficheUI.remove(); ficheUI = null; }
   ficheUI = el("section", { class: "fiche-ile panneau" });
   racineUI.append(ficheUI);
+  document.body.classList.add("avec-fiche");
+  if (window.ResizeObserver) { const ro = new ResizeObserver(() => majCadrage()); ro.observe(ficheUI); ficheUI._ro = ro; }
   ctxJeu.moteur.definirZone(zoneVisible());
-  setTimeout(afficherTuto, 0);
+  setTimeout(() => { afficherTuto(); majCadrage(); }, 0);
   return ficheUI;
 }
 const enTete = (titre, ...sous) => el("header", {}, el("div", {}, el("h3", {}, titre), el("div", { class: "sous" }, ...sous)), el("button", { class: "fermer-fiche", "aria-label": "Fermer", onclick: () => fermerFiche(), html: icone("fermer").innerHTML }));

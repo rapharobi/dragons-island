@@ -33,17 +33,7 @@ function rendre() {
   const p = el("section", { class: "rg panneau" });
   p.append(el("div", {}, el("div", { class: "etiquette" }, "Préférences"), el("h2", {}, "Réglages")));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Faire éclore les œufs"),
-    el("p", {}, `Par défaut, il faut marcher : ${COUVOIR[0].pas.toLocaleString("fr-FR")} pas par œuf (podomètre du téléphone). Tu peux désactiver le podomètre, sur PC comme sur téléphone : l'œuf éclot alors avec le temps (${COUVOIR[0].heures} h par œuf, ${COUVOIR[1].heures} h pour le grand couvoir).`),
-    seg([["podometre", "Podomètre (par défaut)"], ["temps", "Temps à la place"]], r.mode, (v) => changer((s) => {
-      // On garde l'avancement des œufs déjà au couvoir quand on change de mode
-      const def = COUVOIR[s.oeufs.couvoir.niveau];
-      for (const sl of s.oeufs.couvoir.slots) {
-        const av = s.reglages.mode === "temps" ? Math.min(1, (Date.now() + s.decalage - sl.debut) / (def.heures * 3600e3)) : Math.min(1, (s.pas.total - sl.pasDepart) / def.pas);
-        sl.pasDepart = s.pas.total - av * def.pas;
-        sl.debut = Date.now() + s.decalage - av * def.heures * 3600e3;
-      }
-      s.reglages.mode = v;
-    }))));
+    el("p", {}, `Les œufs éclosent avec le temps : ${COUVOIR[0].heures} h par œuf, ${COUVOIR[1].heures} h pour les deux œufs du grand couvoir. Les braises d'éclosion de la boutique les font avancer plus vite.`)));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Son"),
     seg([[true, "Bruitages activés"], [false, "Bruitages coupés"]], r.son, (v) => { changer((s) => { s.reglages.son = v; }); initAudio(); reglerSon(v, E().reglages.musique); }),
     seg([[true, "Musique activée"], [false, "Musique coupée"]], r.musique, (v) => { changer((s) => { s.reglages.musique = v; }); initAudio(); reglerSon(E().reglages.son, v); })));
@@ -51,6 +41,6 @@ function rendre() {
     el("p", {}, "20 secondes dans le jeu final. Tu peux l'enlever pour tester tranquillement."),
     seg([[20, "20 secondes"], [40, "40 secondes"], [0, "Sans limite"]], r.chrono, (v) => changer((s) => { s.reglages.chrono = v; }))));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Sauvegarde"), el("p", {}, lieuSauvegarde() === "compte" ? "Ta partie est enregistrée avec ton compte : tu la retrouves sur tes autres appareils en ouvrant ce lien." : "Ta partie est enregistrée dans ce navigateur. Si tu effaces les données du site, elle sera perdue.")));
-  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.9 : jeu complet hors ligne, avec des bots à la place des vrais adversaires. Le podomètre, le GPS et les nids NFC arriveront avec l'appli mobile.")));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.10 : jeu complet, avec des bots à la place des vrais adversaires et le défi en ligne entre amis. Le GPS et les nids NFC arriveront avec l'appli mobile.")));
   ui.append(p);
 }

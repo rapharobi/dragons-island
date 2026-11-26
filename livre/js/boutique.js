@@ -12,7 +12,7 @@ let D = null, ctxJeu = null, ui = null;
 const vue = { uid: null, armure: "cuirasse" };
 
 styles("boutique", `
-.bq-panneau { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + 8px); bottom: calc(var(--bas) + 84px); width: min(430px, 40vw); padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
+.bq-panneau { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: min(430px, 40vw); padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
 .bq-panneau h2 { font-size: 26px; }
 .bq-note { font-size: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(111,214,138,.1); border: 1px solid rgba(111,214,138,.35); color: #b8f0c8; }
 .bq-dragons { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -121,7 +121,7 @@ function rendre() {
   // Accélérer l'éclosion
   p.append(el("div", { class: "etiquette", style: { marginTop: "8px" } }, "Accélérer l'éclosion"));
   p.append(el("div", { class: "bq-note", style: { background: "rgba(255,138,60,.08)", borderColor: "rgba(255,138,60,.35)", color: "#ffd2b0" } },
-    `Une braise fait avancer un œuf du couvoir d'un quart (environ ${Math.round(COUVOIR[0].pas / 4)} pas ou ${Math.round(COUVOIR[0].heures * 60 / 4)} minutes). 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`));
+    `Une braise fait avancer un œuf du couvoir d'un quart (environ ${Math.round(COUVOIR[0].heures * 60 / 4)} minutes). 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`));
   for (const [n, prix, txt] of [[5, "0,99 €", "De quoi faire éclore un œuf tout de suite."], [30, "4,99 €", "Le meilleur prix : 7 œufs et demi accélérés."], [80, "9,99 €", "Pour les collectionneurs pressés."]]) {
     p.append(el("div", { class: "article", role: "button", tabindex: 0, onclick: () => acheter(`${n} braises d'éclosion (${prix}).`, (s) => { s.ressources.braises = (s.ressources.braises || 0) + n; }) },
       el("b", {}, el("span", { style: { display: "inline-flex", alignItems: "center", gap: "6px" } }, icone("braises"), `${n} braises d'éclosion`)), el("span", { class: "prix" }, prix), el("small", {}, txt)));

@@ -30,7 +30,7 @@ export function nouvellePartie() {
     noeuds: {},
     livre: { vus: [], ulDebloque: false, ulChoisi: null },
     combats: { gagnes: 0, perdus: 0, nuls: 0 },
-    reglages: { mode: "podometre", son: true, musique: true, chrono: 20, qualite: "haute" },
+    reglages: { mode: "temps", son: true, musique: true, chrono: 20, qualite: "haute" },
     intro: true,
     tuto: { etape: "histoire" },
     journal: [],
@@ -96,6 +96,17 @@ function migrer(o) {
   for (const k of Object.keys(base.reglages)) if (o.reglages[k] === undefined) o.reglages[k] = base.reglages[k];
   if (!o.sources) o.sources = base.sources;
   if (!o.tuto || o.tuto.etape === undefined) o.tuto = { etape: o.intro ? "histoire" : "fini" };
+  // Bêta 0.10 : plus de podomètre, les œufs éclosent avec le temps. On garde l'avancement déjà fait.
+  if (o.reglages.mode !== "temps") {
+    const maintenantO = Date.now() + (o.decalage || 0);
+    const def = COUVOIR[o.oeufs.couvoir.niveau] || COUVOIR[0];
+    for (const sl of o.oeufs.couvoir.slots) {
+      const b = sl.oeuf.tuto ? { pas: 300, heures: 1 / 60 } : def;
+      const av = Math.max(0, Math.min(1, ((o.pas ? o.pas.total : 0) - (sl.pasDepart || 0)) / b.pas));
+      sl.debut = maintenantO - av * b.heures * H;
+    }
+    o.reglages.mode = "temps";
+  }
   return o;
 }
 
@@ -322,15 +333,14 @@ export function remplirCouvoir() {
     c.slots.push({ oeuf: o, pasDepart: etat.pas.total, debut: maintenant() });
   }
 }
-// Avancement d'un œuf (0 à 1) : selon les pas, ou selon le temps si le podomètre est désactivé.
-// Les œufs de l'apprentissage sont pressés : 300 pas ou 3 minutes.
-function besoin(slot) { return slot.oeuf.tuto ? { pas: 300, heures: 0.05 } : defCouvoir(); }
+// Avancement d'un œuf (0 à 1), selon le temps passé au couvoir.
+// Les œufs de l'apprentissage sont pressés : une minute.
+function besoin(slot) { return slot.oeuf.tuto ? { pas: 300, heures: 1 / 60 } : defCouvoir(); }
 // slot.bonus : l'avance donnée par les braises d'éclosion (0,25 par braise)
 export function avancement(slot) {
   const def = besoin(slot);
   const bonus = slot.bonus || 0;
-  if (etat.reglages.mode === "temps") return Math.min(1, bonus + (maintenant() - slot.debut) / (def.heures * H));
-  return Math.min(1, bonus + (etat.pas.total - slot.pasDepart) / def.pas);
+  return Math.min(1, bonus + (maintenant() - slot.debut) / (def.heures * H));
 }
 export function pasRestants(slot) {
   const def = besoin(slot);
