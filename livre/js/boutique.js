@@ -55,14 +55,127 @@ function construireVitrine() {
   const camera = new T.PerspectiveCamera(38, 1, 0.05, 200);
   const orbite = new Orbite(camera, document.getElementById("scene3d"));
   const support = new T.Group(); scene.add(support);
-  D = { scene, camera, orbite, support, anim: null, cle: null, update(dt) { orbite.update(dt); support.rotation.y += dt * 0.3; if (D.anim) D.anim.update(dt); } };
+  // Une lumière qui tourne autour de la vitrine : les reflets bougent sur les gemmes et l'or
+  const reflet = new T.PointLight(0xffffff, 1.2, 7); scene.add(reflet);
+  D = { scene, camera, orbite, support, anim: null, cle: null, t: 0, majs: [], update(dt) {
+    D.t += dt; orbite.update(dt); support.rotation.y += dt * 0.3; if (D.anim) D.anim.update(dt);
+    reflet.position.set(Math.cos(D.t * 0.9) * 2.4, 2 + Math.sin(D.t * 1.3) * 0.4, Math.sin(D.t * 0.9) * 2.4);
+    for (const f of D.majs) f(D.t, dt);
+  } };
+}
+
+// ---------- Vitrine : des objets qui brillent, selon la section regardée ----------
+const matGemme = (c, o = 0.9) => new T.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.4, metalness: 0.35, roughness: 0.06, flatShading: true, transparent: o < 1, opacity: o });
+const matOr = () => new T.MeshStandardMaterial({ color: 0xf2b544, emissive: 0x6a4200, emissiveIntensity: 0.35, metalness: 0.85, roughness: 0.22, flatShading: true });
+function gemme(c, t) {
+  const g = new T.Group(), m = matGemme(c);
+  const couronne = new T.CylinderGeometry(t * 0.62, t, t * 0.38, 8); couronne.translate(0, t * 0.19, 0);
+  const pavillon = new T.ConeGeometry(t, t * 1.05, 8); pavillon.rotateX(Math.PI); pavillon.translate(0, -t * 0.52, 0);
+  g.add(new T.Mesh(couronne, m), new T.Mesh(pavillon, m));
+  return g;
+}
+function piece() { const m = new T.Mesh(new T.CylinderGeometry(0.11, 0.11, 0.025, 14), matOr()); m.rotation.set(Math.random() * 0.5, 0, Math.random() * 0.5); return m; }
+function oeuf(c) { return new T.Mesh(new T.SphereGeometry(0.22, 14, 10).scale(0.82, 1.08, 0.82), new T.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.35, roughness: 0.35, metalness: 0.1, flatShading: true })); }
+// Petites étoiles qui scintillent autour de l'objet
+function etincelles(n, rayon, haut, couleur) {
+  const g = new T.Group(), geo = new T.OctahedronGeometry(0.035, 0);
+  for (let i = 0; i < n; i++) {
+    const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: couleur, transparent: true, depthWrite: false }));
+    const a = Math.random() * 6.28, r = rayon * (0.3 + Math.random() * 0.7);
+    m.position.set(Math.cos(a) * r, 0.15 + Math.random() * haut, Math.sin(a) * r); m.userData.ph = Math.random() * 6.28;
+    g.add(m);
+  }
+  g.userData.maj = (t) => g.children.forEach((m) => { const k = Math.max(0, Math.sin(t * 2.6 + m.userData.ph)); m.scale.setScalar(0.2 + k * 1.8); m.material.opacity = k; m.rotation.y = t * 3; });
+  return g;
+}
+function objetVitrine(type) {
+  const g = new T.Group(), majs = [];
+  const lum = (c, i, y) => { const l = new T.PointLight(c, i, 5); l.position.y = y; g.add(l); return l; };
+  if (type === "gemmes") {
+    const grande = gemme(0xb45cff, 0.46); grande.position.y = 1.15; g.add(grande);
+    const tour = new T.Group(); g.add(tour);
+    [0xff6ad8, 0x7fd6ff, 0xb45cff, 0xffd86a, 0x8a7bff, 0xff8ab4].forEach((c, i) => { const p = gemme(c, 0.16); const a = (i / 6) * 6.28; p.position.set(Math.cos(a) * 0.85, 1.1 + Math.sin(i) * 0.12, Math.sin(a) * 0.85); tour.add(p); });
+    for (let i = 0; i < 12; i++) { const p = gemme([0xb45cff, 0xd08aff, 0x7fd6ff][i % 3], 0.08 + Math.random() * 0.07); const a = Math.random() * 6.28, r = 0.25 + Math.random() * 0.7; p.position.set(Math.cos(a) * r, 0.1, Math.sin(a) * r); p.rotation.set(Math.random(), Math.random() * 6, Math.random()); g.add(p); }
+    const l = lum(0xc08aff, 1.6, 1.3);
+    g.add(etincelles(26, 1.3, 1.8, 0xffffff));
+    majs.push((t) => { grande.rotation.y = t * 0.8; grande.position.y = 1.15 + Math.sin(t * 1.6) * 0.08; tour.rotation.y = -t * 0.5; tour.children.forEach((p, i) => { p.rotation.y = t * 2 + i; }); l.intensity = 1.4 + Math.sin(t * 3) * 0.4; });
+  } else if (type === "packs") {
+    const bois = new T.MeshStandardMaterial({ color: 0x7a4220, roughness: 0.7, flatShading: true });
+    const coffre = new T.Group(); coffre.position.y = 0.3; g.add(coffre);
+    coffre.add(new T.Mesh(new T.BoxGeometry(1.3, 0.6, 0.85), bois));
+    for (const x of [-0.5, 0.5]) { const b = new T.Mesh(new T.BoxGeometry(0.08, 0.62, 0.87), matOr()); b.position.x = x; coffre.add(b); }
+    const serrure = new T.Mesh(new T.BoxGeometry(0.16, 0.2, 0.05), matOr()); serrure.position.set(0, 0.12, 0.44); coffre.add(serrure);
+    const couvercle = new T.Group(); couvercle.position.set(0, 0.3, -0.42); coffre.add(couvercle);
+    const dessus = new T.Mesh(new T.BoxGeometry(1.34, 0.12, 0.88).translate(0, 0.06, 0.44), bois); couvercle.add(dessus);
+    for (const x of [-0.5, 0.5]) { const b = new T.Mesh(new T.BoxGeometry(0.08, 0.14, 0.9).translate(x, 0.06, 0.44), matOr()); couvercle.add(b); }
+    couvercle.rotation.x = -1.9;
+    [[0xff7a3a, -0.33], [0x7fd6ff, 0], [0x2fd0c0, 0.33]].forEach(([c, x], i) => { const o = oeuf(c); o.position.set(x, 0.38 + (i === 1 ? 0.08 : 0), 0); o.rotation.z = (i - 1) * 0.25; coffre.add(o); });
+    for (let i = 0; i < 14; i++) { const p = piece(); const a = Math.random() * 6.28, r = 0.85 + Math.random() * 0.6; p.position.set(Math.cos(a) * r, 0.02 + Math.random() * 0.04, Math.sin(a) * r); g.add(p); }
+    const l = lum(0xffc86a, 2, 0.9);
+    g.add(etincelles(22, 1.2, 1.4, 0xffe8a0));
+    majs.push((t) => { couvercle.rotation.x = -1.9 + Math.sin(t * 1.5) * 0.06; l.intensity = 1.7 + Math.sin(t * 4) * 0.35; coffre.children.forEach((c, i) => { if (c.geometry && c.geometry.type === "SphereGeometry") c.position.y = 0.4 + Math.sin(t * 2 + i) * 0.04; }); });
+  } else if (type === "braises") {
+    const pierres = [];
+    for (let i = 0; i < 7; i++) {
+      const m = new T.Mesh(new T.DodecahedronGeometry(0.16 + Math.random() * 0.12, 0), new T.MeshStandardMaterial({ color: 0x2a1610, emissive: 0xff5a0a, emissiveIntensity: 0.8, roughness: 0.8, flatShading: true }));
+      const a = (i / 7) * 6.28, r = i === 0 ? 0 : 0.45 + Math.random() * 0.2;
+      m.position.set(Math.cos(a) * r, i === 0 ? 0.35 : 0.15, Math.sin(a) * r); m.rotation.set(Math.random() * 3, Math.random() * 3, 0); m.userData.ph = Math.random() * 6;
+      g.add(m); pierres.push(m);
+    }
+    const flammes = [];
+    for (let i = 0; i < 5; i++) { const f = new T.Mesh(new T.ConeGeometry(0.12, 0.5, 6), new T.MeshBasicMaterial({ color: [0xffd23a, 0xff8a1a, 0xff4a0a][i % 3], transparent: true, opacity: 0.75, depthWrite: false })); f.position.set((Math.random() - 0.5) * 0.5, 0.55, (Math.random() - 0.5) * 0.5); f.userData.ph = Math.random() * 6; g.add(f); flammes.push(f); }
+    const escarbilles = [];
+    for (let i = 0; i < 18; i++) { const m = new T.Mesh(new T.TetrahedronGeometry(0.03, 0), new T.MeshBasicMaterial({ color: 0xffb040, transparent: true })); m.userData.ph = Math.random(); g.add(m); escarbilles.push(m); }
+    const l = lum(0xff7a2a, 2.2, 0.8);
+    majs.push((t) => {
+      pierres.forEach((m) => { m.material.emissiveIntensity = 0.6 + Math.sin(t * 2.4 + m.userData.ph) * 0.35; });
+      flammes.forEach((f) => { const k = Math.sin(t * 9 + f.userData.ph) * 0.15; f.scale.set(1 - k, 1 + k * 2, 1 - k); f.rotation.y = t * 2; });
+      escarbilles.forEach((m, i) => { const u = (t * 0.35 + m.userData.ph) % 1; m.position.set(Math.sin(i * 2.3 + t * 0.7) * 0.4 * (1 - u), 0.4 + u * 2, Math.cos(i * 1.7) * 0.4 * (1 - u)); m.material.opacity = 1 - u; });
+      l.intensity = 2 + Math.sin(t * 7) * 0.4 + Math.sin(t * 13) * 0.2;
+    });
+  } else {
+    // Énergie et ressources : un cristal d'énergie entouré d'anneaux, un œuf et de la nourriture
+    const cristal = new T.Mesh(new T.OctahedronGeometry(0.42, 0).scale(1, 1.7, 1), matGemme(0xffd23a, 0.95)); cristal.position.y = 1.05; g.add(cristal);
+    const anneaux = [0, 1].map((i) => { const a = new T.Mesh(new T.TorusGeometry(0.7 + i * 0.18, 0.025, 6, 40), matOr()); a.position.y = 1.05; g.add(a); return a; });
+    const o = oeuf(0xf2e6cc); o.position.set(-0.75, 0.24, 0.2); g.add(o);
+    for (let i = 0; i < 5; i++) { const p = gemme([0x7fd6ff, 0xff6a3a, 0x2fd0c0][i % 3], 0.09); p.position.set(0.55 + Math.random() * 0.4, 0.09, -0.3 + Math.random() * 0.6); g.add(p); }
+    const l = lum(0xffe08a, 1.8, 1.1);
+    g.add(etincelles(20, 1.1, 1.8, 0xfff2b0));
+    majs.push((t) => { cristal.rotation.y = t; cristal.position.y = 1.05 + Math.sin(t * 2) * 0.07; anneaux[0].rotation.set(t * 0.9, t * 0.4, 0); anneaux[1].rotation.set(-t * 0.6, 0, t * 0.8); l.intensity = 1.6 + Math.sin(t * 3.4) * 0.4; });
+  }
+  g.traverse((c) => { if (c.userData.maj) majs.push(c.userData.maj); });
+  return { g, majs };
+}
+function montrerObjet(type) {
+  const cle = "objet|" + type;
+  if (cle === D.cle) return;
+  D.cle = cle; D.anim = null;
+  while (D.support.children.length) D.support.remove(D.support.children[0]);
+  const o = objetVitrine(type);
+  D.support.add(o.g); D.majs = o.majs;
+  const etroit = window.innerWidth / window.innerHeight < 0.8 ? 2.1 : 1;
+  D.orbite.viser(new T.Vector3(0, 0.8, 0), 5.4 * etroit, 0.7, 1.2);
+}
+// Quelle section est à l'écran : la vitrine change avec elle
+const SECTIONS = [["gemmes", "bq-gemmes"], ["packs", "bq-packs"], ["braises", "bq-braises"], ["ressources", "bq-res"], ["ul", "bq-ul"]];
+function majVitrine() {
+  const p = document.querySelector(".bq-panneau");
+  if (!p || !D) return;
+  // En bas de la liste, c'est la dernière section (les versions UL) qui compte
+  const ligne = p.scrollTop + p.clientHeight >= p.scrollHeight - 6 ? 1e9 : p.scrollTop + p.clientHeight * 0.4;
+  let cur = "gemmes";
+  for (const [k, id] of SECTIONS) { const s = document.getElementById(id); if (s && s.offsetTop <= ligne) cur = k; }
+  const d = E().dragons.find((x) => x.uid === vue.uid);
+  const leg = document.querySelector(".bq-apercu");
+  if (cur === "ul" && d) { montrer(d, vue.ul); if (leg) { leg.hidden = false; leg.textContent = `${PAR_ID[d.id].nom} · ${vue.ul ? "version UL" : "version normale"}`; } }
+  else { montrerObjet(cur); if (leg) leg.hidden = true; }
 }
 
 function montrer(d, ul) {
   const st = Math.max(1, stadeEffectif(d));
   const cle = `${d.id}|${ul}|${st}`;
   if (cle === D.cle) return;
-  D.cle = cle;
+  D.cle = cle; D.majs = [];
   while (D.support.children.length) D.support.remove(D.support.children[0]);
   const rig = construireDragon(d.id, st, { ul });
   D.support.add(rig.racine);
@@ -199,14 +312,14 @@ function rendre() {
   p.append(el("div", { class: "bq-gemmes" }, GEMMES.map((g) => el("button", { onclick: () => acheterGemmes(g) }, g.bonus ? el("i", {}, g.bonus) : null, icone("gemmes"), el("b", {}, nb(g.n)), el("span", {}, g.prix)))));
   p.append(el("div", { class: "bq-note" }, "Bêta : l'achat de gemmes est simulé, aucun paiement n'est demandé. Tout le reste de la boutique se paie en gemmes."));
   // Packs de démarrage
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" } }, "Packs de démarrage"));
+  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-packs" }, "Packs de démarrage"));
   for (const pk of PACKS) {
     const deja = pk.unique && e.achats && e.achats[pk.id] ? "déjà acheté" : null;
     p.append(article({ nom: pk.nom, prix: pk.prix, texte: pk.texte, contenu: pk.contenu, ruban: pk.ruban, classe: `pack ${pk.vedette ? "vedette" : ""}`, deja,
       onclick: () => payer(pk.prix, pk.nom, (s) => { pk.donner(s); s.achats = s.achats || {}; s.achats[pk.id] = (s.achats[pk.id] || 0) + 1; }) }));
   }
   // Accélérer l'éclosion
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" } }, "Accélérer l'éclosion"));
+  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-braises" }, "Accélérer l'éclosion"));
   p.append(el("div", { class: "bq-note", style: { background: "rgba(255,138,60,.08)", borderColor: "rgba(255,138,60,.35)", color: "#ffd2b0" } },
     `Une braise fait avancer un œuf du couvoir d'un quart (environ ${Math.round(COUVOIR[0].heures * 60 / 4)} minutes). 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`));
   for (const [n, prix, txt] of BRAISES) p.append(article({ nom: `${n} braises d'éclosion`, ic: "braises", prix, texte: txt, onclick: () => payer(prix, `${n} braises d'éclosion`, (s) => { s.ressources.braises = (s.ressources.braises || 0) + n; }) }));
@@ -220,7 +333,6 @@ function rendre() {
     "Une robe rare, aux reflets métalliques et aux couleurs uniques. Seule l'apparence change : aucun avantage en combat."));
   if (d) {
     const src = PAR_ID[d.id];
-    montrer(d, vue.ul);
     const choix = el("div", { class: "bq-dragons" });
     for (const x of e.dragons) choix.append(el("button", { class: `${PAR_ID[x.id].element} ${x.uid === vue.uid ? "actif" : ""}`, onclick: () => { vue.uid = x.uid; vue.ul = true; rendre(); } }, PAR_ID[x.id].nom, x.ulPossede ? " ✦" : ""));
     p.append(choix);
@@ -233,7 +345,9 @@ function rendre() {
         : el("button", { class: "btn principal", onclick: () => payer(PRIX_UL, `${src.nom} UL`, (s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ulPossede = true; x.ul = true; }) }, icone("gemmes"), `${src.nom} UL · ${nb(PRIX_UL)} gemmes`),
     ));
   } else p.append(el("p", { class: "doux" }, "Fais éclore un dragon pour voir sa version UL."));
-  if (d) ui.append(el("div", { class: "bq-apercu" }, `${PAR_ID[d.id].nom} · ${vue.ul ? "version UL" : "version normale"}`));
+  ui.append(el("div", { class: "bq-apercu", hidden: true }));
   ui.append(p);
   p.scrollTop = defile;
+  p.addEventListener("scroll", majVitrine, { passive: true });
+  majVitrine();
 }
