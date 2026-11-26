@@ -72,6 +72,28 @@ export const Son = {
     else { osc("sine", 1800, t, 0.4, 0.12, busEffets, { rev: 0.5 }); osc("sine", 2700, t + 0.05, 0.4, 0.08, busEffets, { rev: 0.5 }); }
     osc("triangle", 880, t + 0.12, 0.1, 0.08); osc("triangle", 1320, t + 0.2, 0.15, 0.08);
   },
+  seisme() {
+    const t = T0();
+    bruit(t, 4.2, 0.55, "lowpass", 90, 45, busEffets, { a: 0.4 });
+    osc("sine", 38, t, 4.2, 0.35, busEffets, { a: 0.3, vers: 30 });
+    for (let i = 0; i < 9; i++) bruit(t + 0.3 + Math.random() * 3.6, 0.12, 0.25, "bandpass", 300 + Math.random() * 500, null, busEffets, { q: 1.2 });
+  },
+  sifflement() { const t = T0(); bruit(t, 1.5, 0.12, "bandpass", 3200, 600, busEffets, { q: 6, a: 0.3, rev: 0.3 }); },
+  eclipse() { const t = T0(); [110, 138.6, 164.8].forEach((f, i) => osc("sine", f, t + i * 0.4, 5, 0.06, busEffets, { a: 1.2, rev: 0.8 })); },
+  croquer(sorte = "rations") {
+    const t = T0();
+    const f = sorte === "rations_glace" ? 3200 : sorte === "rations_eau" ? 1400 : sorte === "rations_feu" ? 2400 : 1100;
+    for (let i = 0; i < 4; i++) bruit(t + i * 0.035 + Math.random() * 0.02, 0.05, 0.32, "bandpass", f * (0.7 + Math.random() * 0.6), null, busEffets, { q: 2.5 });
+    bruit(t, 0.12, 0.18, "lowpass", 500);
+  },
+  ronron(element = "feu", grave = 0.5) {
+    const t = T0(); const f0 = 70 + (1 - grave) * 60;
+    osc("sawtooth", f0, t, 0.9, 0.06, busEffets, { filtre: 380, vers: f0 * 0.92 });
+    osc("sine", f0 * 2, t + 0.05, 0.8, 0.05);
+  },
+  joie() { const t = T0(); osc("triangle", 520, t, 0.12, 0.08, busEffets, { vers: 880 }); osc("triangle", 700, t + 0.12, 0.14, 0.07, busEffets, { vers: 1100, rev: 0.2 }); },
+  ailes() { const t = T0(); for (let i = 0; i < 3; i++) bruit(t + i * 0.22, 0.16, 0.22, "lowpass", 700 - i * 80, 260, busEffets, { a: 0.05 }); },
+  glisse() { const t = T0(); bruit(t, 0.12, 0.12, "bandpass", 1800, 900, busEffets, { q: 1.5 }); },
   pas() { const t = T0(); bruit(t, 0.06, 0.25, "lowpass", 400); },
   // Cri d'un dragon : grave = 0 (petit) à 1 (énorme)
   crier(element = "feu", grave = 0.5) {

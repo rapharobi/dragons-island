@@ -172,7 +172,9 @@ export class Orbite {
     if (phi !== undefined) this.phiV = phi;
   }
   update(dt) {
-    const k = 1 - Math.exp(-7 * dt);
+    // douceur : mouvement de caméra plus lent pendant un moment (la plongée à l'arrivée), qui revient à la normale
+    const k = 1 - Math.exp(-(this.douceur || 7) * dt);
+    if (this.douceur) { this.douceur += dt * 2; if (this.douceur >= 7) this.douceur = 0; }
     this.thetaV += this.auto * dt;
     this.theta += (this.thetaV - this.theta) * k;
     this.phi += (this.phiV - this.phi) * k;

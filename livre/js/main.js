@@ -2,19 +2,21 @@
 import { charger, E, surChangement, mettreAJour, energie } from "./etat.js";
 import { Moteur } from "./scene.js";
 import { enregistrerElements } from "./modele.js";
-import { DRAGONS, ENERGIE_MAX } from "./regles.js";
+import { DRAGONS, ENERGIE_MAX, MATERIAUX } from "./regles.js";
 import { initAudio, Musique, reglerSon, Son } from "./son.js";
-import { el, icone, toast } from "./ui.js";
+import { el, icone, toast, modale } from "./ui.js";
+import { ecranAccueil } from "./portail.js";
 import * as Iles from "./iles.js";
 import * as Couvoir from "./couvoir.js";
 import * as Combat from "./combat.js";
 import * as Boutique from "./boutique.js";
 import * as Reglages from "./reglages.js";
+import * as Pilotage from "./pilotage.js";
 import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto } from "./tuto.js";
 
 enregistrerElements(DRAGONS);
 
-const ECRANS = { iles: Iles, couvoir: Couvoir, combat: Combat, boutique: Boutique, reglages: Reglages };
+const ECRANS = { iles: Iles, couvoir: Couvoir, combat: Combat, boutique: Boutique, reglages: Reglages, pilotage: Pilotage };
 const NAV = [["iles", "Îles"], ["couvoir", "Couvoir"], ["combat", "Combat"], ["boutique", "Boutique"], ["reglages", "Réglages"]];
 
 const ctx = {
@@ -56,6 +58,37 @@ function majNav() {
 function codeDuel() { const m = /^#duel-([a-z0-9]{4})$/i.exec(location.hash || ""); return m ? m[1].toUpperCase() : null; }
 
 let dernierChoix = -1;
+const PUCES = [["rations", "Rations"], ["brindilles", "Brindilles"], ["pierres", "Pierres"], ["obsidienne", "Obsidienne (île de Feu)"], ["givrite", "Givrite (île de Glace)"], ["corail", "Corail (île d'Eau)"], ["coeurs", "Cœurs de dragon"], ["rations_feu", "Piments de lave"], ["rations_glace", "Baies de givre"], ["rations_eau", "Poissons des abysses"], ["braises", "Braises d'éclosion"]];
+// À quoi sert chaque ressource (MATERIAUX dit déjà comment on l'obtient)
+const USAGES = {
+  energie: ["Énergie", "Sert à lancer les duels de mage, la tour du nid et à réveiller les sources.", "Se recharge toute seule de 1 par heure, jusqu'à 100. Le Grand couvoir et les sources l'améliorent."],
+  gemmes: ["Gemmes", "La monnaie de la boutique : packs, œufs, braises, ressources, versions UL."],
+  rations: ["Rations", "Nourrissent et soignent tes dragons (20 % des PV par ration). Les dragons K.O. en ont besoin pour combattre."],
+  brindilles: ["Brindilles", "Servent à construire et améliorer les nids."],
+  pierres: ["Pierres", "Servent à construire et améliorer les nids."],
+  obsidienne: ["Obsidienne", "Pour les nids des dragons de feu."],
+  givrite: ["Givrite", "Pour les nids des dragons de glace."],
+  corail: ["Corail", "Pour les nids des dragons d'eau."],
+  coeurs: ["Cœurs de dragon", "Indispensables pour construire les nids uniques, ceux des dragons les plus évolués."],
+  rations_feu: ["Piments de lave", "Font gagner 40 XP à un dragon de feu et le soignent de 30 %. Au-delà du niveau 10, ils le font monter de niveau."],
+  rations_glace: ["Baies de givre", "Font gagner 40 XP à un dragon de glace et le soignent de 30 %. Au-delà du niveau 10, elles le font monter de niveau."],
+  rations_eau: ["Poissons des abysses", "Font gagner 40 XP à un dragon d'eau et le soignent de 30 %. Au-delà du niveau 10, ils le font monter de niveau."],
+  braises: ["Braises d'éclosion", "Chaque braise fait avancer un œuf du couvoir d'un quart."],
+};
+function infoRessource(k) {
+  const e = E();
+  const [nom, usage, obtenir] = USAGES[k] || [k, ""];
+  const qte = k === "energie" ? `${energie()} / ${ENERGIE_MAX}` : (e.ressources[k] || 0).toLocaleString("fr-FR");
+  const comment = obtenir || (MATERIAUX[k] ? MATERIAUX[k].desc : "");
+  modale({
+    titre: nom,
+    contenu: el("div", { class: "info-res" },
+      el("div", { class: "info-res-tete" }, icone(k), el("b", { class: "num" }, qte)),
+      el("div", {}, el("div", { class: "etiquette" }, "À quoi ça sert"), el("p", {}, usage)),
+      comment ? el("div", {}, el("div", { class: "etiquette" }, "Comment l'obtenir"), el("p", {}, comment)) : null),
+    boutons: [{ texte: "Fermer" }, { texte: k === "gemmes" ? "Acheter des gemmes" : "En acheter à la boutique", classe: "principal", action: () => ctx.aller("boutique", { voir: k }) }],
+  });
+}
 function majHud() {
   const e = E();
   if (!e) return;
@@ -65,36 +98,14 @@ function majHud() {
   const en = energie();
   hud.innerHTML = "";
   hud.append(
-    el("div", { class: "logo" }, "Dragons Island", el("small", {}, "bêta 0.11")),
+    el("div", { class: "logo" }, "Dragon World", el("small", {}, "bêta 0.12")),
     el("div", { class: "ressources" },
-      el("span", { class: "puce energie", title: "Énergie : se recharge de 1 par heure" }, icone("energie"), el("span", { class: "jauge" }, el("i", { style: { width: (en / ENERGIE_MAX) * 100 + "%" } })), `${en}`),
+      el("span", { class: "puce energie", title: "Énergie : se recharge de 1 par heure", role: "button", onclick: () => { Son.clic(); infoRessource("energie"); } }, icone("energie"), el("span", { class: "jauge" }, el("i", { style: { width: (en / ENERGIE_MAX) * 100 + "%" } })), `${en}`),
       el("span", { class: "puce gemmes", title: "Gemmes : touche pour ouvrir la boutique", role: "button", style: { pointerEvents: "auto", cursor: "pointer" }, onclick: () => { Son.clic(); ctx.aller("boutique"); } }, icone("gemmes"), `${(r.gemmes || 0).toLocaleString("fr-FR")}`),
-      el("span", { class: "puce", title: "Rations" }, icone("rations"), `${r.rations}`),
-      el("span", { class: "puce", title: "Brindilles" }, icone("brindilles"), `${r.brindilles}`),
-      el("span", { class: "puce", title: "Pierres" }, icone("pierres"), `${r.pierres}`),
-      el("span", { class: "puce", title: "Obsidienne (île de Feu)" }, icone("obsidienne"), `${r.obsidienne}`),
-      el("span", { class: "puce", title: "Givrite (île de Glace)" }, icone("givrite"), `${r.givrite}`),
-      el("span", { class: "puce", title: "Corail (île d'Eau)" }, icone("corail"), `${r.corail}`),
-      el("span", { class: "puce", title: "Cœurs de dragon" }, icone("coeurs"), `${r.coeurs}`),
-      el("span", { class: "puce", title: "Piments de lave (nourriture de feu)" }, icone("rations_feu"), `${r.rations_feu || 0}`),
-      el("span", { class: "puce", title: "Baies de givre (nourriture de glace)" }, icone("rations_glace"), `${r.rations_glace || 0}`),
-      el("span", { class: "puce", title: "Poissons des abysses (nourriture d'eau)" }, icone("rations_eau"), `${r.rations_eau || 0}`),
-      r.braises ? el("span", { class: "puce", title: "Braises d'éclosion : accélèrent les œufs du couvoir" }, icone("braises"), `${r.braises}`) : null,
+      ...PUCES.filter(([k]) => k !== "braises" || r.braises).map(([k, titre]) => el("span", { class: "puce", title: titre, role: "button", onclick: () => { Son.clic(); infoRessource(k); } }, icone(k), `${r[k] || 0}`)),
     ),
   );
   if (e.oeufs.choix !== dernierChoix) { dernierChoix = e.oeufs.choix; majNav(); }
-}
-
-// Entrée dans le monde des dragons : on traverse le portail de la tablette magique.
-function portail(suite) {
-  Son.portail();
-  const p = el("div", { class: "portail", "aria-hidden": "true" },
-    el("div", { class: "anneau a1" }), el("div", { class: "anneau a2" }), el("div", { class: "anneau a3" }),
-    el("div", { class: "coeur" }), el("div", { class: "eclair" }),
-    ...Array.from({ length: 28 }, (_, i) => el("i", { style: { "--a": (i / 28) * 360 + "deg", "--d": (0.2 + Math.random() * 0.8) + "s", "--r": (20 + Math.random() * 30) + "vmin" } })));
-  document.body.append(p);
-  setTimeout(() => { try { suite(); } catch (e) { console.error(e); } }, 1500);
-  setTimeout(() => p.remove(), 2300);
 }
 
 function suivreHud() {
@@ -120,36 +131,37 @@ async function demarrer() {
   surChangement((etatNeuf, source) => {
     majHud();
     // La sauvegarde du compte vient d'arriver : on réaffiche l'écran courant avec elle.
-    if (source === "compte" && ctx.ecran && !document.querySelector(".ecran-titre") && ctx.ecran !== "combat") { ctx.cacherInterface(false); ctx.aller(ctx.ecran); }
+    if (source === "compte" && ctx.ecran && !document.querySelector(".accueil") && ctx.ecran !== "combat") { ctx.cacherInterface(false); ctx.aller(ctx.ecran); }
   });
   setInterval(majHud, 1000);
-  // Décor de fond de l'écran titre : les îles
-  Iles.decor(ctx).afficherFond();
-  const titre = el("div", { class: "ecran-titre" },
-    el("div", { class: "note doux" }, "Bêta jouable"),
-    el("h1", {}, "Dragons", el("br"), el("span", {}, "Island")),
-    el("p", {}, e.intro ? "Tu es un mage. Grâce à ta tablette magique, un portail s'ouvre sur le monde des dragons." : `${e.dragons.length} dragon${e.dragons.length > 1 ? "s" : ""} t'attend${e.dragons.length > 1 ? "ent" : ""} sur les îles.`),
-    el("button", { class: "btn principal", style: { fontSize: "16px", padding: "13px 28px" }, onclick: () => { initAudio(); portail(() => {
-      titre.remove();
-      document.getElementById("hud").hidden = false;
-      document.getElementById("nav").hidden = false;
-      majHud();
-      if (E().intro && etapeTuto() === "histoire") { document.getElementById("hud").hidden = true; document.getElementById("nav").hidden = true; histoire(() => { ctx.aller("couvoir", { intro: true }); }); }
-      else if (E().intro) ctx.aller("couvoir", { intro: true });
-      else if (codeDuel()) ctx.aller("combat", { rejoindre: codeDuel() });
-      else {
-        const h = location.hash.slice(1);
-        ctx.aller(ECRANS[h] ? h : "iles");
-      }
-      if (E().intro && codeDuel()) toast(`Ton ami t'attend avec le code ${codeDuel()}. Fais d'abord éclore ton premier dragon, puis va dans Combat › Défi en ligne.`, "bon");
-      if (E().cadeauJour) { toast("Un œuf gratuit est apparu aujourd'hui ! Va au couvoir.", "bon"); E().cadeauJour = false; }
-    }); } }, e.intro ? "Commencer l'aventure" : "Jouer"),
-  );
-  document.getElementById("ecran").append(titre);
+  // Écran d'accueil : le portail magique (sans les îles derrière)
+  const entrer = () => {
+    document.getElementById("hud").hidden = false;
+    document.getElementById("nav").hidden = false;
+    majHud();
+    // On arrive du ciel : la caméra plonge vers les îles
+    Iles.decor(ctx).plongee();
+    if (E().intro && etapeTuto() === "histoire") { document.getElementById("hud").hidden = true; document.getElementById("nav").hidden = true; histoire(() => { ctx.aller("couvoir", { intro: true }); }); }
+    else if (E().intro) ctx.aller("couvoir", { intro: true });
+    else if (codeDuel()) ctx.aller("combat", { rejoindre: codeDuel() });
+    else {
+      const h = location.hash.slice(1);
+      ctx.aller(ECRANS[h] ? h : "iles");
+    }
+    if (E().intro && codeDuel()) toast(`Ton ami t'attend avec le code ${codeDuel()}. Fais d'abord éclore ton premier dragon, puis va dans Combat › Défi en ligne.`, "bon");
+    if (E().cadeauJour) { toast("Un œuf gratuit est apparu aujourd'hui ! Va au couvoir.", "bon"); E().cadeauJour = false; }
+  };
+  const accueil = ecranAccueil({
+    note: "Bêta jouable",
+    texte: e.intro ? "Tu es un mage. Grâce à ta tablette magique, un portail s'ouvre sur le monde des dragons." : `${e.dragons.length} dragon${e.dragons.length > 1 ? "s" : ""} t'attend${e.dragons.length > 1 ? "ent" : ""} de l'autre côté du portail.`,
+    bouton: e.intro ? "Commencer l'aventure" : "Jouer",
+    surJouer: () => { initAudio(); Son.portail(); accueil.ouvrir(entrer); },
+  });
+  document.body.append(accueil.racine);
   window.addEventListener("hashchange", () => {
-    if (codeDuel() && !document.querySelector(".ecran-titre") && !E().intro) { ctx.aller("combat", { rejoindre: codeDuel() }); return; }
+    if (codeDuel() && !document.querySelector(".accueil") && !E().intro) { ctx.aller("combat", { rejoindre: codeDuel() }); return; }
     const h = location.hash.slice(1);
-    if (ECRANS[h] && h !== ctx.ecran && !document.querySelector(".ecran-titre")) ctx.aller(h);
+    if (ECRANS[h] && h !== ctx.ecran && !document.querySelector(".accueil")) ctx.aller(h);
   });
 }
 

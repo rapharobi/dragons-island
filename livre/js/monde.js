@@ -399,6 +399,7 @@ export function construireIle(element) {
   semis(deco, pierrePlate, mat(theme.roche || 0x777777, { r: 1 }), sentier.filter((p) => p.y > NIVEAU_EAU + 0.05));
   g.userData.animes = animes;
   g.userData.sol = sol;
+  g.userData.deco = deco;
   g.userData.bord = (a) => bordA(a);
   return g;
 }

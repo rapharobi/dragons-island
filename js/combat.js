@@ -3,7 +3,7 @@ import { construireDragon } from "./modele.js";
 import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite, versEcran } from "./scene.js";
 import { mat, mesh, bloc } from "./outils3d.js";
-import { E, changer, depenserEnergie, energie, gagnerXp, maintenant, noter, rationsPourSoigner, soignerEquipe } from "./etat.js";
+import { E, changer, depenserEnergie, energie, gagnerXp, maintenant, noter, rationsPourSoigner, soignerEquipe, remplirCouvoir } from "./etat.js";
 import { DRAGONS, PAR_ID, ELEMENTS, TOURS, COUT, degats, tirerAlea, domine, postures, pvMax, stadeEffectif, stadeDuNiveau, xpCombat, ESPERANCE, nomStade, armuresDe } from "./regles.js";
 import { preparer, ouvrirSalon, nouveauCode, codeValide, identifiant, modeReseau, lienInvitation, VERSION_RESEAU, aleaGraine } from "./reseau.js";
 import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement } from "./ui.js";
@@ -89,6 +89,25 @@ styles("combat", `
 .fc-tete { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .fc-tete b { font-family: var(--titre); font-size: 19px; color: var(--accent); }
 .fc-tete .btn { padding: 5px 10px; font-size: 12px; }
+.fc-outils { display: flex; gap: 8px; align-items: center; }
+.fc-auto { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--doux); white-space: nowrap; }
+.fc-auto input { width: 16px; height: 16px; accent-color: var(--ambre); }
+.fc-suite { display: flex; justify-content: flex-end; animation: entre .25s; }
+.fc-suite .btn { padding: 10px 22px; }
+.tour-etages { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; direction: rtl; }
+.tour-etages span { direction: ltr; height: 26px; border-radius: 6px; display: grid; place-items: center; font: 600 11px var(--mono); border: 1px solid var(--trait); color: var(--doux); background: rgba(255,255,255,.03); }
+.tour-etages span.fait { background: rgba(111,214,138,.16); border-color: rgba(111,214,138,.45); color: #b8f0c8; }
+.tour-etages span.ici { background: rgba(242,181,68,.2); border-color: var(--ambre); color: var(--ambre); box-shadow: 0 0 12px rgba(242,181,68,.35); }
+.tour-etages span.sommet { background: rgba(180,92,255,.18); border-color: #b45cff; color: #ecd8ff; }
+.tour-oeufs { display: grid; gap: 8px; }
+.tour-slot { display: grid; grid-template-columns: 54px repeat(3, 1fr); gap: 6px; align-items: center; }
+.tour-slot > span { font-size: 12px; color: var(--doux); }
+.tour-slot button { padding: 9px 4px; border-radius: 10px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); font-weight: 700; font-size: 13px; display: grid; justify-items: center; gap: 2px; }
+.tour-slot button i { width: 18px; height: 23px; border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; background: var(--el); box-shadow: inset -3px -4px 0 rgba(0,0,0,.25); }
+.tour-slot button.actif { border-color: var(--el); background: color-mix(in srgb, var(--el) 20%, transparent); }
+.tour-equipe { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.tour-equipe .carte-dr { cursor: default; }
+.tour-equipe .carte-dr.relache { border-color: #ff8a8a; background: rgba(255,90,90,.12); }
 .fc-duel { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; }
 .fc-cote { display: grid; gap: 2px; min-width: 0; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.04); border-left: 3px solid var(--el); }
 .fc-cote.droite { text-align: right; border-left: 0; border-right: 3px solid var(--el); }
@@ -517,11 +536,13 @@ function rendrePrep() {
   let modes = [
     ["bot", "Duel de mage (classé)", et === "mage" ? "Un mage rival a ouvert un portail et te défie. Gratuit pendant l'apprentissage." : `Un autre mage de ton niveau. Si aucun n'est en ligne, un mage-bot du même niveau te défie. Coûte ${COUT.combat} d'énergie.`],
     ["ligne", "Défi en ligne (code ami)", "Chacun sur son téléphone : crée une partie et envoie le code à ton ami, ou entre le sien. Combat amical : gratuit, sans expérience, et tes dragons ne perdent pas de PV."],
-    ["sauvage", "Dragons sauvages", "Des dragons sauvages rôdent autour des îles. Moins rusés qu'un mage : idéal pour gagner de l'expérience. Coûte 2 d'énergie (gratuit pendant l'apprentissage)."],
+    ["tour", "La tour du nid", `Mode roguelite : tu entres sans dragon, tu choisis 3 œufs, et tu grimpes ${ETAGES} étages contre une IA de plus en plus forte. Au sommet : un œuf et un œuf mystère UL. Coûte ${COUT_TOUR} d'énergie par ascension.`],
+    ["sauvage", "Dragons sauvages", "Des dragons sauvages rôdent autour des îles. Idéal pour apprendre. Gratuit pendant l'apprentissage."],
     ["ami", "Défi entre amis", "Sur le même appareil : chacun choisit à son tour, sans regarder. L'écart de niveau est permis. Gratuit."],
   ];
   if (et === "sauvage1" || et === "sauvage2") modes = modes.filter((m) => m[0] === "sauvage" || m[0] === "ligne");
   if (et === "mage") modes = modes.filter((m) => m[0] === "bot" || m[0] === "ligne");
+  if (et !== "sauvage1" && et !== "sauvage2") modes = modes.filter((m) => m[0] !== "sauvage");
   if (!modes.some((m) => m[0] === prep.mode)) prep.mode = modes[0][0];
   for (const [id, nom, desc] of modes) gauche.append(el("button", { class: "mode-btn" + (prep.mode === id ? " actif" : ""), onclick: () => { Son.clic(); prep.mode = id; rendrePrep(); if (id === "ligne") montrerBlocLigne(); } }, el("b", {}, nom), el("span", {}, desc)));
   if (prep.mode === "ami") {
@@ -534,6 +555,7 @@ function rendrePrep() {
   const cout = coutMode(prep.mode);
   const peut = nb > 0 && energie() >= cout;
   // Soigner tous ses dragons d'un coup, avec des rations
+  if (prep.mode === "tour") { zone.append(gauche, panneauTour()); ui.append(zone); restaurerDefilement(".cb-prep, .cb-prep > section", defil); return; }
   const blesses = e.dragons.filter((d) => d.pv < pvMax(d));
   const besoin = rationsPourSoigner(blesses);
   if (besoin > 0) gauche.append(el("div", { style: { display: "grid", gap: "6px", padding: "10px", borderRadius: "10px", border: "1px solid var(--trait)" } },
@@ -568,6 +590,126 @@ function rendrePrep() {
   ui.append(zone);
   restaurerDefilement(".cb-prep, .cb-prep > section", defil);
   if (L) publierLigne();
+}
+
+// ---------- La tour du nid : mode roguelite ----------
+// On entre sans dragon, on choisit 3 œufs, chaque étage gagné fait monter toute l'équipe d'un niveau
+// et donne un nouvel œuf. L'IA a la même équipe (mêmes éléments, mêmes niveaux) et devient plus rusée.
+export const ETAGES = 21;
+const COUT_TOUR = 5;
+const EL3 = ["feu", "glace", "eau"];
+const NOMS_EL = { feu: "Feu", glace: "Glace", eau: "Eau" };
+const choixTour = { oeufs: ["feu", "glace", "eau"], nouvel: "feu", relache: null };
+function especeTour(elx, deja) {
+  const l = DRAGONS.filter((d) => d.element === elx).map((d) => d.id);
+  const libres = l.filter((id) => !deja.includes(id));
+  const liste = libres.length ? libres : l;
+  return liste[Math.floor(Math.random() * liste.length)];
+}
+function slotOeuf(titre, valeur, choisir) {
+  return el("div", { class: "tour-slot" }, el("span", {}, titre), ...EL3.map((x) => el("button", { class: valeur === x ? "actif" : "", style: `--el: ${ELEMENTS[x].couleur}`, onclick: () => { Son.clic(); choisir(x); rendrePrep(); } }, el("i"), NOMS_EL[x])));
+}
+function carteTour(x, extra = {}) {
+  const s = PAR_ID[x.id];
+  const d = { id: x.id, niveau: x.niveau, nid: 3 };
+  return el("div", { class: `carte-dr ${s.element} ${extra.classe || ""}`, onclick: extra.onclick, role: extra.onclick ? "button" : null },
+    el("b", {}, s.nom), el("div", { class: "meta" }, el("span", {}, `Nv ${x.niveau} · ${nomStade(stadeEffectif(d))}`), el("span", { style: { color: ELEMENTS[s.element].couleur } }, NOMS_EL[s.element])));
+}
+function gradinsTour(etage) {
+  const g = el("div", { class: "tour-etages", "aria-label": `Étage ${etage} sur ${ETAGES}` });
+  // Du bas vers le haut : l'étage 1 en bas à droite… on remplit à l'envers pour que le sommet soit en haut
+  for (let n = ETAGES; n >= 1; n--) g.append(el("span", { class: n < etage ? "fait" : n === etage ? "ici" : n === ETAGES ? "sommet" : "" }, n === ETAGES ? "★" : String(n)));
+  return g;
+}
+function panneauTour() {
+  const e = E();
+  const tn = e.tourNid;
+  const run = tn.run;
+  const s = el("section", { class: "panneau", style: { display: "grid", gap: "12px", alignContent: "start" } },
+    el("div", {}, el("div", { class: "etiquette" }, `Record : étage ${tn.record}/${ETAGES}${tn.sommets ? ` · sommet atteint ${tn.sommets} fois` : ""}`), el("h2", {}, "La tour du nid")));
+  if (!run) {
+    s.append(el("p", { class: "doux", style: { margin: 0 } }, `Tu entres sans aucun dragon. Choisis tes 3 premiers œufs : un de chaque élément, ou trois du même, c'est toi qui vois. Chaque étage gagné fait monter toute ton équipe d'un niveau et t'offre un nouvel œuf. En face, un mage a exactement les mêmes éléments et les mêmes niveaux que toi, et il devient de plus en plus rusé. Une défaite, et l'ascension s'arrête.`));
+    s.append(el("div", { class: "tour-oeufs" }, ...[0, 1, 2].map((i) => slotOeuf(`Œuf ${i + 1}`, choixTour.oeufs[i], (x) => { choixTour.oeufs[i] = x; }))));
+    s.append(el("div", { class: "bq-note", style: { fontSize: "12px", color: "var(--doux)" } }, `Récompenses : des ressources à chaque étage, des gemmes aux étages 7 et 14, et au sommet (étage ${ETAGES}) un œuf et un œuf mystère : on ne sait rien de lui, sauf qu'il éclot en version UL.`));
+    s.append(el("button", { class: "btn principal", style: { padding: "13px" }, disabled: energie() < COUT_TOUR, onclick: () => demarrerTour() }, icone("combat"), `Faire éclore et entrer (${COUT_TOUR} d'énergie)`));
+    if (energie() < COUT_TOUR) s.append(el("p", { class: "doux", style: { color: "#ffb0b0", margin: 0 } }, "Pas assez d'énergie."));
+    return s;
+  }
+  s.append(gradinsTour(run.etage));
+  if (run.attente === "oeuf") {
+    s.append(el("p", { style: { margin: 0 } }, `Étage ${run.etage - 1} conquis ! Toute ton équipe a gagné un niveau. Choisis ton nouvel œuf.`));
+    const plein = run.dragons.length >= 7;
+    if (plein) s.append(el("p", { class: "doux", style: { margin: 0 } }, "Ton équipe est pleine (7 dragons). Touche le dragon qui laisse sa place, ou passe ton tour."));
+    s.append(el("div", { class: "tour-equipe" }, ...run.dragons.map((x, i) => carteTour(x, plein ? { classe: choixTour.relache === i ? "relache" : "", onclick: () => { Son.clic(); choixTour.relache = choixTour.relache === i ? null : i; rendrePrep(); } } : {}))));
+    s.append(slotOeuf("Œuf", choixTour.nouvel, (x) => { choixTour.nouvel = x; }));
+    s.append(el("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+      el("button", { class: "btn principal", disabled: plein && choixTour.relache === null, onclick: () => ajouterOeufTour(true) }, "Faire éclore"),
+      plein ? el("button", { class: "btn", onclick: () => ajouterOeufTour(false) }, "Pas de nouvel œuf") : null));
+    return s;
+  }
+  const sommet = run.etage >= ETAGES;
+  s.append(el("p", { style: { margin: 0 } }, sommet ? "Le gardien du sommet t'attend. Il est plus fort et presque impossible à tromper." : `Étage ${run.etage} : un mage avec les mêmes éléments que toi${bonusTour(run.etage) ? `, et ${bonusTour(run.etage)} niveau${bonusTour(run.etage) > 1 ? "x" : ""} de plus` : ""}.`));
+  s.append(el("div", { class: "tour-equipe" }, ...run.dragons.map((x) => carteTour(x))));
+  s.append(el("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
+    el("button", { class: "btn principal", style: { padding: "13px" }, onclick: () => lancer() }, icone("combat"), sommet ? "Affronter le gardien" : `Combattre l'étage ${run.etage}`),
+    el("button", { class: "btn", onclick: () => modale({ titre: "Quitter la tour ?", contenu: `Tu gardes les récompenses des ${run.etage - 1} étage${run.etage > 2 ? "s" : ""} conquis, mais l'ascension s'arrête.`, boutons: [{ texte: "Continuer" }, { texte: "Quitter", classe: "danger", action: () => { let g = []; changer((x) => { g = recompensesTour(x, x.tourNid.run.etage - 1, false); x.tourNid.run = null; }); toast(g.length ? g.join(" · ") : "Ascension terminée.", "bon"); rendrePrep(); } }] }) }, "Quitter la tour")));
+  return s;
+}
+function bonusTour(etage) { return Math.floor(etage / 7) + (etage >= ETAGES ? 1 : 0); }
+function demarrerTour() {
+  let ok = false;
+  changer((e) => {
+    if (!depenserEnergie(COUT_TOUR)) return;
+    const ids = [];
+    for (const elx of choixTour.oeufs) ids.push(especeTour(elx, ids));
+    e.tourNid.run = { etage: 1, dragons: ids.map((id) => ({ id, niveau: 1 })), attente: null, debut: maintenant() };
+    ok = true;
+  });
+  if (!ok) { toast("Pas assez d'énergie.", "mal"); return; }
+  Son.eclosion();
+  toast(`Les œufs éclosent : ${E().tourNid.run.dragons.map((x) => PAR_ID[x.id].nom).join(", ")} !`, "bon");
+  rendrePrep();
+}
+function ajouterOeufTour(nouveau) {
+  let nom = "";
+  changer((e) => {
+    const run = e.tourNid.run;
+    if (!run) return;
+    if (nouveau) {
+      if (run.dragons.length >= 7 && choixTour.relache !== null) run.dragons.splice(choixTour.relache, 1);
+      if (run.dragons.length < 7) {
+        const id = especeTour(choixTour.nouvel, run.dragons.map((x) => x.id));
+        // Le nouveau venu arrive au niveau du plus faible de l'équipe
+        const niv = Math.max(1, Math.min(...run.dragons.map((x) => x.niveau), run.etage));
+        run.dragons.push({ id, niveau: niv });
+        nom = PAR_ID[id].nom;
+      }
+    }
+    run.attente = null;
+  });
+  choixTour.relache = null;
+  if (nom) { Son.eclosion(); toast(`${nom} rejoint ton équipe !`, "bon"); }
+  rendrePrep();
+}
+function equipeMiroir(dragons, bonus) {
+  const ids = [];
+  return dragons.map((x) => { const id = especeTour(PAR_ID[x.id].element, ids); ids.push(id); return membreBot(id, Math.min(20, x.niveau + bonus), 4); });
+}
+// Récompenses quand l'ascension s'arrête (n étages conquis)
+function recompensesTour(e, n, sommet) {
+  const g = [];
+  const r = e.ressources;
+  if (n > 0) { r.rations += 4 * n; r.brindilles += 3 * n; r.pierres += 3 * n; g.push(`+${4 * n} rations`, `+${3 * n} brindilles`, `+${3 * n} pierres`); }
+  let gem = (n >= 7 ? 30 : 0) + (n >= 14 ? 100 : 0) + (sommet ? 300 : 0);
+  if (gem) { r.gemmes = (r.gemmes || 0) + gem; g.push(`+${gem} gemmes`); }
+  if (sommet) {
+    e.oeufs.choix += 1;
+    e.oeufs.reserve.push({ uid: "o" + (++e.compteur), element: EL3[Math.floor(Math.random() * 3)], ul: true, mystere: true });
+    remplirCouvoir();
+    g.push("+1 œuf", "+1 œuf mystère UL (au couvoir)");
+  }
+  e.tourNid.record = Math.max(e.tourNid.record, n);
+  return g;
 }
 
 // ---------- Défi en ligne : chacun sur son téléphone, reliés par un code ----------
@@ -724,7 +866,7 @@ function essayerReveler() {
 function coutMode(mode) {
   const et = etapeTuto();
   if (et !== "fini") return 0;
-  return mode === "bot" ? COUT.combat : mode === "sauvage" ? 2 : 0;
+  return mode === "bot" ? COUT.combat : mode === "sauvage" ? 2 : 0; // la tour se paie à l'entrée
 }
 
 function membreJoueur(d) {
@@ -740,7 +882,10 @@ function lancer() {
     if (!ok) { toast("Pas assez d'énergie.", "mal"); return; }
   }
   const et = etapeTuto();
-  const moi = (prep.mode === "ligne" ? dragonsPrets() : prep.equipe.map((u) => e.dragons.find((d) => d.uid === u)).filter(Boolean)).map(membreJoueur);
+  const run = prep.mode === "tour" ? e.tourNid.run : null;
+  if (prep.mode === "tour" && (!run || run.attente)) return;
+  const moi = run ? run.dragons.map((x) => membreBot(x.id, x.niveau, 4)) : (prep.mode === "ligne" ? dragonsPrets() : prep.equipe.map((u) => e.dragons.find((d) => d.uid === u)).filter(Boolean)).map(membreJoueur);
+  if (!moi.length) { toast("Choisis au moins un dragon en forme.", "mal"); return; }
   const niveaux = moi.map((m) => m.niveau);
   const stadeMax = Math.max(...moi.map((m) => m.stade));
   let lui, nomAdv;
@@ -753,13 +898,16 @@ function lancer() {
     const nv = et === "sauvage1" ? 1 : et === "sauvage2" ? 2 : Math.max(1, moyen - 1);
     lui = equipeBot(new Array(n).fill(nv), stadeMax);
     nomAdv = "Dragons sauvages";
+  } else if (prep.mode === "tour") {
+    lui = equipeMiroir(run.dragons, bonusTour(run.etage));
+    nomAdv = run.etage >= ETAGES ? "Gardien du sommet" : `Mage de l'étage ${run.etage}`;
   } else if (prep.mode === "ligne") {
     if (!L || !L.autre) return;
     lui = decoderEquipe(L.autre.eq);
     nomAdv = nomPropre(L.autre.nom);
     if (!lui.length || !moi.length) return;
   } else { lui = equipeBot(new Array(Math.max(3, moi.length)).fill(prep.niveauAmi), 4); nomAdv = "Joueur 2"; }
-  C = { mode: prep.mode, tour: 1, totaux: [0, 0], equipes: [moi, lui], noms: ["Toi", nomAdv], choix: [null, null], fini: false, sel: [null, null], historique: [] };
+  C = { mode: prep.mode, tour: 1, totaux: [0, 0], equipes: [moi, lui], noms: ["Toi", nomAdv], choix: [null, null], fini: false, sel: [null, null], historique: [], etage: run ? run.etage : 0 };
   if (prep.mode === "ligne") {
     C.hote = L.hote;
     C.graine = L.hote ? L.graine : (L.autre.g | 0);
@@ -775,6 +923,8 @@ function lancer() {
     const nivAdv = Math.round(lui.reduce((s, m) => s + m.niveau, 0) / lui.length);
     const textes = prep.mode === "ligne"
       ? ["Défi en ligne", `${nomAdv} est prêt !`, `${lui.length} dragon${lui.length > 1 ? "s" : ""} de niveau ${nivAdv} en moyenne. Chacun choisit en secret sur son téléphone.`]
+      : prep.mode === "tour"
+      ? [`La tour du nid · étage ${run.etage}/${ETAGES}`, run.etage >= ETAGES ? "Le gardien du sommet se dresse !" : `${nomAdv} t'attend`, `Même équipe que toi : ${lui.length} dragon${lui.length > 1 ? "s" : ""} de niveau ${nivAdv} en moyenne.`]
       : prep.mode === "sauvage"
       ? ["Les herbes bougent…", "Des dragons sauvages surgissent !", `${lui.length} dragon${lui.length > 1 ? "s" : ""} sauvage${lui.length > 1 ? "s" : ""} de niveau ${nivAdv}.`]
       : et === "mage"
@@ -800,7 +950,7 @@ function debutTour() {
   C.choix = [null, null];
   C.dernierChoix = null;
   viserArene();
-  if (C.mode === "bot" || C.mode === "sauvage") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" ? 0.45 : 0.12);
+  if (C.mode === "bot" || C.mode === "sauvage" || C.mode === "tour") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" ? 0.45 : C.mode === "tour" ? Math.max(0, 0.5 - C.etage * 0.024) : 0.12);
   if (!D.cotes[0]) { const m = C.equipes[0].find((x) => x.pv > 0); placerDragon(0, m); }
   if (!D.cotes[1]) { const m = C.equipes[1].find((x) => x.pv > 0); placerDragon(1, m); }
   rendreChoix(0);
@@ -992,6 +1142,7 @@ function ficheCoup(k, sa, sd) {
   const sous = C.mode === "ami" ? "" : k === 0 ? "" : "Ta défense";
   const v = D.vitesse;
   const bouton = el("button", { class: "btn petit", onclick: () => { D.vitesse = D.vitesse === 1 ? 2 : 1; changer((s) => { s.reglages.vitesseCombat = D.vitesse; }); bouton.textContent = `Vitesse × ${D.vitesse}`; } }, `Vitesse × ${v}`);
+  const auto = C.mode === "ligne" ? null : el("label", { class: "fc-auto" }, el("input", { type: "checkbox", checked: !!E().reglages.combatAuto, onchange: (ev) => { changer((s) => { s.reglages.combatAuto = ev.target.checked; }); if (ev.target.checked && f._suite) f._suite(); } }), "Enchaîner");
   const cote = (m, p, tag, val, ic, droite) => el("div", { class: "fc-cote" + (droite ? " droite" : ""), style: { "--el": ELEMENTS[m.element].couleur } },
     el("span", { class: "tag" }, tag), el("span", { class: "nm" }, m.nom), el("span", { class: "ps" }, p.nom),
     el("span", { class: "val" }, icone(ic), val));
@@ -1004,7 +1155,7 @@ function ficheCoup(k, sa, sd) {
   const valeur = el("b", {}, "…");
   const total = el("div", { class: "fc-total" }, el("span", {}, "Dégâts"), valeur);
   const f = el("section", { class: `fiche-coup panneau ${k === 0 ? "nous" : "eux"}` },
-    el("div", { class: "fc-tete" }, el("div", {}, el("b", {}, titre), sous ? el("span", { class: "doux", style: { fontSize: "12px", marginLeft: "8px" } }, sous) : null), bouton),
+    el("div", { class: "fc-tete" }, el("div", {}, el("b", {}, titre), sous ? el("span", { class: "doux", style: { fontSize: "12px", marginLeft: "8px" } }, sous) : null), el("div", { class: "fc-outils" }, auto, bouton)),
     el("div", { class: "fc-duel" },
       cote(att.m, att.p, `Attaque · ${NOMS_STYLE[sa]}`, att.p.atk, "epee", false),
       el("span", { class: "fc-fleche" }, "→"),
@@ -1119,6 +1270,17 @@ async function phase(k) {
   clearTimeout(secours);
   await pause(1100);
   if (bouclier) bouclier.vise = 0;
+  await attendreSuite(fiche);
+}
+// Après chaque attaque, le récapitulatif reste à l'écran jusqu'à « Continuer » (sauf si « Enchaîner » est coché)
+function attendreSuite(fiche) {
+  if (!C || C.fini || C.mode === "ligne" || E().reglages.combatAuto) return Promise.resolve();
+  return new Promise((r) => {
+    const barreS = el("div", { class: "fc-suite" }, el("button", { class: "btn principal", onclick: () => { Son.clic(); fin(); } }, "Continuer ›"));
+    const fin = () => { fiche._suite = null; barreS.remove(); r(); };
+    fiche._suite = fin;
+    fiche.append(barreS);
+  });
 }
 
 function apresCoups(d1, d2) {
@@ -1147,8 +1309,11 @@ function abandonner(silencieux = false) {
   C.fini = true;
   clearInterval(chronoInt);
   if (C.mode === "ligne") { if (L) { L.envoi = { ab: 1, gc: C.graine }; L.pret = 0; publierLigne(); } }
-  else ecrirePv();
-  changer((e) => { if (C.mode === "bot") e.combats.perdus++; });
+  else if (C.mode !== "tour") ecrirePv();
+  changer((e) => {
+    if (C.mode === "bot") e.combats.perdus++;
+    if (C.mode === "tour" && e.tourNid.run) { recompensesTour(e, e.tourNid.run.etage - 1, false); e.tourNid.run = null; }
+  });
   if (C.mode !== "ami" && C.mode !== "ligne") signaler("combat_fini", { mode: C.mode, victoire: false });
   if (!silencieux) { fermerModale(); ctxJeu.cacherInterface(false); ouvrir(ctxJeu); toast("Combat abandonné.", "mal"); }
 }
@@ -1185,6 +1350,18 @@ function finCombat(raison) {
   const progres = [];
   changer((e) => {
     if (!enLigne) for (const m of C.equipes[0]) if (m.d) m.d.pv = Math.max(0, Math.round(m.pv));
+    if (C.mode === "tour") {
+      const run = e.tourNid.run;
+      if (!run) return;
+      if (victoire) {
+        for (const x of run.dragons) x.niveau = Math.min(20, x.niveau + 1);
+        e.tourNid.record = Math.max(e.tourNid.record, run.etage);
+        if (run.etage >= ETAGES) { gains.push(...recompensesTour(e, ETAGES, true)); e.tourNid.sommets++; e.tourNid.run = null; C.finTour = "sommet"; }
+        else { gains.push(`Étage ${run.etage} conquis`, "+1 niveau pour toute l'équipe", "un nouvel œuf à choisir"); run.etage++; run.attente = "oeuf"; C.finTour = "suite"; }
+      } else { gains.push(...recompensesTour(e, run.etage - 1, false)); e.tourNid.run = null; C.finTour = "chute"; }
+      noter(`Tour du nid, étage ${C.etage} : ${resultat}.`);
+      return;
+    }
     if (C.mode !== "ami" && !enLigne) {
       const apprentissage = etapeTuto() !== "fini";
       if (C.mode === "bot") { if (victoire) e.combats.gagnes++; else if (resultat === "nul") e.combats.nuls++; else e.combats.perdus++; }
@@ -1212,7 +1389,8 @@ function finCombat(raison) {
   if (D.cotes[1] && !victoire && D.cotes[1].membre.pv > 0) D.cotes[1].anim.jouer("rugir");
   ui.innerHTML = "";
   ui.append(rendreHaut());
-  const titre = C.mode === "ami" ? (victoire ? "Le joueur 1 gagne" : resultat === "nul" ? "Égalité" : "Le joueur 2 gagne") : (victoire ? "Victoire" : resultat === "nul" ? "Égalité" : "Défaite");
+  const titre = C.mode === "tour" ? (C.finTour === "sommet" ? "Sommet de la tour atteint !" : C.finTour === "suite" ? `Étage ${C.etage} conquis !` : `Chute à l'étage ${C.etage}`)
+    : C.mode === "ami" ? (victoire ? "Le joueur 1 gagne" : resultat === "nul" ? "Égalité" : "Le joueur 2 gagne") : (victoire ? "Victoire" : resultat === "nul" ? "Égalité" : "Défaite");
   const contenu = el("div", { style: { display: "grid", gap: "10px" } },
     forfait ? el("p", { style: { margin: 0 } }, `${C.noms[1]} ${raison === "abandon" ? "a abandonné" : "a quitté la partie"}.`) : null,
     el("p", { style: { margin: 0 } }, `Dégâts infligés : ${t0} contre ${t1}.`),
@@ -1220,7 +1398,7 @@ function finCombat(raison) {
     progres.length ? el("div", {}, el("div", { class: "etiquette" }, "Expérience"), ...progres.map((p) => el("div", { style: { fontSize: "13px" } }, `${p.nom} : +${p.xp} XP` + (p.niveaux ? ` · niveau ${p.niveau} !` : "") + (p.evolution ? " · évolution !" : "")))) : null,
     gains.length ? el("div", {}, el("div", { class: "etiquette" }, "Butin"), el("div", { style: { fontSize: "13px" } }, gains.join(" · "))) : null,
     el("details", {}, el("summary", { class: "doux", style: { cursor: "pointer" } }, "Détail des tours"), el("div", { style: { fontSize: "12px", display: "grid", gap: "3px", marginTop: "6px" } }, C.historique.map((h) => el("div", { class: "num" }, `T${h.tour} · ${h.a} −${h.d1} / ${h.b} −${h.d2}`)))),
-    blocSoins(),
+    C.mode === "tour" ? null : blocSoins(),
   );
   if (progres.some((p) => p.niveaux)) Son.niveau();
   if (C.mode !== "ami" && !enLigne) signaler("combat_fini", { mode: C.mode, victoire });
@@ -1229,9 +1407,13 @@ function finCombat(raison) {
     boutons: enLigne ? [
       { texte: "Quitter", action: () => { quitterLigne(); ctxJeu.cacherInterface(false); ctxJeu.aller("iles"); } },
       { texte: L && L.autre ? "Revanche" : "Nouveau combat", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ouvrir(ctxJeu); } },
+    ] : C.mode === "tour" ? [
+      { texte: "Retour aux îles", action: () => { ctxJeu.cacherInterface(false); ctxJeu.aller("iles"); } },
+      { texte: C.finTour === "suite" ? "Continuer l'ascension" : "Retour à la tour", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ouvrir(ctxJeu); } },
     ] : [
       { texte: "Retour aux îles", action: () => { ctxJeu.cacherInterface(false); ctxJeu.aller("iles"); } },
-      { texte: "Nouveau combat", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ouvrir(ctxJeu); } },
+      // Relance tout de suite un combat du même type, avec la même équipe
+      { texte: "Nouveau combat", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ouvrir(ctxJeu); if (dragonsPrets().length) lancer(); else toast("Tes dragons sont K.O. : soigne-les d'abord.", "mal"); } },
     ],
   }), 1200);
 }

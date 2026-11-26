@@ -1,16 +1,16 @@
 // Boutique : on achète des gemmes (de 1 € à 100 €, paiement simulé pendant la bêta), puis tout le reste en gemmes :
-// packs de démarrage, braises d'éclosion, ressources, œufs, énergie, armures.
+// packs de démarrage, braises d'éclosion, ressources, œufs, énergie, versions UL des dragons.
 import { construireDragon } from "./modele.js";
 import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite, socle } from "./scene.js";
 import { E, changer } from "./etat.js";
-import { PAR_ID, ELEMENTS, armuresDe, ENERGIE_MAX, COUVOIR } from "./regles.js";
+import { PAR_ID, ELEMENTS, ENERGIE_MAX, COUVOIR, stadeEffectif } from "./regles.js";
 import { el, styles, toast, modale, icone } from "./ui.js";
 import { Son, Musique } from "./son.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null;
-const vue = { uid: null, armure: "cuirasse" };
+const vue = { uid: null, ul: true };
 
 styles("boutique", `
 .bq-panneau { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: min(430px, 40vw); padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
@@ -57,13 +57,13 @@ function construireVitrine() {
   D = { scene, camera, orbite, support, anim: null, cle: null, update(dt) { orbite.update(dt); support.rotation.y += dt * 0.3; if (D.anim) D.anim.update(dt); } };
 }
 
-function montrer(d, armure) {
-  const cle = `${d.id}|${armure}`;
+function montrer(d, ul) {
+  const st = Math.max(1, stadeEffectif(d));
+  const cle = `${d.id}|${ul}|${st}`;
   if (cle === D.cle) return;
   D.cle = cle;
   while (D.support.children.length) D.support.remove(D.support.children[0]);
-  const st = Math.max(2, Math.min(4, d.stadeVue ?? 3));
-  const rig = construireDragon(d.id, st, { armure });
+  const rig = construireDragon(d.id, st, { ul });
   D.support.add(rig.racine);
   D.anim = new Animateur(rig); D.anim.jouer("joie");
   const h = rig.taille.y, l = Math.max(rig.taille.x, rig.taille.z);
@@ -80,6 +80,9 @@ export function ouvrir(ctx, params = {}) {
   if (params.uid) vue.uid = params.uid;
   if (!vue.uid || !e.dragons.some((d) => d.uid === vue.uid)) vue.uid = e.dragons[0] ? e.dragons[0].uid : null;
   rendre();
+  // Arrivée depuis une fiche : on descend directement à la bonne section
+  const cible = params.voir === "gemmes" ? "bq-gemmes" : params.voir ? "bq-res" : params.uid ? "bq-ul" : null;
+  if (cible) setTimeout(() => { const b = document.getElementById(cible), p = document.querySelector(".bq-panneau"); if (b && p) p.scrollTo({ top: Math.max(0, b.offsetTop - 70), behavior: "smooth" }); }, 60);
 }
 export function fermer() { ctxJeu.moteur.definirZone(null); }
 
@@ -92,7 +95,7 @@ const GEMMES = [
   { n: 6500, prix: "50 €", bonus: "+30 %" },
   { n: 14000, prix: "100 €", bonus: "+40 %" },
 ];
-const PRIX_ARMURE = 500;
+const PRIX_UL = 800;
 // Packs : plusieurs œufs (à choisir au couvoir), des braises pour les faire éclore vite, et de quoi démarrer.
 const PACKS = [
   {
@@ -207,31 +210,28 @@ function rendre() {
     `Une braise fait avancer un œuf du couvoir d'un quart (environ ${Math.round(COUVOIR[0].heures * 60 / 4)} minutes). 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`));
   for (const [n, prix, txt] of BRAISES) p.append(article({ nom: `${n} braises d'éclosion`, ic: "braises", prix, texte: txt, onclick: () => payer(prix, `${n} braises d'éclosion`, (s) => { s.ressources.braises = (s.ressources.braises || 0) + n; }) }));
   // Ressources
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" } }, "Ressources et énergie"));
+  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-res" }, "Ressources et énergie"));
   for (const r of RESSOURCES) p.append(article({ nom: r.nom, ic: r.ic, prix: r.prix, texte: r.texte, onclick: () => payer(r.prix, r.nom, r.donner) }));
-  // Armures
+  // Versions UL (Ultime) : une robe rare pour chacun de tes dragons
   const d = e.dragons.find((x) => x.uid === vue.uid);
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" } }, "Armures"));
+  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-ul" }, "Versions UL (Ultime)"));
+  p.append(el("div", { class: "bq-note", style: { background: "rgba(180,92,255,.1)", borderColor: "rgba(190,120,255,.4)", color: "#ecd8ff" } },
+    "Une robe rare, aux reflets métalliques et aux couleurs uniques. Seule l'apparence change : aucun avantage en combat."));
   if (d) {
     const src = PAR_ID[d.id];
-    montrer(d, vue.armure);
+    montrer(d, vue.ul);
     const choix = el("div", { class: "bq-dragons" });
-    for (const x of e.dragons) choix.append(el("button", { class: `${PAR_ID[x.id].element} ${x.uid === vue.uid ? "actif" : ""}`, onclick: () => { vue.uid = x.uid; rendre(); } }, PAR_ID[x.id].nom));
+    for (const x of e.dragons) choix.append(el("button", { class: `${PAR_ID[x.id].element} ${x.uid === vue.uid ? "actif" : ""}`, onclick: () => { vue.uid = x.uid; vue.ul = true; rendre(); } }, PAR_ID[x.id].nom, x.ulPossede ? " ✦" : ""));
     p.append(choix);
-    for (const a of armuresDe(d.id)) {
-      const a_deja = d.armures.includes(a.id);
-      p.append(el("div", { class: "article" + (vue.armure === a.id ? " actif" : ""), role: "button", tabindex: 0, onclick: () => { vue.armure = a.id; Son.clic(); rendre(); } },
-        el("b", {}, a.nomComplet), a_deja ? el("span", { class: "prix" }, "possédée") : prixG(PRIX_ARMURE),
-        el("small", {}, `Surtout pour le style. Petit bonus : ${a.texte}.`)));
-    }
-    const a = armuresDe(d.id).find((x) => x.id === vue.armure);
-    const deja = d.armures.includes(vue.armure);
+    p.append(el("div", { class: "bq-dragons" },
+      el("button", { class: !vue.ul ? "actif" : "", onclick: () => { vue.ul = false; Son.clic(); rendre(); } }, "Voir normale"),
+      el("button", { class: vue.ul ? "actif" : "", onclick: () => { vue.ul = true; Son.evolution(); rendre(); } }, "Voir UL")));
     p.append(el("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
-      deja
-        ? el("button", { class: "btn principal", onclick: () => { changer(() => { d.armure = vue.armure; }); Son.achat(); toast(`${src.nom} porte ${a.nomComplet}.`, "bon"); } }, "Équiper")
-        : el("button", { class: "btn principal", onclick: () => payer(PRIX_ARMURE, `${a.nomComplet} pour ${src.nom}`, () => { d.armures.push(a.id); d.armure = a.id; }) }, icone("gemmes"), `Acheter · ${nb(PRIX_ARMURE)} gemmes`),
+      d.ulPossede
+        ? el("button", { class: "btn principal", onclick: () => { changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = !x.ul; }); Son.achat(); toast(d.ul ? `${src.nom} porte sa robe UL.` : `${src.nom} reprend sa robe normale.`, "bon"); rendre(); } }, d.ul ? "Remettre la robe normale" : "Porter la robe UL")
+        : el("button", { class: "btn principal", onclick: () => payer(PRIX_UL, `${src.nom} UL`, (s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ulPossede = true; x.ul = true; }) }, icone("gemmes"), `${src.nom} UL · ${nb(PRIX_UL)} gemmes`),
     ));
-  } else p.append(el("p", { class: "doux" }, "Fais éclore un dragon pour lui acheter des armures."));
+  } else p.append(el("p", { class: "doux" }, "Fais éclore un dragon pour voir sa version UL."));
   ui.append(p);
   p.scrollTop = defile;
 }

@@ -269,7 +269,7 @@ function rendre() {
     el("a", { class: "doux", style: { fontSize: "12px" }, href: window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM", target: "_blank", rel: "noopener" }, "Ouvrir le Livre des dragons"));
   if (livreComplet() && !e.livre.ulChoisi) coll.append(el("button", { class: "btn principal petit", onclick: () => {
     const liste = el("div", { style: { display: "grid", gap: "6px" } });
-    for (const d of e.dragons) liste.append(el("button", { class: "btn", onclick: () => { changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = true; s.livre.ulDebloque = true; s.livre.ulChoisi = d.id; }); Son.evolution(); toast(`${PAR_ID[d.id].nom} devient UL !`, "bon"); modale({ titre: "Version UL", contenu: "Sa nouvelle robe t'attend sur son île." }); rendre(); return false; } }, `${PAR_ID[d.id].nom} · Nv ${d.niveau}`));
+    for (const d of e.dragons) liste.append(el("button", { class: "btn", onclick: () => { changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = true; x.ulPossede = true; s.livre.ulDebloque = true; s.livre.ulChoisi = d.id; }); Son.evolution(); toast(`${PAR_ID[d.id].nom} devient UL !`, "bon"); modale({ titre: "Version UL", contenu: "Sa nouvelle robe t'attend sur son île." }); rendre(); return false; } }, `${PAR_ID[d.id].nom} · Nv ${d.niveau}`));
     modale({ titre: "Choisis ton dragon UL", contenu: el("div", {}, el("p", { class: "doux" }, "Tu as complété le Livre ! Un de tes dragons reçoit une robe Ultime, rare. Seule l'apparence change."), liste), boutons: [{ texte: "Plus tard" }] });
   } }, "Choisir mon dragon UL"));
   p.append(coll);

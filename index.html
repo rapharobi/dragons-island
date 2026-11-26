@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0e13"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.DRAGONS_SITE = true;</script></head><body><title>Dragons Island</title>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0e13"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.DRAGONS_SITE = true;</script></head><body><title>Dragon World</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,6 +51,9 @@ h1, h2, h3, h4 { font-family: var(--titre); margin: 0; text-wrap: balance; lette
 .puce svg { width: 16px; height: 16px; flex: none; }
 .puce.energie { border-color: rgba(242, 181, 68, 0.4); }
 .puce.gemmes { border-color: rgba(190, 120, 255, .55); color: #e8d0ff; }
+.puce[role=button] { cursor: pointer; } .puce[role=button]:active { transform: scale(.95); }
+.info-res { display: grid; gap: 12px; } .info-res p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; }
+.info-res-tete { display: flex; align-items: center; gap: 10px; } .info-res-tete svg { width: 34px; height: 34px; } .info-res-tete b { font-size: 26px; }
 .puce .jauge { width: 38px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .puce .jauge i { display: block; height: 100%; background: var(--ambre); }
 

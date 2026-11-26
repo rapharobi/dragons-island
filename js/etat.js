@@ -30,7 +30,8 @@ export function nouvellePartie() {
     noeuds: {},
     livre: { vus: [], ulDebloque: false, ulChoisi: null },
     combats: { gagnes: 0, perdus: 0, nuls: 0 },
-    reglages: { mode: "temps", son: true, musique: true, chrono: 20, qualite: "haute" },
+    reglages: { mode: "temps", son: true, musique: true, chrono: 20, qualite: "haute", combatAuto: false },
+    tourNid: { run: null, record: 0, sommets: 0 },
     intro: true,
     tuto: { etape: "histoire" },
     journal: [],
@@ -106,6 +107,16 @@ function migrer(o) {
       sl.debut = maintenantO - av * b.heures * H;
     }
     o.reglages.mode = "temps";
+  }
+  // Bêta 0.12 : les armures sont retirées (remboursées en gemmes), les robes UL deviennent un achat
+  if (!o.migre12) {
+    for (const d of o.dragons) {
+      if (d.ul) d.ulPossede = true;
+      const n = (d.armures || []).length;
+      if (n) o.ressources.gemmes = (o.ressources.gemmes || 0) + n * 500;
+      d.armures = []; d.armure = null;
+    }
+    o.migre12 = true;
   }
   return o;
 }
@@ -386,7 +397,9 @@ export function eclore(index) {
     const id = tirerEspece(s.oeuf.element);
     const double = possede(id);
     const d = nouveauDragon(id);
-    ids.push({ d, double });
+    // Œuf mystère du sommet de la tour : le dragon sort en version UL
+    if (s.oeuf.ul) { d.ul = true; d.ulPossede = true; }
+    ids.push({ d, double, ul: !!s.oeuf.ul });
     c.slots.splice(c.slots.indexOf(s), 1);
   }
   remplirCouvoir();

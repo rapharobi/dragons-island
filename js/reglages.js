@@ -3,6 +3,7 @@ import { E, changer, lieuSauvegarde, reinitialiser } from "./etat.js";
 import { COUVOIR } from "./regles.js";
 import { el, styles, toast, modale } from "./ui.js";
 import { Son, Musique, reglerSon, initAudio } from "./son.js";
+import { pleinEcranPossible, basculerPleinEcran } from "./portail.js";
 
 let ctxJeu = null, ui = null;
 
@@ -37,6 +38,9 @@ function rendre() {
   p.append(el("div", { class: "opt" }, el("h3", {}, "Son"),
     seg([[true, "Bruitages activés"], [false, "Bruitages coupés"]], r.son, (v) => { changer((s) => { s.reglages.son = v; }); initAudio(); reglerSon(v, E().reglages.musique); }),
     seg([[true, "Musique activée"], [false, "Musique coupée"]], r.musique, (v) => { changer((s) => { s.reglages.musique = v; }); initAudio(); reglerSon(E().reglages.son, v); })));
+  if (pleinEcranPossible()) p.append(el("div", { class: "opt" }, el("h3", {}, "Affichage"),
+    el("p", {}, "Le jeu prend tout l'écran du téléphone, sans la barre du navigateur."),
+    el("div", { class: "seg" }, el("button", { onclick: () => basculerPleinEcran() }, "⛶ Plein écran (activer / quitter)"))));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Temps pour choisir en combat"),
     el("p", {}, "20 secondes dans le jeu final. Tu peux l'enlever pour tester tranquillement."),
     seg([[20, "20 secondes"], [40, "40 secondes"], [0, "Sans limite"]], r.chrono, (v) => changer((s) => { s.reglages.chrono = v; }))));
@@ -45,6 +49,15 @@ function rendre() {
     el("div", { class: "seg" },
       el("button", { onclick: () => { const t = JSON.stringify(E()); navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast("Sauvegarde copiée.", "bon"), () => toast("Copie refusée par le navigateur.", "mal")); } }, "Copier la sauvegarde"),
       el("button", { onclick: () => modale({ titre: "Recommencer à zéro ?", contenu: "Toute la partie sera effacée : dragons, ressources, œufs et gemmes.", boutons: [{ texte: "Annuler" }, { texte: "Tout effacer", classe: "danger", action: () => { reinitialiser(); location.hash = ""; location.reload(); } }] }) }, "Recommencer à zéro"))));
-  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", {}, "Dragons Island, bêta 0.11 : jeu complet, avec des bots à la place des vrais adversaires et le défi en ligne entre amis. Le GPS et les nids NFC arriveront avec l'appli mobile.")));
+  let tapes = 0;
+  let admin = false; try { admin = localStorage.getItem("dw-pilote") === "1"; } catch (e) { /* stockage refusé */ }
+  if (admin) p.append(el("div", { class: "opt", style: { borderColor: "rgba(190,120,255,.5)" } }, el("h3", {}, "Pilotage du jeu"),
+    el("p", {}, "Ton poste de commande : ressources, dragons, séismes, météorites, éclipses et, avec les comptes, la modération des joueurs."),
+    el("div", { class: "seg" }, el("button", { class: "actif", onclick: () => ctxJeu.aller("pilotage") }, "Ouvrir le pilotage"))));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "À propos"), el("p", { onclick: () => {
+    if (++tapes < 7) return;
+    try { localStorage.setItem("dw-pilote", "1"); } catch (e) { /* stockage refusé */ }
+    toast("Pilotage débloqué.", "bon"); rendre();
+  } }, "Dragon World, bêta 0.12 : jeu complet, avec des bots à la place des vrais adversaires et le défi en ligne entre amis. Le GPS et les nids NFC arriveront avec l'appli mobile.")));
   ui.append(p);
 }

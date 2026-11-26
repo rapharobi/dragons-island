@@ -49,6 +49,30 @@ styles("iles", `
 .etiq .humeur { font-size: 10px; color: var(--doux); }
 .etiq .recolte { font-size: 11px; color: var(--ambre); font-weight: 600; }
 .bandeau-placement { position: fixed; z-index: 18; top: calc(var(--hud) + var(--tuto, 0px) + 54px); left: 50%; transform: translateX(-50%); padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; width: min(560px, calc(100vw - 32px)); text-align: center; }
+.fleche-fiche { position: fixed; z-index: 17; width: 34px; height: 52px; border-radius: 12px; border: 1px solid var(--trait-fort); background: rgba(13,14,19,.86); color: var(--ambre); font-size: 30px; line-height: 1; display: grid; place-items: center; padding: 0 0 4px; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.fleche-fiche.g { left: 5px; } .fleche-fiche.d { right: 5px; }
+@media (max-width: 560px) { .fiche-ile.avec-fleches { left: 44px !important; right: 44px !important; } }
+@media (min-width: 561px) { .fleche-fiche.g { left: auto; right: calc(var(--bord-d) + min(380px, calc(100vw - 32px)) + 6px); } .fleche-fiche.d { right: calc(var(--bord-d) - 40px); } }
+.fiche-rang { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12px; }
+.pil.ul { border-color: #d8b0ff; color: #e8ccff; background: rgba(170,110,255,.16); }
+.liste-dragons { position: fixed; z-index: 19; top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 80px); left: 50%; transform: translateX(-50%); width: min(460px, calc(100vw - 24px)); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.liste-dragons header { display: flex; justify-content: space-between; align-items: flex-start; }
+.liste-dragons h3 { font-size: 22px; }
+.liste-dragons input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.05); color: inherit; font: inherit; }
+.ld-outils { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ld-filtres { display: flex; gap: 5px; flex-wrap: wrap; }
+.ld-filtres .btn.actif { border-color: var(--ambre); color: var(--ambre); }
+.ld-outils select { padding: 7px 8px; border-radius: 9px; border: 1px solid var(--trait-fort); background: #1a1b24; color: inherit; font: inherit; font-size: 12px; }
+.ld-corps { overflow: auto; display: grid; gap: 6px; align-content: start; flex: 1; min-height: 0; }
+.ld-ligne { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; text-align: left; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--trait); background: rgba(255,255,255,.03); color: inherit; }
+.ld-ligne:active { background: rgba(255,255,255,.08); }
+.ld-pastille { width: 10px; height: 34px; border-radius: 4px; background: var(--doux); }
+.ld-ligne.feu .ld-pastille { background: var(--feu); } .ld-ligne.glace .ld-pastille { background: var(--glace); } .ld-ligne.eau .ld-pastille { background: var(--eau); }
+.ld-nom { display: grid; gap: 2px; min-width: 0; } .ld-nom b { font-family: var(--titre); font-size: 15px; } .ld-nom small { color: var(--doux); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ld-ul { color: #e8ccff; font-size: 11px; }
+.ld-droite { display: grid; gap: 4px; justify-items: end; font-size: 12px; } .ld-droite .barre { width: 70px; height: 5px; }
+.ld-alerte { color: var(--ambre); font-size: 10px; }
+.iles-choix .mes-dragons { border-color: var(--ambre); color: var(--ambre); }
 @media (max-width: 560px) { .fiche-ile { left: var(--bord-g); right: var(--bord-d); width: auto; bottom: calc(var(--bas) + 76px); max-height: min(40vh, calc(100vh - var(--hud) - var(--tuto, 0px) - var(--bas) - 240px)); padding: 12px 14px 14px; } .fiche-ile h3 { font-size: 19px; } body.avec-fiche .iles-choix { display: none; } .iles-aide { display: none; } .etiq .humeur { display: none; } }
 `);
 
@@ -102,6 +126,7 @@ function construireDecor() {
     g.position.copy(POS_ILES[elx]);
     scene.add(g);
     iles[elx] = { groupe: g, noeuds: [], source: null, niveauSource: -1, sol: g.userData.sol };
+    iles[elx].obstacles = obstaclesIle(g, elx);
   }
   const centre = construireCentre();
   scene.add(centre.groupe);
@@ -176,12 +201,14 @@ function construireDecor() {
     scene, camera, orbite, iles, centre, sky, nuages, lum,
     dragons: new Map(),
     couvoir: null, couvoirCle: null,
-    focus: null, t: 0, fond: false, suivi: null, placement: null, marqueurs: [], repas: [], rituel: null, eclats: [],
+    focus: null, t: 0, fond: false, suivi: null, placement: null, marqueurs: [], repas: [], rituel: null, eclats: [], meteores: [], secousse: 0, eclipse: 0,
+    lumBase: { hemi: lum.hemi.intensity, soleil: lum.soleil.intensity, contre: lum.contre.intensity },
     update(dt) {
       D.t += dt;
       if (D.suivi && orbite.distV > (D.suiviDist || 1e9) * 1.6) { D.suivi = null; majBoutons(); }
       if (D.suivi) { const v = new T.Vector3(); D.suivi.mobile.getWorldPosition(v); v.y += D.suivi.hauteur * 0.45; orbite.cibleVoulue.copy(v); }
       orbite.update(dt);
+      majEvenements(dt);
       for (const ile of Object.values(iles)) {
         for (const f of ile.groupe.userData.animes || []) f(D.t);
         if (ile.source) for (const f of ile.source.userData.animes || []) f(D.t);
@@ -195,7 +222,7 @@ function construireDecor() {
       }
       nuages.position.x = Math.sin(D.t * 0.03) * 8;
       for (const [, v] of D.dragons) { vivre(v, dt); v.anim.update(dt); }
-      for (let i = D.repas.length - 1; i >= 0; i--) { const r = D.repas[i]; r.t += dt; const k = Math.max(0, 1 - r.t / 1.9); r.o.scale.setScalar(Math.max(0.01, k)); if (r.t > 1.9) { r.o.parent && r.o.parent.remove(r.o); D.repas.splice(i, 1); } }
+      majRepas(dt);
       for (const m of D.marqueurs) { m.rotation.y += dt; m.children[0].material.opacity = 0.5 + Math.sin(D.t * 4) * 0.25; }
       if (E()) for (const ile of Object.values(iles)) for (const n of ile.noeuds) {
         const u = n.objet.userData;
@@ -222,7 +249,74 @@ export function decor(ctx) {
   if (!D) construireDecor();
   return {
     afficherFond() { synchroniser(); D.fond = true; D.orbite.viser(new T.Vector3(0, 0, 0), 84, 0.3, 1.08); ctx.moteur.montrer(D); },
+    // Arrivée par le portail : la caméra part de très haut dans le ciel et plonge vers les îles
+    plongee() { D.orbite.dist = 210; D.orbite.phi = 0.28; D.orbite.theta = D.orbite.thetaV + 1.4; D.orbite.cible.set(0, 30, 0); D.orbite.douceur = 0.9; },
   };
+}
+
+// ---------- Obstacles : cheminées, colonnes, pics, arbres, la source ----------
+// Chaque gros objet du décor devient un cylindre (x, z, rayon, haut) que les dragons contournent ou survolent.
+function obstaclesIle(g, elx) {
+  g.updateMatrixWorld(true);
+  const l = [], b = new T.Box3(), base = g.position;
+  for (const o of (g.userData.deco || { children: [] }).children) {
+    if (o.isInstancedMesh || (o.material && o.material.transparent)) continue;
+    b.setFromObject(o);
+    if (b.isEmpty()) continue;
+    const x = (b.min.x + b.max.x) / 2 - base.x, z = (b.min.z + b.max.z) / 2 - base.z;
+    const haut = b.max.y - base.y;
+    if (haut - solIle(elx, x, z) < 0.55) continue;
+    l.push({ x, z, r: Math.max(0.35, Math.max(b.max.x - b.min.x, b.max.z - b.min.z) * 0.45), haut });
+  }
+  return l;
+}
+function obstacles(v) { const ile = D.iles[v.element]; return ile.obstSource ? ile.obstacles.concat([ile.obstSource]) : ile.obstacles; }
+// Rayon à garder autour d'un obstacle (plus petit si le nid du dragon est collé à l'obstacle)
+function rayonAutour(v, o) {
+  const rr = o.r + 0.2 + v.taille * 0.18;
+  const dm = Math.hypot(v.maison.x - o.x, v.maison.z - o.z);
+  return dm < rr ? dm - 0.15 : rr;
+}
+function dansObstacle(v, x, z) {
+  for (const o of obstacles(v)) { if (o.source) continue; const rr = rayonAutour(v, o); if (rr > 0 && Math.hypot(x - o.x, z - o.z) < rr) return true; }
+  return false;
+}
+// Repousse le dragon hors des obstacles en le faisant glisser autour
+function repousser(v, dt) {
+  const p = v.mobile.position;
+  let pousse = false;
+  for (const o of obstacles(v)) {
+    const rr = o.source ? o.r : rayonAutour(v, o);
+    if (rr <= 0) continue;
+    const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz);
+    if (d >= rr || d < 1e-4) continue;
+    p.x = o.x + (dx / d) * rr; p.z = o.z + (dz / d) * rr;
+    // Petit pas de côté pour ne pas rester coincé face à l'obstacle
+    p.x += (-dz / d) * dt * 0.8; p.z += (dx / d) * dt * 0.8;
+    pousse = true;
+  }
+  v.bloque = pousse ? (v.bloque || 0) + dt : 0;
+  if (v.bloque > 2.5 && (v.etat === "marche" || v.etat === "rejoindre")) { v.etat = "pause"; v.minuteur = 0.5; v.bloque = 0; v.anim.jouer("repos"); }
+}
+// Hauteur minimale de vol au-dessus du relief et des obstacles autour de (x, z)
+function plafondVol(v, x, z) {
+  let h = solIle(v.element, x, z);
+  for (const o of obstacles(v)) if (Math.hypot(x - o.x, z - o.z) < o.r + 1.4 + v.taille * 0.3) h = Math.max(h, o.haut + 0.5);
+  return h;
+}
+// Cercle de vol qui reste au-dessus de l'île (pas au-dessus du vide ni des ponts)
+function cercleDeVol(v, centre, rayon) {
+  const c = centre.clone();
+  for (let k = 0; k < 8; k++) {
+    let ok = true;
+    for (let a = 0; a < 6.28 && ok; a += 0.4) {
+      const x = c.x + Math.cos(a) * rayon, z = c.z + Math.sin(a) * rayon;
+      if (Math.hypot(x, z) > rayonBord(v.element, Math.atan2(z, x)) - 1.6) ok = false;
+    }
+    if (ok) break;
+    rayon = Math.max(1.4, rayon * 0.8); c.multiplyScalar(0.85);
+  }
+  return { centre: c, rayon };
 }
 
 // ---------- Terrain : où chaque dragon peut aller ----------
@@ -232,7 +326,8 @@ function terrainOk(v, x, z) {
   if (r > rayonBord(v.element, Math.atan2(z, x)) - 2.4) return false;
   const [cx, cz, cr] = CENTRE[v.element];
   const h = solIle(v.element, x, z);
-  if (nage(v)) return dansLEau(v.element, x, z, v.habitat === "fond") && Math.hypot(x - cx, z - cz) > cr;
+  if (nage(v)) return dansLEau(v.element, x, z, v.habitat === "fond") && Math.hypot(x - cx, z - cz) > cr && !dansObstacle(v, x, z);
+  if (dansObstacle(v, x, z)) return false;
   if (v.element === "eau" && h < 0.08) return false;
   if (v.element === "glace" && h > 2.2) return false;
   return Math.hypot(x - cx, z - cz) > cr;
@@ -279,7 +374,7 @@ function choisirEnvie(v) {
   if (choix === "marche") { const c = pointAuHasard(v, v.habitat === "cheminee" || perche ? v.maison : p, perche ? 2 : v.habitat === "cheminee" ? 3 : 4.5); if (c) return allerVers(v, c, "marche", 0.7 + Math.random() * 0.6); choix = "action"; }
   if (choix === "action") { v.etat = "action"; const a = ACTIONS_SEUL[Math.floor(Math.random() * ACTIONS_SEUL.length)]; v.anim.jouer(a); v.minuteur = 2.6; if (a === "rugir" && v.proche) Son.crier(v.element, Math.min(1, v.stade / 4)); return; }
   if (choix === "dort" || choix === "nid") return allerVers(v, v.maison.clone(), "nid", 0.8);
-  if (choix === "vol") { v.etat = "vol"; v.volT = 0; v.volCentre = (perche ? v.maison : p).clone(); v.volR = 2.5 + Math.random() * 3; v.volA = Math.random() * 6.28; v.volDuree = 8 + Math.random() * 6; v.anim.jouer("vol"); return; }
+  if (choix === "vol") return decoller(v);
   if (choix === "ami") {
     const ami = voisins[Math.floor(Math.random() * voisins.length)];
     const milieu = p.clone().lerp(ami.mobile.position, 0.5);
@@ -289,6 +384,15 @@ function choisirEnvie(v) {
     allerVers(ami, milieu.clone().add(dir.clone().multiplyScalar(ecart)), "rejoindre", 1.1);
     v.ami = ami; ami.ami = v;
   }
+}
+
+function decoller(v, duree) {
+  const p = v.mobile.position;
+  const c = cercleDeVol(v, (v.habitat === "perchoir" ? v.maison : p).clone().setY(0), 2.5 + Math.random() * 3);
+  v.etat = "vol"; v.volT = 0; v.volCentre = c.centre; v.volR = c.rayon;
+  v.volA = Math.atan2(p.z - c.centre.z, p.x - c.centre.x);
+  v.volDuree = duree || 8 + Math.random() * 6; v.volY = p.y;
+  v.anim.jouer("vol");
 }
 
 function tourner(v, angle, dt, vitesse = 5) {
@@ -364,9 +468,18 @@ function vivre(v, dt) {
       const duree = v.volDuree || 9;
       const env = Math.max(0, Math.min(1, v.volT / 1.5, (duree - v.volT) / 1.5));
       v.volA += dt * 0.5;
-      p.x = v.volCentre.x + Math.cos(v.volA) * v.volR * env; p.z = v.volCentre.z + Math.sin(v.volA) * v.volR * env;
-      tourner(v, v.volA + Math.PI, dt, 3);
-      hauteurVol = env * (v.habitat === "perchoir" ? 4.5 : 2.8);
+      // Le dragon rejoint son cercle en douceur (pas de saut au décollage)
+      const tx = v.volCentre.x + Math.cos(v.volA) * v.volR * env, tz = v.volCentre.z + Math.sin(v.volA) * v.volR * env;
+      const k = Math.min(1, dt * 2.5);
+      const ax = p.x, az = p.z;
+      p.x += (tx - p.x) * k; p.z += (tz - p.z) * k;
+      if (Math.hypot(p.x - ax, p.z - az) > 1e-4) tourner(v, Math.atan2(p.x - ax, p.z - az), dt, 3);
+      // Altitude : au-dessus du relief, des cheminées, des pics et de la source, en regardant un peu devant
+      const devant = v.volA + 0.6;
+      const fx = v.volCentre.x + Math.cos(devant) * v.volR * env, fz = v.volCentre.z + Math.sin(devant) * v.volR * env;
+      const plancher = Math.max(plafondVol(v, p.x, p.z), plafondVol(v, fx, fz));
+      const voulu = solIle(v.element, p.x, p.z) + env * (v.habitat === "perchoir" ? 4.5 : 2.8);
+      v.volY = Math.max(voulu, env > 0.05 ? plancher + 0.4 : voulu);
       if (v.volT >= duree) {
         v.anim.jouer("repos");
         if (v.habitat === "perchoir") allerVers(v, v.maison.clone(), "nid", 0.8);
@@ -396,6 +509,14 @@ function vivre(v, dt) {
       tourner(v, Math.atan2(sx - p.x, sz - p.z), dt, 4);
       break;
     }
+    case "atterrir": {
+      // Il se pose d'abord (au sol, ou à son nid s'il survole un obstacle), puis il mange
+      const dx = v.cible.x - p.x, dz = v.cible.z - p.z, dist = Math.hypot(dx, dz);
+      if (dist > 0.15) { tourner(v, Math.atan2(dx, dz), dt, 4); const vit = Math.min(dist, 2.2 * dt); p.x += (dx / dist) * vit; p.z += (dz / dist) * vit; }
+      const sol = hauteurVoulue(v, p.x, p.z);
+      if (dist <= 0.15 && p.y - sol < 0.1) { v.anim.jouer("repos"); poserRepas(v); }
+      break;
+    }
     case "repas": {
       if (v.minuteur <= 0) { v.etat = "pause"; v.minuteur = 1; }
       break;
@@ -412,8 +533,9 @@ function vivre(v, dt) {
       if (v.minuteur <= 0 && !v.anim.action && D.suivi !== v) choisirEnvie(v);
     }
   }
-  const y = hauteurVoulue(v, p.x, p.z) + hauteurVol;
-  p.y += (y - p.y) * Math.min(1, dt * (nage(v) ? 2 : 6));
+  if (v.etat !== "vol" && v.etat !== "atterrir") repousser(v, dt);
+  const y = v.etat === "vol" ? v.volY : hauteurVoulue(v, p.x, p.z) + hauteurVol;
+  p.y += (y - p.y) * Math.min(1, dt * (v.etat === "vol" ? 3 : v.etat === "atterrir" ? 1.8 : nage(v) ? 2 : 6));
 }
 
 // ---------- Récolte : un dragon de l'île va chercher la ressource ----------
@@ -528,7 +650,11 @@ function majEclats(dt) {
   for (let i = D.eclats.length - 1; i >= 0; i--) {
     const e = D.eclats[i], p = e.o.position;
     e.t += dt;
-    if (e.poussiere) {
+    if (e.libre) {
+      e.v.y += e.g * dt; if (e.frein !== 1) e.v.multiplyScalar(Math.pow(e.frein, dt));
+      p.addScaledVector(e.v, dt); if (e.grossit) e.o.scale.multiplyScalar(1 + e.grossit * dt);
+      if (e.o.geometry === GEO_COEUR) e.o.quaternion.copy(D.camera.quaternion);
+    } else if (e.poussiere) {
       p.addScaledVector(e.v, dt); e.o.scale.multiplyScalar(1 + dt * 0.8);
     } else if (e.terre) {
       // Morceaux qui retombent et rebondissent sur le sol
@@ -553,6 +679,7 @@ function majEclats(dt) {
     }
     const reste = e.vie - e.t;
     if (reste < 0.8) e.o.material.opacity = Math.max(0, reste / 0.8) * (e.bulle ? 0.8 : 1);
+    if (e.libre && e.o.geometry !== GEO_COEUR && reste < e.vie) e.o.material.opacity = Math.max(0, Math.min(e.o.material.opacity, reste / e.vie));
     if (e.t >= e.vie) { e.o.parent && e.o.parent.remove(e.o); e.o.material.dispose(); D.eclats.splice(i, 1); }
   }
 }
@@ -616,6 +743,11 @@ function majSource(elx, animer = false) {
   const zc = new T.Mesh(new T.CylinderGeometry(2.2, 2.2, 3, 10), new T.MeshBasicMaterial({ visible: false })); zc.position.y = elx === "eau" ? -0.5 : 1; s.add(zc);
   ile.groupe.add(s);
   ile.source = s; ile.niveauSource = niv;
+  if (elx !== "eau") {
+    s.updateMatrixWorld(true);
+    const bb = new T.Box3().setFromObject(s);
+    ile.obstSource = bb.isEmpty() ? null : { x, z, r: CENTRE[elx][2] * 0.85, haut: bb.max.y - ile.groupe.position.y, source: true };
+  }
   if (animer && niv > 0) ile.croissance = 0;
 }
 
@@ -793,7 +925,7 @@ function action(a, objet) {
     const v = D.dragons.get(d.uid);
     ficheDragon(d);
     if (v) suivre(v);
-    if (v && !v.ko && !["vol", "recolte", "versRecolte", "rituel", "rituelPret", "repas"].includes(v.etat)) { v.etat = "action"; v.minuteur = 3; v.anim.jouer(nage(v) ? "nage" : "repos"); v.anim.jouer(Math.random() < 0.5 ? "joie" : "regarder"); }
+    if (v && !v.ko && !["vol", "atterrir", "recolte", "versRecolte", "rituel", "rituelPret", "repas"].includes(v.etat)) { v.etat = "action"; v.minuteur = 3; v.anim.jouer(nage(v) ? "nage" : "repos"); v.anim.jouer(Math.random() < 0.5 ? "joie" : "regarder"); }
   } else if (a.type === "noeud") {
     if (!noeudDispo(a.cle)) { toast(`Ça repousse : encore ${fmtDuree(e.noeuds[a.cle] - maintenant())}.`); return; }
     lancerRecolte(a, objet);
@@ -826,6 +958,7 @@ function majCadrage() {
   const z = zoneVisible();
   ctxJeu.moteur.definirZone(z);
   if (D.suivi) D.orbite.distV = D.suiviDist = distanceSuivi(D.suivi, z);
+  placerFleches();
 }
 
 // ---------- Caméra ----------
@@ -905,19 +1038,21 @@ export function ouvrir(ctx) {
   ctx.majHud();
   signaler("ecran", "iles");
 }
-export function fermer() { finirPlacement(); calqueEtiq = null; ficheUI = null; etiquettes.clear(); if (D) D.suivi = null; ctxJeu.moteur.definirZone(null); }
+export function fermer() { finirPlacement(); calqueEtiq = null; ficheUI = null; fermerListe(); etiquettes.clear(); if (D) D.suivi = null; ctxJeu.moteur.definirZone(null); }
 
 function majBoutons() {
   const c = document.getElementById("iles-choix");
   if (!c) return;
   c.innerHTML = "";
+  if (E().dragons.length) c.append(el("button", { class: "btn petit mes-dragons", onclick: () => { Son.clic(); ouvrirListe(); } }, `Mes dragons (${E().dragons.length})`));
   for (const [id, nom] of [["tout", "Vue d'ensemble"], ["feu", "Île de Feu"], ["glace", "Île de Glace"], ["eau", "Île d'Eau"], ["centre", "Couvoir"]]) {
     const cls = id === "feu" || id === "glace" || id === "eau" ? id : "";
     c.append(el("button", { class: `btn petit ${D.focus === id && !D.suivi ? "actif" : ""} ${cls}`, style: cls ? { color: `var(--${cls})` } : null, onclick: () => { Son.clic(); if (id === "centre" && D.focus === "centre") { ctxJeu.aller("couvoir"); return; } fermerFiche(); focaliser(id); } }, nom));
   }
 }
 
-function fermerFiche() { document.body.classList.remove("avec-fiche"); if (ficheUI) { if (ficheUI._ro) ficheUI._ro.disconnect(); ficheUI.remove(); ficheUI = null; afficherTuto(); ctxJeu.moteur.definirZone(null); } if (D && D.suivi) { D.suivi = null; majBoutons(); } }
+function retirerFiche() { if (!ficheUI) return; if (ficheUI._ro) ficheUI._ro.disconnect(); for (const f of ficheUI._fleches || []) f.remove(); ficheUI.remove(); ficheUI = null; }
+function fermerFiche() { document.body.classList.remove("avec-fiche"); if (ficheUI) { retirerFiche(); afficherTuto(); ctxJeu.moteur.definirZone(null); } if (D && D.suivi) { D.suivi = null; majBoutons(); } }
 function zoneVisible() {
   const l = window.innerWidth, h = window.innerHeight;
   if (l <= 560) {
@@ -935,7 +1070,7 @@ function zoneVisible() {
   return { x: 0, y: 0, l: 1 - Math.min(400, l * 0.4) / l, h: 1 };
 }
 function nouvelleFiche() {
-  if (ficheUI) { ficheUI.remove(); ficheUI = null; }
+  retirerFiche();
   ficheUI = el("section", { class: "fiche-ile panneau" });
   racineUI.append(ficheUI);
   document.body.classList.add("avec-fiche");
@@ -946,16 +1081,340 @@ function nouvelleFiche() {
 }
 const enTete = (titre, ...sous) => el("header", {}, el("div", {}, el("h3", {}, titre), el("div", { class: "sous" }, ...sous)), el("button", { class: "fermer-fiche", "aria-label": "Fermer", onclick: () => fermerFiche(), html: icone("fermer").innerHTML }));
 
-// Une petite ration posée devant le dragon, qu'il mange
-function montrerRepas(v, couleur) {
-  const o = mesh(new T.IcosahedronGeometry(0.22 * Math.max(0.7, v.echelle), 0), mat(couleur, { r: 0.6, e: couleur, ei: 0.2 }), false);
-  const devant = new T.Vector3(Math.sin(v.mobile.rotation.y), 0, Math.cos(v.mobile.rotation.y)).multiplyScalar(v.taille * 0.45 + 0.3);
+// ---------- Repas : la vraie nourriture, posée devant le dragon ----------
+// Ration = morceau de viande sur un os ; piments de lave ; baies de givre ; poisson des abysses.
+const COUL_REPAS = { rations: [0x9a3a22, 0xf0e6d0], rations_feu: [0xd8261a, 0x3a8a2a], rations_glace: [0x7fd6ff, 0x4a9a8a], rations_eau: [0x2f9fb0, 0xd8f4ff] };
+function modeleRepas(sorte) {
+  const g = new T.Group();
+  if (sorte === "rations_feu") {
+    for (const s of [-1, 1]) {
+      const p = new T.Group();
+      p.add(mesh(new T.ConeGeometry(0.075, 0.36, 7).rotateZ(-Math.PI / 2), mat(0xd8261a, { r: 0.3, e: 0x8a1004, ei: 0.45 }), false));
+      p.add(mesh(new T.CylinderGeometry(0.03, 0.05, 0.05, 6).rotateZ(-Math.PI / 2).translate(-0.2, 0, 0), mat(0x3a8a2a, { r: 0.7 }), false));
+      p.add(mesh(new T.CylinderGeometry(0.012, 0.014, 0.09, 4).rotateZ(-Math.PI / 2.6).translate(-0.25, 0.03, 0), mat(0x2a6a1a, { r: 0.7 }), false));
+      p.position.set(0.02 * s, 0.075, 0.07 * s); p.rotation.set(0, s * 0.45, s * 0.12);
+      g.add(p);
+    }
+  } else if (sorte === "rations_glace") {
+    const m = mat(0x7fd6ff, { r: 0.15, e: 0x3aa0e0, ei: 0.45, m: 0.1 });
+    [[0, 0.07, 0], [0.09, 0.06, 0.03], [-0.08, 0.06, 0.04], [0.02, 0.06, -0.09], [0.03, 0.15, 0.01], [-0.05, 0.13, -0.04]].forEach(([x, y, z]) => { const b = mesh(new T.IcosahedronGeometry(0.06, 1), m, false); b.position.set(x, y, z); g.add(b); });
+    for (const s of [-1, 1]) { const f = mesh(new T.ConeGeometry(0.05, 0.16, 3).rotateZ(Math.PI / 2).scale(1, 0.25, 1), mat(0x4a9a8a, { r: 0.8, d: true }), false); f.position.set(0.07 * s, 0.2, 0); f.rotation.y = s * 0.6; g.add(f); }
+  } else if (sorte === "rations_eau") {
+    const corps = mesh(new T.SphereGeometry(0.09, 9, 7).scale(2.3, 0.95, 0.6), mat(0x2f9fb0, { r: 0.25, m: 0.45 }), false);
+    const ventre = mesh(new T.SphereGeometry(0.085, 9, 7).scale(2.1, 0.6, 0.55).translate(0, -0.03, 0), mat(0xd8f4ff, { r: 0.3, m: 0.3 }), false);
+    const queue = mesh(new T.ConeGeometry(0.09, 0.14, 4).rotateZ(Math.PI / 2).scale(1, 1, 0.3).translate(-0.25, 0, 0), mat(0x1f7f90, { r: 0.4, d: true }), false);
+    const oeil = mesh(new T.SphereGeometry(0.018, 6, 4), mat(0x050505, { r: 0.2 }), false); oeil.position.set(0.15, 0.025, 0.045);
+    g.add(corps, ventre, queue, oeil); g.position.y = 0.06; g.rotation.z = 0.15;
+    const h = new T.Group(); h.add(g); h.rotation.y = 0.4; return h;
+  } else {
+    const viande = mesh(new T.DodecahedronGeometry(0.12, 0).scale(1.35, 0.85, 1), mat(0x9a3a22, { r: 0.65 }), false); viande.position.y = 0.1;
+    const gras = mesh(new T.DodecahedronGeometry(0.06, 0), mat(0xe8b090, { r: 0.7 }), false); gras.position.set(0.06, 0.17, 0.05);
+    const os = mesh(new T.CylinderGeometry(0.025, 0.025, 0.46, 6).rotateZ(Math.PI / 2), mat(0xf0e6d0, { r: 0.5 }), false); os.position.y = 0.1;
+    g.add(viande, gras, os);
+    for (const s of [-1, 1]) for (const t of [-1, 1]) { const b = mesh(new T.SphereGeometry(0.035, 6, 5), mat(0xf0e6d0, { r: 0.5 }), false); b.position.set(0.24 * s, 0.1, 0.025 * t); g.add(b); }
+  }
+  return g;
+}
+// Nourrir : s'il vole, le dragon se pose d'abord
+function montrerRepas(v, sorte) {
+  v.repasSorte = sorte;
+  const p = v.mobile.position;
+  const enLAir = !nage(v) && !v.libre && p.y - solIle(v.element, p.x, p.z) > 0.35;
+  if (v.etat === "vol" || enLAir) {
+    v.cible = terrainOk(v, p.x, p.z) ? p.clone() : v.maison.clone();
+    v.etat = "atterrir"; v.anim.jouer("vol");
+    return;
+  }
+  poserRepas(v);
+}
+function poserRepas(v) {
+  const sorte = v.repasSorte || "rations";
+  const o = modeleRepas(sorte);
+  o.scale.setScalar(1.25 * Math.max(0.8, v.echelle));
+  const devant = new T.Vector3(Math.sin(v.mobile.rotation.y), 0, Math.cos(v.mobile.rotation.y)).multiplyScalar(v.taille * 0.42 + 0.25);
   o.position.copy(v.mobile.position).add(devant);
-  o.position.y = nage(v) ? v.mobile.position.y + v.hauteur * 0.4 : solIle(v.element, o.position.x, o.position.z) + 0.15;
+  o.position.y = nage(v) ? v.mobile.position.y + v.hauteur * 0.35 : solIle(v.element, o.position.x, o.position.z) + 0.01;
+  o.rotation.y = Math.random() * 6;
   D.iles[v.element].groupe.add(o);
-  D.repas.push({ o, t: 0 });
-  v.etat = "repas"; v.minuteur = 2.2;
+  D.repas.push({ o, t: 0, v, sorte, bouchees: 0, base: o.scale.x });
+  v.etat = "repas"; v.minuteur = 3.8;
   v.anim.jouer(nage(v) ? "nage" : "repos"); v.anim.jouer("manger");
+}
+const BOUCHEES = [0.75, 1.6, 2.5, 3.3];
+function majRepas(dt) {
+  for (let i = D.repas.length - 1; i >= 0; i--) {
+    const r = D.repas[i];
+    r.t += dt;
+    if (r.bouchees < BOUCHEES.length && r.t >= BOUCHEES[r.bouchees]) {
+      r.bouchees++;
+      if (r.bouchees === 2 && r.v.etat === "repas") r.v.anim.jouer("manger");
+      miettes(r.o, COUL_REPAS[r.sorte] || COUL_REPAS.rations, r.v.element);
+      if (r.v.proche) Son.croquer(r.sorte);
+    }
+    // Chaque bouchée fait rétrécir le repas d'un coup
+    const k = Math.max(0, 1 - r.bouchees / BOUCHEES.length);
+    const voulu = r.base * Math.max(0.001, k);
+    r.o.scale.setScalar(r.o.scale.x + (voulu - r.o.scale.x) * Math.min(1, dt * 14));
+    if (r.t > 3.6) { r.o.parent && r.o.parent.remove(r.o); D.repas.splice(i, 1); }
+  }
+}
+function miettes(objet, couleurs, elx) {
+  if (!objet.parent || D.eclats.length > 200) return;
+  for (let i = 0; i < 5; i++) {
+    const m = new T.Mesh(GEO_ECLAT[1 + (i % 2)], mat(couleurs[i % couleurs.length], { unique: true, o: 0.999, r: 0.7 }));
+    m.position.copy(objet.position); m.position.y += 0.12;
+    m.scale.setScalar(0.5 + Math.random() * 0.5);
+    objet.parent.add(m);
+    const a = Math.random() * 6.28, f = 0.4 + Math.random() * 0.6;
+    D.eclats.push({ o: m, v: new T.Vector3(Math.cos(a) * f, 1.2 + Math.random(), Math.sin(a) * f), rot: new T.Vector3(Math.random() * 8, 0, Math.random() * 8), t: 0, vie: 1.4, terre: true, elx });
+  }
+}
+
+// ---------- Interactions : chaque dragon a son caractère ----------
+const CARACTERES = [
+  { nom: "Joueur", desc: "Il adore qu'on s'occupe de lui et ne tient pas en place.", caresse: ["joie", "jouer"],
+    rep: { caresser: "se roule de bonheur", jouer: "bondit partout, ravi", rugir: "pousse un petit cri joyeux", souffle: "fait un feu d'artifice rien que pour toi", envol: "file comme une flèche" } },
+  { nom: "Fier", desc: "Un vrai seigneur. Il aime qu'on l'admire.", caresse: ["regarder", "rugir"],
+    rep: { caresser: "bombe le torse", jouer: "accepte de jouer… mais avec classe", rugir: "rugit à faire trembler l'île", souffle: "montre toute sa puissance", envol: "s'élève majestueusement" } },
+  { nom: "Timide", desc: "Il lui faut du temps, mais il est très attachant.", caresse: ["regarder", "joie"],
+    rep: { caresser: "hésite… puis se blottit contre toi", jouer: "ose enfin jouer un peu", rugir: "fait un tout petit rugissement", souffle: "souffle tout doucement", envol: "s'envole en jetant un œil derrière lui" } },
+  { nom: "Gourmand", desc: "Il pense surtout à manger. Il renifle tes poches.", caresse: ["renifler", "joie"],
+    rep: { caresser: "renifle tes poches pour trouver à manger", jouer: "joue en espérant une récompense", rugir: "a l'estomac qui gronde plus fort que lui", souffle: "fait cuire… rien du tout", envol: "part chercher un goûter" } },
+  { nom: "Paresseux", desc: "Il passerait sa vie à dormir au soleil.", caresse: ["bailler", "etirer"],
+    rep: { caresser: "bâille et s'étire de tout son long", jouer: "joue trois secondes, puis se recouche", rugir: "rugit… en bâillant", souffle: "souffle sans conviction", envol: "décolle en traînant des ailes" } },
+  { nom: "Curieux", desc: "Il veut tout voir, tout sentir, tout comprendre.", caresse: ["renifler", "regarder"],
+    rep: { caresser: "te renifle avec curiosité", jouer: "invente un nouveau jeu", rugir: "écoute l'écho de son rugissement", souffle: "observe ce que fait son souffle", envol: "va voir ce qu'il y a là-haut" } },
+];
+export function caractere(d) { let h = 0; for (const c of d.uid) h = (h * 31 + c.charCodeAt(0)) >>> 0; return CARACTERES[h % CARACTERES.length]; }
+const NOM_SOUFFLE = { feu: "Souffle de feu", glace: "Souffle de givre", eau: "Jet d'eau" };
+const COUL_SOUFFLE = { feu: [0xfff0a0, 0xffb02a, 0xff5a0a], glace: [0xffffff, 0xcff2ff, 0x7fd6ff], eau: [0xe8fbff, 0x9fe8ff, 0x48c8e0] };
+function peutVoler(v) { return v.rig.ailes.length > 0 && v.stade >= 1 && !nage(v); }
+function interagir(d, type) {
+  const v = D.dragons.get(d.uid);
+  const nom = PAR_ID[d.id].nom;
+  if (!v) return;
+  if (v.ko) { Son.erreur(); toast(`${nom} est K.O. : nourris-le d'abord.`, "mal"); return; }
+  if (["recolte", "versRecolte", "rituel", "rituelPret", "repas", "atterrir"].includes(v.etat)) { toast(`${nom} est occupé.`); return; }
+  if (v.etat === "vol" && type !== "souffle" && type !== "rugir") { toast(`${nom} vole : attends qu'il se pose.`); return; }
+  const car = caractere(d);
+  if (type === "envol") { decoller(v, 9); Son.ailes(); }
+  else {
+    if (v.etat !== "vol") { v.etat = "action"; v.minuteur = type === "caresser" ? 3.2 : 2.6; }
+    if (type === "caresser") { v.anim.jouer(car.caresse[0]); setTimeout(() => { if (v.etat === "action") v.anim.jouer(car.caresse[1]); }, 1250); coeurs(v); Son.ronron(v.element, Math.min(1, v.stade / 4)); }
+    else if (type === "jouer") { v.anim.jouer("jouer"); setTimeout(() => { if (v.etat === "action") v.anim.jouer("joie"); }, 1500); Son.joie(); }
+    else if (type === "rugir") { v.anim.jouer("rugir"); Son.crier(v.element, Math.min(1, v.stade / 4)); }
+    else if (type === "souffle") { v.anim.jouer("attaque"); setTimeout(() => souffler(v), 380); Son.souffle(v.element); }
+  }
+  toast(`${nom} ${car.rep[type]}.`, "bon");
+  // Le lien grandit avec les moments passés ensemble (une fois toutes les 10 s)
+  const t = maintenant();
+  if (!v.dernierLien || t - v.dernierLien > 10e3) { v.dernierLien = t; changer(() => { d.lien = Math.min(100, (d.lien || 0) + 1); }); }
+}
+function particule(parent, pos, couleur, vitesse, opts = {}) {
+  const m = new T.Mesh(opts.geo || GEO_BULLE, mat(couleur, { unique: true, o: opts.o ?? 0.95, e: opts.e ? couleur : undefined, ei: opts.e ? 0.9 : undefined, r: 0.4 }));
+  m.position.copy(pos); m.scale.setScalar(opts.taille || 1);
+  parent.add(m);
+  D.eclats.push({ o: m, v: vitesse, rot: new T.Vector3(), t: 0, vie: opts.vie || 1, libre: true, g: opts.g || 0, frein: opts.frein ?? 1, grossit: opts.grossit || 0 });
+}
+function teteLocale(v) {
+  const parent = D.iles[v.element].groupe;
+  const w = new T.Vector3();
+  if (v.rig.tete) v.rig.tete.getWorldPosition(w);
+  else { v.mobile.getWorldPosition(w); w.y += v.hauteur * 0.7; }
+  return parent.worldToLocal(w);
+}
+function souffler(v) {
+  const parent = D.iles[v.element].groupe;
+  const a = v.mobile.rotation.y;
+  const dir = new T.Vector3(Math.sin(a), -0.18, Math.cos(a)).normalize();
+  const coul = COUL_SOUFFLE[v.element] || COUL_SOUFFLE.feu;
+  const depart = teteLocale(v).add(dir.clone().multiplyScalar(0.25 * v.echelle));
+  for (let vague = 0; vague < 4; vague++) setTimeout(() => {
+    for (let i = 0; i < 9; i++) {
+      const s = 2.6 + Math.random() * 2.4;
+      const ecart = new T.Vector3((Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.6);
+      const vit = dir.clone().add(ecart).normalize().multiplyScalar(s * Math.max(0.7, v.echelle));
+      particule(parent, depart, coul[i % 3], vit, v.element === "feu" ? { e: true, g: 1.6, frein: 0.25, grossit: 1.6, vie: 0.9, taille: 1.2 } : v.element === "glace" ? { e: true, g: -0.4, frein: 0.3, grossit: 1.2, vie: 1.2, taille: 1, o: 0.85 } : { g: -7, frein: 0.7, vie: 1, taille: 0.9, o: 0.8 });
+    }
+  }, vague * 90);
+}
+const GEO_COEUR = (() => { const s = new T.Shape(); s.moveTo(0, -0.06); s.bezierCurveTo(0.09, 0, 0.07, 0.08, 0, 0.045); s.bezierCurveTo(-0.07, 0.08, -0.09, 0, 0, -0.06); return new T.ShapeGeometry(s); })();
+function coeurs(v) {
+  const parent = D.iles[v.element].groupe;
+  const c = teteLocale(v);
+  for (let i = 0; i < 6; i++) setTimeout(() => {
+    const p = c.clone().add(new T.Vector3((Math.random() - 0.5) * 0.5, 0.1, (Math.random() - 0.5) * 0.5));
+    particule(parent, p, 0xff6a9a, new T.Vector3((Math.random() - 0.5) * 0.3, 0.7 + Math.random() * 0.3, (Math.random() - 0.5) * 0.3), { geo: GEO_COEUR, e: true, vie: 1.5, taille: 1.6 + Math.random() });
+  }, i * 140);
+}
+
+// ---------- Événements du monde (lancés depuis le pilotage) ----------
+// Séisme : la caméra tremble, les dragons sont secoués, des cailloux sautent.
+// Météorites : des rochers en feu tombent du ciel et explosent sur les îles.
+// Éclipse : la lumière baisse pendant une vingtaine de secondes.
+export function evenement(type, elx) {
+  if (!D) return;
+  const ile = elx || (D.focus && D.iles[D.focus] ? D.focus : ["feu", "glace", "eau"][Math.floor(Math.random() * 3)]);
+  if (type === "seisme") {
+    D.secousse = 4.5; D.forceSecousse = 0.35;
+    Son.seisme();
+    for (const [, v] of D.dragons) if (!v.ko && v.etat !== "vol") { v.etat = "action"; v.minuteur = 3; v.anim.jouer("coup"); setTimeout(() => { if (!v.ko) v.anim.jouer(Math.random() < 0.5 ? "rugir" : "regarder"); }, 900); }
+    for (const e of ["feu", "glace", "eau"]) for (const n of D.iles[e].noeuds) if (n.objet.visible && Math.random() < 0.5) setTimeout(() => eclater(n.objet, n.objet.userData.action.noeud, 4, e), Math.random() * 3000);
+  } else if (type === "meteorites") {
+    const n = 14;
+    for (let i = 0; i < n; i++) setTimeout(() => lancerMeteore(ile), i * 380 + Math.random() * 300);
+  } else if (type === "eclipse") {
+    D.eclipse = 22;
+    Son.eclipse();
+  }
+}
+const GEO_METEORE = new T.DodecahedronGeometry(0.45, 0);
+function lancerMeteore(elx) {
+  const g = D.iles[elx].groupe;
+  const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * rayonBord(elx, a) * 0.85;
+  const x = Math.cos(a) * d, z = Math.sin(a) * d;
+  const cible = new T.Vector3(x, D.iles[elx].sol(x, z), z);
+  const dep = cible.clone().add(new T.Vector3(-14 + Math.random() * 6, 34, -10 + Math.random() * 6));
+  const m = new T.Mesh(GEO_METEORE, mat(0x2a1a14, { e: 0xff5a0a, ei: 0.9, r: 0.8, unique: true }));
+  m.scale.setScalar(0.7 + Math.random() * 0.8);
+  m.position.copy(dep);
+  g.add(m);
+  D.meteores.push({ m, g, elx, dep, cible, t: 0, duree: 1.6 + Math.random() * 0.5 });
+  if (Math.random() < 0.5) Son.sifflement();
+}
+function majEvenements(dt) {
+  // Secousse : petits décalages aléatoires de la caméra
+  if (D.secousse > 0) {
+    D.secousse -= dt;
+    const a = Math.min(1, D.secousse / 1.5) * (D.forceSecousse || 0.3) * Math.min(1.5, D.orbite.dist / 20);
+    D.camera.position.x += (Math.random() - 0.5) * a; D.camera.position.y += (Math.random() - 0.5) * a; D.camera.position.z += (Math.random() - 0.5) * a;
+  }
+  // Éclipse : la lumière baisse puis revient
+  const b = D.lumBase;
+  const k = D.eclipse > 0 ? Math.max(0.18, 1 - Math.min(1, (22 - D.eclipse) / 2.5, D.eclipse / 2.5) * 0.82) : 1;
+  if (D.eclipse > 0) D.eclipse -= dt;
+  D.lum.hemi.intensity = b.hemi * k; D.lum.soleil.intensity = b.soleil * k; D.lum.contre.intensity = b.contre * (0.6 + 0.4 * k) * (k < 1 ? 1.6 : 1);
+  for (let i = D.meteores.length - 1; i >= 0; i--) {
+    const o = D.meteores[i];
+    o.t += dt;
+    const u = Math.min(1, o.t / o.duree);
+    o.m.position.lerpVectors(o.dep, o.cible, u * u);
+    o.m.rotation.x += dt * 5; o.m.rotation.y += dt * 3;
+    // Traînée de feu
+    for (let k2 = 0; k2 < 3; k2++) particule(o.g, o.m.position, [0xfff0a0, 0xffa02a, 0xff4a0a][k2], new T.Vector3((Math.random() - 0.5) * 0.6, 0.4 + Math.random() * 0.4, (Math.random() - 0.5) * 0.6), { e: true, vie: 0.6, grossit: 1.4, taille: 1.6 * o.m.scale.x, frein: 0.4 });
+    if (u >= 1) {
+      o.g.remove(o.m); o.m.material.dispose(); D.meteores.splice(i, 1);
+      impactMeteore(o);
+    }
+  }
+}
+function impactMeteore(o) {
+  const c = o.cible;
+  const eau = dansLEau(o.elx, c.x, c.z);
+  for (let i = 0; i < 26; i++) {
+    const a = Math.random() * 6.28, f = 1 + Math.random() * 3.5;
+    const v = new T.Vector3(Math.cos(a) * f, 2 + Math.random() * 4, Math.sin(a) * f);
+    if (eau) particule(o.g, c.clone().setY(NIVEAU_EAU), [0xffffff, 0x9fe8ff, 0x48c8e0][i % 3], v.multiplyScalar(1.2), { g: -9, vie: 1.2, taille: 1.4, o: 0.85 });
+    else particule(o.g, c, [0xfff0a0, 0xffa02a, 0xff4a0a, 0x3a2a24][i % 4], v, i % 4 === 3 ? { geo: GEO_ECLAT[1], g: -9, vie: 1.6, taille: 2 } : { e: true, g: 0.5, frein: 0.25, grossit: 2, vie: 0.9, taille: 2.2 });
+  }
+  if (!eau) {
+    // Cratère fumant qui disparaît doucement
+    const cr = new T.Mesh(new T.CircleGeometry(0.9 + Math.random() * 0.5, 9), mat(0x120a08, { o: 0.85, unique: true, r: 1 }));
+    cr.rotation.x = -Math.PI / 2; cr.position.copy(c).add(new T.Vector3(0, 0.03, 0));
+    o.g.add(cr);
+    D.eclats.push({ o: cr, v: new T.Vector3(), rot: new T.Vector3(), t: 0, vie: 18, libre: true, g: 0, frein: 1, grossit: 0 });
+    for (let i = 0; i < 4; i++) particule(o.g, c, 0x6a625e, new T.Vector3((Math.random() - 0.5) * 0.3, 0.6, (Math.random() - 0.5) * 0.3), { vie: 3, grossit: 0.8, taille: 3, o: 0.5 });
+  }
+  D.secousse = Math.max(D.secousse, 0.6); D.forceSecousse = 0.25;
+  Son.impact("feu", true);
+  // Les dragons proches sursautent
+  for (const [, v] of D.dragons) if (v.element === o.elx && !v.ko && v.mobile.position.distanceTo(c) < 3 && v.etat !== "vol") { v.etat = "action"; v.minuteur = 2; v.anim.jouer("coup"); }
+}
+
+// ---------- Passer d'un dragon à l'autre, liste de tous les dragons ----------
+const ORDRE_EL = { feu: 0, glace: 1, eau: 2 };
+function dragonsTries() { return [...E().dragons].sort((a, b) => ORDRE_EL[PAR_ID[a.id].element] - ORDRE_EL[PAR_ID[b.id].element] || b.niveau - a.niveau || PAR_ID[a.id].nom.localeCompare(PAR_ID[b.id].nom)); }
+function voirDragon(uid) {
+  const d = E().dragons.find((x) => x.uid === uid);
+  if (!d) return;
+  const v = D.dragons.get(uid);
+  ficheDragon(d);
+  if (v) suivre(v);
+}
+function voisinDragon(d, sens) {
+  const l = dragonsTries();
+  if (l.length < 2) return;
+  const i = l.findIndex((x) => x.uid === d.uid);
+  Son.glisse();
+  voirDragon(l[(i + sens + l.length) % l.length].uid);
+}
+const vueListe = { filtre: "tous", tri: "element", texte: "" };
+function ouvrirListe() {
+  fermerListe();
+  const p = el("section", { class: "liste-dragons panneau", id: "liste-dragons" });
+  const corps = el("div", { class: "ld-corps" });
+  const champ = el("input", { type: "search", placeholder: "Chercher un dragon…", value: vueListe.texte, oninput: (e) => { vueListe.texte = e.target.value; remplir(); } });
+  const filtres = el("div", { class: "ld-filtres" });
+  const tris = el("select", { onchange: (e) => { vueListe.tri = e.target.value; remplir(); } });
+  for (const [k, n] of [["element", "Par île"], ["niveau", "Par niveau"], ["nom", "Par nom"], ["pv", "PV les plus bas"], ["lien", "Par lien"]]) tris.append(el("option", { value: k, selected: vueListe.tri === k }, n));
+  const majFiltres = () => {
+    filtres.innerHTML = "";
+    for (const [k, n] of [["tous", "Tous"], ["feu", "Feu"], ["glace", "Glace"], ["eau", "Eau"], ["ko", "K.O."], ["alerte", "À faire évoluer"]])
+      filtres.append(el("button", { class: `btn petit ${vueListe.filtre === k ? "actif" : ""}`, onclick: () => { vueListe.filtre = k; majFiltres(); remplir(); } }, n));
+  };
+  const remplir = () => {
+    corps.innerHTML = "";
+    const t = vueListe.texte.trim().toLowerCase();
+    let l = dragonsTries().filter((d) => {
+      const s = PAR_ID[d.id];
+      if (t && !(s.nom.toLowerCase().includes(t) || (s.titre || "").toLowerCase().includes(t) || ELEMENTS[s.element].nom.toLowerCase().includes(t))) return false;
+      if (vueListe.filtre === "ko") return d.pv <= 0;
+      if (vueListe.filtre === "alerte") return evolutionBloquee(d) || attendPercee(d);
+      return vueListe.filtre === "tous" || s.element === vueListe.filtre;
+    });
+    if (vueListe.tri === "niveau") l.sort((a, b) => b.niveau - a.niveau);
+    else if (vueListe.tri === "nom") l.sort((a, b) => PAR_ID[a.id].nom.localeCompare(PAR_ID[b.id].nom));
+    else if (vueListe.tri === "pv") l.sort((a, b) => a.pv / pvMax(a) - b.pv / pvMax(b));
+    else if (vueListe.tri === "lien") l.sort((a, b) => (b.lien || 0) - (a.lien || 0));
+    if (!l.length) corps.append(el("p", { class: "doux", style: { textAlign: "center" } }, "Aucun dragon ne correspond."));
+    for (const d of l) {
+      const s = PAR_ID[d.id], v = D.dragons.get(d.uid);
+      const humeur = !v ? "" : v.ko ? "K.O." : HUMEURS[v.etat] || "";
+      corps.append(el("button", { class: `ld-ligne ${s.element}`, onclick: () => { Son.clic(); fermerListe(); voirDragon(d.uid); } },
+        el("span", { class: "ld-pastille" }),
+        el("span", { class: "ld-nom" }, el("b", {}, s.nom, d.ul ? el("span", { class: "ld-ul" }, " UL") : null), el("small", {}, `${nomStade(stadeEffectif(d))} · ${humeur}`)),
+        el("span", { class: "ld-droite" }, el("span", { class: "num" }, `Nv ${d.niveau}`), barre(d.pv, pvMax(d), "pv"),
+          evolutionBloquee(d) || attendPercee(d) ? el("small", { class: "ld-alerte" }, "à faire évoluer") : (d.lien ? el("small", { class: "doux" }, `lien ${d.lien}`) : null))));
+    }
+  };
+  p.append(el("header", {}, el("div", {}, el("div", { class: "etiquette" }, `${E().dragons.length} dragons`), el("h3", {}, "Mes dragons")),
+    el("button", { class: "fermer-fiche", "aria-label": "Fermer", onclick: () => fermerListe(), html: icone("fermer").innerHTML })),
+    champ, el("div", { class: "ld-outils" }, filtres, tris), corps);
+  racineUI.append(p);
+  majFiltres(); remplir();
+}
+function fermerListe() { const l = document.getElementById("liste-dragons"); if (l) l.remove(); }
+function flechesFiche(d) {
+  const g = el("button", { class: "fleche-fiche g", "aria-label": "Dragon précédent", onclick: () => voisinDragon(d, -1) }, "‹");
+  const dr = el("button", { class: "fleche-fiche d", "aria-label": "Dragon suivant", onclick: () => voisinDragon(d, 1) }, "›");
+  racineUI.append(g, dr);
+  ficheUI._fleches = [g, dr];
+  ficheUI.classList.add("avec-fleches");
+  placerFleches();
+  // Glisser le doigt sur la fiche pour changer de dragon
+  let x0 = null, y0 = 0;
+  ficheUI.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  ficheUI.addEventListener("touchend", (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 70 && Math.abs(dy) < 45) voisinDragon(d, dx < 0 ? 1 : -1);
+  }, { passive: true });
+}
+function placerFleches() {
+  if (!ficheUI || !ficheUI._fleches) return;
+  const r = ficheUI.getBoundingClientRect();
+  for (const f of ficheUI._fleches) f.style.top = Math.round(r.top + Math.min(r.height * 0.5, 120) - 22) + "px";
 }
 
 function ficheDragon(d) {
@@ -966,8 +1425,12 @@ function ficheDragon(d) {
   const max = pvMax(d);
   const xpS = xpSuivant(d.niveau);
   const hab = habitatDe(d.id);
+  const tous = dragonsTries();
+  const rang = tous.findIndex((x) => x.uid === d.uid) + 1;
+  const car = caractere(d);
   f.append(
-    enTete(src.nom, el("span", { class: "pil " + src.element }, ELEMENTS[src.element].nom), el("span", { class: "pil" }, nomStade(st)), el("span", { class: "doux" }, src.titre)),
+    enTete(src.nom, el("span", { class: "pil " + src.element }, ELEMENTS[src.element].nom), el("span", { class: "pil" }, nomStade(st)), d.ul ? el("span", { class: "pil ul" }, "UL") : null, el("span", { class: "doux" }, src.titre)),
+    el("div", { class: "fiche-rang" }, el("button", { class: "btn petit", onclick: () => { Son.clic(); ouvrirListe(); } }, `Mes dragons · ${rang}/${tous.length}`), el("span", { class: "doux" }, `${car.nom} · lien ${d.lien || 0}/100`)),
     el("div", { class: "ligne" }, el("span", { class: "etiquette" }, "PV"), barre(d.pv, max, "pv"), el("span", { class: "num" }, `${d.pv}/${max}`)),
     el("div", { class: "ligne" }, el("span", { class: "etiquette" }, `Nv ${d.niveau}`), barre(d.xp, xpS || 1, "xp"), el("span", { class: "num doux" }, xpS ? `${d.xp}/${xpS} XP` : "max")),
   );
@@ -982,17 +1445,24 @@ function ficheDragon(d) {
         let res; changer(() => { res = nourrir(d); });
         if (!res.ok) { Son.erreur(); toast(res.raison, "mal"); return; }
         Son.ok(); toast(`${src.nom} mange : +${res.soin} PV`, "bon");
-        synchroniser(); const v2 = D.dragons.get(d.uid); if (v2 && !v2.ko) { montrerRepas(v2, 0xc8703a); suivre(v2); }
+        synchroniser(); const v2 = D.dragons.get(d.uid); if (v2 && !v2.ko) { montrerRepas(v2, "rations"); suivre(v2); }
         ficheDragon(d); signaler("nourri");
       } }, icone("rations"), `Ration (${e.ressources.rations})`),
       el("button", { class: "btn petit" + ((e.ressources[cleEl] || 0) > 0 ? " principal" : ""), disabled: (e.ressources[cleEl] || 0) < 1, title: MATERIAUX[cleEl].desc, onclick: () => {
         let res; changer(() => { res = nourrirElement(d); });
         if (!res.ok) { Son.erreur(); toast(res.raison, "mal"); return; }
         Son.niveau(); toast(`${src.nom} se régale : +${res.xp} XP${res.niveaux ? ` · niveau ${d.niveau} !` : ""}`, "bon");
-        synchroniser(); const v2 = D.dragons.get(d.uid); if (v2 && !v2.ko) { montrerRepas(v2, { feu: 0xe8401a, glace: 0x7fd6ff, eau: 0x2fd0c0 }[src.element]); suivre(v2); }
+        synchroniser(); const v2 = D.dragons.get(d.uid); if (v2 && !v2.ko) { montrerRepas(v2, cleEl); suivre(v2); }
         ficheDragon(d);
       } }, icone(cleEl), `${MATERIAUX[cleEl].nom} (${e.ressources[cleEl] || 0})`),
     )));
+  const vv = D.dragons.get(d.uid);
+  const inter = [["caresser", "Caresser"], ["jouer", "Jouer"], ["rugir", "Rugir"], ["souffle", NOM_SOUFFLE[src.element]]];
+  if (vv && peutVoler(vv)) inter.push(["envol", "S'envoler"]);
+  f.append(el("div", { class: "bloc" },
+    el("div", { class: "etiquette" }, `Caractère : ${car.nom}`),
+    el("div", { class: "info" }, car.desc),
+    el("div", { class: "actions" }, ...inter.map(([k, n]) => el("button", { class: "btn petit", onclick: () => interagir(d, k) }, n)))));
   const nidBloc = el("div", { class: "bloc" }, el("div", { class: "etiquette" }, `Nid : ${NIDS[d.nid].nom}`), el("div", { class: "info" }, NIDS[d.nid].desc), el("div", { class: "info" }, `Habitat : ${NOMS_HABITAT[hab]}.`));
   if (evolutionBloquee(d)) nidBloc.append(el("div", { class: "alerte" }, `${src.nom} est prêt à devenir ${nomStade(stVoulu)}, mais son nid est trop petit.`));
   const actionsNid = el("div", { class: "actions" });
@@ -1012,17 +1482,17 @@ function ficheDragon(d) {
   actionsNid.append(el("button", { class: "btn petit", onclick: () => demarrerPlacement(d) }, "Déplacer le nid"));
   nidBloc.append(actionsNid);
   f.append(nidBloc);
-  const arm = el("div", { class: "bloc" }, el("div", { class: "etiquette" }, "Armure"));
-  const possedees = armuresDe(d.id).filter((a) => d.armures.includes(a.id));
-  const ligneA = el("div", { class: "actions" }, el("button", { class: "btn petit" + (!d.armure ? " principal" : ""), onclick: () => { changer(() => { d.armure = null; }); synchroniser(); ficheDragon(d); } }, "Aucune"));
-  for (const a of possedees) ligneA.append(el("button", { class: "btn petit" + (d.armure === a.id ? " principal" : ""), title: a.texte, onclick: () => { changer(() => { d.armure = a.id; }); Son.achat(); synchroniser(); ficheDragon(d); } }, a.nomComplet));
-  ligneA.append(el("button", { class: "btn petit", onclick: () => ctxJeu.aller("boutique", { uid: d.uid }) }, icone("boutique"), "Boutique"));
-  arm.append(ligneA);
-  f.append(arm);
-  f.append(el("div", { class: "bloc" }, el("div", { class: "actions" },
-    el("a", { class: "btn petit", href: LIEN_LIVRE, target: "_blank", rel: "noopener" }, icone("livre"), "Livre des dragons"),
-    el("button", { class: "btn petit", onclick: () => { const vv = D.dragons.get(d.uid); if (vv) { vv.anim.jouer("rugir"); Son.crier(src.element, Math.min(1, stadeEffectif(d) / 4)); } } }, "Faire rugir"),
-  )));
+  const robe = el("div", { class: "bloc" }, el("div", { class: "etiquette" }, "Robe"));
+  if (d.ulPossede) {
+    robe.append(el("div", { class: "actions" },
+      el("button", { class: "btn petit" + (!d.ul ? " principal" : ""), onclick: () => { changer(() => { d.ul = false; }); synchroniser(); ficheDragon(d); } }, "Normale"),
+      el("button", { class: "btn petit" + (d.ul ? " principal" : ""), onclick: () => { changer(() => { d.ul = true; }); Son.evolution(); synchroniser(); ficheDragon(d); } }, "UL (Ultime)")));
+  } else {
+    robe.append(el("div", { class: "info" }, "La version UL (Ultime) : une robe rare, seule l'apparence change."),
+      el("div", { class: "actions" }, el("button", { class: "btn petit", onclick: () => ctxJeu.aller("boutique", { uid: d.uid }) }, icone("boutique"), "Voir la version UL")));
+  }
+  f.append(robe);
+  flechesFiche(d);
 }
 
 function ficheSource(elx) {
