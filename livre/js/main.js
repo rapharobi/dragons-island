@@ -13,6 +13,7 @@ import * as Boutique from "./boutique.js";
 import * as Reglages from "./reglages.js";
 import * as Pilotage from "./pilotage.js";
 import "./village.js";
+import { verifierRecits } from "./recit.js";
 import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto } from "./tuto.js";
 
 enregistrerElements(DRAGONS);
@@ -168,6 +169,11 @@ async function demarrer() {
     if (source === "compte" && ctx.ecran && !document.querySelector(".accueil") && ctx.ecran !== "combat") { ctx.cacherInterface(false); ctx.aller(ctx.ecran); }
   });
   setInterval(majHud, 1000);
+  // L'histoire reprend de temps en temps, et le chantier du couvoir prévient quand il est fini
+  setInterval(() => {
+    verifierRecits(ctx);
+    if (E().chantierFini) { delete E().chantierFini; toast("Le chantier du couvoir est terminé !", "bon"); Son.evolution(); if (ctx.ecran === "couvoir") ctx.aller("couvoir"); }
+  }, 2000);
   // Écran d'accueil : le portail magique (sans les îles derrière)
   const entrer = () => {
     document.getElementById("hud").hidden = false;

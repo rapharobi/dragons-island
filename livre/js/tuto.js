@@ -7,7 +7,8 @@ import { el, styles, modale, toast, fermerModale } from "./ui.js";
 import { Son } from "./son.js";
 
 let ctx = null, bulle = null, reduite = false;
-export const MENTOR = "Maëlis";
+export const MENTOR = "Lia";
+const NB_ETAPES = 12;
 
 styles("tuto", `
 .tuto-bulle { position: fixed; z-index: 30; top: calc(var(--hud) + 6px); left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); padding: 14px 16px; display: grid; grid-template-columns: 46px 1fr; gap: 12px; background: rgba(20, 16, 30, .94); border: 1px solid rgba(190, 150, 255, .45); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); animation: entre .3s; }
@@ -43,6 +44,15 @@ styles("tuto", `
 @media (max-width: 560px) { .tuto-bulle { left: var(--bord-g); right: var(--bord-d); width: auto; transform: none; grid-template-columns: 30px 1fr; gap: 10px; padding: 8px 12px; max-height: 34vh; overflow: auto; } .tuto-bulle .portrait { width: 30px !important; height: 30px !important; } .tuto-bulle .portrait svg { width: 20px; height: 20px; } .tuto-bulle .bas { margin-top: 4px; } .tuto-bulle .portrait { width: 36px; height: 36px; } .tuto-bulle p { font-size: 12px; } .tuto-bulle.haut { top: calc(var(--hud) + 34px); left: var(--bord-g); right: var(--bord-d); transform: none; } .tuto-bulle.haut2 { bottom: auto; top: calc(var(--hud) + 100px); } .tuto-bulle.reduite { left: auto; right: var(--bord-d); top: calc(var(--hud) + 54px); } }
 `);
 
+styles("tuto-lia", `
+.tuto-fleche { position: fixed; z-index: 45; width: 34px; height: 44px; transform: translate(-50%, -100%); pointer-events: none; filter: drop-shadow(0 0 10px rgba(242,181,68,.8)); animation: lia-rebond .9s ease-in-out infinite; }
+.tuto-fleche svg { width: 100%; height: 100%; }
+@keyframes lia-rebond { 50% { margin-top: -12px; } }
+@media (prefers-reduced-motion: reduce) { .tuto-fleche { animation: none; } }
+.tuto-bulle .voix { position: absolute; top: 8px; right: 34px; background: none; border: 0; font-size: 15px; padding: 2px 4px; opacity: .85; }
+.triangle-boite { display: grid; gap: 10px; } .triangle-boite svg { width: min(300px, 100%); display: block; margin: 0 auto; font-family: var(--titre); }
+.triangle-boite p { margin: 0; line-height: 1.5; }
+`);
 const RUNE = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M12 3v18M7 7l10 10M17 7 7 17"/><circle cx="12" cy="12" r="8" stroke-opacity=".6"/></svg>';
 
 const nomPremier = () => { const d = E().dragons[0]; return d ? PAR_ID[d.id].nom : "ton dragon"; };
@@ -51,18 +61,18 @@ const tous3 = () => { const els = new Set(E().dragons.map((d) => PAR_ID[d.id].el
 // Chaque étape : texte, condition pour passer à la suite, effets à l'arrivée, bouton du menu à faire briller.
 const ETAPES = {
   recolter: {
-    num: 1, cible: "iles",
+    num: 1, cible: "iles", vise: () => (E().ressources.brindilles < 20 ? "buisson" : "rocher"),
     texte: () => { const r = E().ressources; return `Voici ${nomPremier()}. Pour grandir, il lui faut un nid. Touche un buisson : ton dragon ira le récolter pour toi. Il te faut 20 brindilles (${Math.min(20, r.brindilles)}/20) et 5 pierres (${Math.min(5, r.pierres)}/5), que donnent les rochers.`; },
     fini: () => E().ressources.brindilles >= 20 && E().ressources.pierres >= 5,
     suite: "nid",
   },
   nid: {
-    num: 2, cible: "iles",
+    num: 2, cible: "iles", vise: () => "dragon",
     texte: () => `Bravo ! Touche ${nomPremier()}, puis « Construire le nid ». Un nid de base lui permet d'évoluer jusqu'au niveau 5. Plus tard, le nid de l'élément puis le nid unique débloqueront ses autres évolutions.`,
     quand: (n) => n === "nid", suite: "nourrir",
   },
   nourrir: {
-    num: 3, cible: "iles",
+    num: 3, cible: "iles", vise: () => "dragon",
     texte: () => `L'éclosion l'a épuisé : regarde sa barre de PV. Touche-le et donne-lui une ration. Les PV perdus en combat ne reviennent qu'en mangeant, et chaque dragon doit manger une fois par jour.`,
     quand: (n) => n === "nourri", suite: "oeufs",
   },
@@ -82,7 +92,7 @@ const ETAPES = {
     fini: () => tous3(), suite: "ferme",
   },
   ferme: {
-    num: 6, cible: "iles",
+    num: 6, cible: "iles", vise: () => "source",
     entree: (e) => {
       for (const d of e.dragons) if (!d.nid) d.nid = 1;
       e.ressources.brindilles = Math.max(e.ressources.brindilles, 15);
@@ -92,18 +102,18 @@ const ETAPES = {
     quand: (n) => n === "source", suite: "sauvage1",
   },
   sauvage1: {
-    num: 7, cible: "combat",
-    texte: () => "Les sources se réveillent plus tard, avec le bon dragon. Pour l'instant, tes dragons doivent combattre pour monter de niveau. Des dragons sauvages rôdent autour des îles : va dans Combat, mode « Dragons sauvages ». Le combat dure 9 tours ; le plus de dégâts gagne.",
+    num: 7, cible: "combat", triangle: true,
+    texte: () => "Les sources se réveillent plus tard. Pour l'instant, tes dragons doivent combattre pour monter de niveau. Un jeune dragon sauvage rôde : il est d'un élément que tu bats, ce sera facile. Va dans Combat, mode « Dragons sauvages ». Regarde d'abord le triangle des éléments !",
     quand: (n, d) => n === "combat_fini" && d.mode === "sauvage", suite: "sauvage2",
   },
   sauvage2: {
-    num: 8, cible: "combat",
+    num: 8, cible: "combat", triangle: true,
     entree: () => soignerTout(),
     texte: () => "Bien joué ! J'ai soigné tes dragons (après l'apprentissage, ce sera à toi de les nourrir). Toute l'équipe gagne de l'expérience : encore un combat sauvage et tes trois dragons atteindront le niveau 3.",
     quand: (n, d) => n === "combat_fini" && d.mode === "sauvage", suite: "mage",
   },
   mage: {
-    num: 9, cible: "combat",
+    num: 9, cible: "combat", triangle: true,
     entree: (e) => { for (const d of e.dragons) if (d.niveau < 3) fixerNiveau(d, 3); soignerTout(); },
     texte: () => "Tes trois dragons sont niveau 3. Attention… un autre portail s'ouvre : un mage rival te défie en duel ! Va dans Combat, mode « Duel de mage ». Choisis bien : il va essayer de deviner tes coups.",
     quand: (n, d) => n === "combat_fini" && d.mode === "bot", suite: "recompense",
@@ -113,16 +123,90 @@ const ETAPES = {
     entree: () => soignerTout(),
     texte: () => "Quel duel ! Pour te remercier d'avoir pris soin de ta couvée, le portail t'offre un 4e dragon. Choisis l'élément et le dragon que tu veux.",
     bouton: { texte: "Choisir mon 4e dragon", action: () => choisirQuatrieme() },
-    quand: (n) => n === "quatrieme", suite: "fin",
+    quand: (n) => n === "quatrieme", suite: "couvoir2",
+  },
+  couvoir2: {
+    num: 11, cible: "couvoir",
+    entree: (e) => { e.oeufs.choix += 1; demarrerMinuteur(); },
+    texte: () => {
+      const e = E(), n = e.dragons.length, haut = Math.max(0, ...e.dragons.map((d) => d.niveau));
+      return `Le couvoir est aussi le cœur de ton futur village, et son niveau limite celui de tes dragons (niveau 6 pour l'instant). Pour l'agrandir : 5 dragons (${Math.min(5, n)}/5), dont un au niveau 6 (meilleur : ${haut}), tous au moins au niveau 3. Je t'offre un 5e œuf ! Au début, l'expérience est doublée : combats, puis lance le chantier au couvoir.`;
+    },
+    fini: () => E().oeufs.couvoir.niveau >= 1 || !!E().oeufs.couvoir.chantier, suite: "fin",
   },
   fin: {
-    num: 11, cible: null,
-    texte: () => "Tu sais tout ! Récolte, nourris tes dragons chaque jour, améliore leurs nids pour qu'ils évoluent, et combats pour gagner XP et rations. Réveille les sources (volcan, glacier, tourbillon) : leur nourriture est indispensable après le niveau 10. Le minuteur des œufs démarre : prochain œuf dans 1 heure.",
+    num: 12, cible: null,
+    texte: () => "Le chantier est lancé ! Tes bâtisseurs ne combattent pas pendant ce temps, mais plus ils sont nombreux, plus ça va vite (et les gemmes peuvent tout finir d'un coup). Récolte, nourris tes dragons chaque jour, réveille les sources : leur nourriture est indispensable après le niveau 10. La suite de l'histoire t'attend quand le couvoir sera prêt…",
     bouton: { texte: "Terminer l'apprentissage", action: () => terminer() },
   },
 };
 
-export function initTuto(c) { ctx = c; }
+export function initTuto(c) {
+  ctx = c;
+  // Les conditions « finies » (ressources, niveaux…) sont revérifiées régulièrement
+  setInterval(() => { if (tutoActif()) { const et = ETAPES[etape()]; if (et && et.fini && et.fini()) signaler("tick"); } }, 2000);
+  requestAnimationFrame(placerFleche);
+}
+
+// ---------- La voix de Lia (synthèse vocale du navigateur, en français) ----------
+let dernierParle = null;
+function voixActive() { const e = E(); return !e || !e.reglages || e.reglages.voixLia !== false; }
+function basculerVoix() { const v = !voixActive(); changer((s) => { s.reglages.voixLia = v; }); if (!v && window.speechSynthesis) speechSynthesis.cancel(); else dernierParle = null; }
+function voixFr() {
+  const l = (window.speechSynthesis ? speechSynthesis.getVoices() : []).filter((v) => /^fr/i.test(v.lang));
+  return l.find((v) => /amélie|amelie|audrey|julie|denise|hortense|marie|léa|celine|céline|female|femme/i.test(v.name)) || l.find((v) => /google/i.test(v.name)) || l[0] || null;
+}
+export function parler(texte) {
+  if (!voixActive() || !window.speechSynthesis || !texte) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texte.replace(/[«»]/g, ""));
+    const v = voixFr(); if (v) u.voice = v;
+    u.lang = "fr-FR"; u.rate = 1.04; u.pitch = 1.15;
+    speechSynthesis.speak(u);
+  } catch (e) { /* pas de voix sur ce navigateur */ }
+}
+
+// ---------- La flèche de Lia : montre où toucher ----------
+const fleche = el("div", { class: "tuto-fleche", hidden: true, html: '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M20 50 4 28h10V2h12v26h10z" fill="#f2b544" stroke="#fff6d8" stroke-width="2.5" stroke-linejoin="round"/></svg>' });
+function placerFleche() {
+  requestAnimationFrame(placerFleche);
+  if (!fleche.isConnected) document.body.append(fleche);
+  let p = null;
+  const et = tutoActif() ? ETAPES[etape()] : null;
+  const modaleOuverte = !document.getElementById("modale")?.hidden || document.querySelector(".histoire");
+  if (et && !modaleOuverte && ctx) {
+    if (et.cible && ctx.ecran !== et.cible) {
+      const a = document.querySelector(`#nav a[href="#${et.cible}"]`);
+      if (a && !document.getElementById("nav").hidden) { const r = a.getBoundingClientRect(); p = { x: r.left + r.width / 2, y: r.top - 4 }; }
+    } else if (et.vise && ctx.cibleTuto && ctx.ecran === "iles" && !document.querySelector(".fiche-ile")) p = ctx.cibleTuto(et.vise());
+  }
+  fleche.hidden = !p;
+  if (p) { fleche.style.left = Math.round(p.x) + "px"; fleche.style.top = Math.round(p.y) + "px"; }
+}
+
+// ---------- Le triangle des éléments ----------
+export function montrerTriangle() {
+  const svg = `<svg viewBox="0 0 300 250" class="triangle" role="img" aria-label="Le feu bat la glace, la glace bat l'eau, l'eau bat le feu">
+    <defs><marker id="pointe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="#f2b544"/></marker></defs>
+    <path d="M128 62 72 160" stroke="#f2b544" stroke-width="4" fill="none" marker-end="url(#pointe)"/>
+    <path d="M92 196 H208" stroke="#f2b544" stroke-width="4" fill="none" marker-end="url(#pointe)"/>
+    <path d="M228 160 172 62" stroke="#f2b544" stroke-width="4" fill="none" marker-end="url(#pointe)"/>
+    <circle cx="150" cy="40" r="34" fill="#ff6a3d"/><text x="150" y="46" text-anchor="middle" font-size="17" font-weight="700" fill="#1a0f08">Feu</text>
+    <circle cx="62" cy="196" r="34" fill="#7fd6ff"/><text x="62" y="202" text-anchor="middle" font-size="17" font-weight="700" fill="#08141a">Glace</text>
+    <circle cx="238" cy="196" r="34" fill="#2fd0c0"/><text x="238" y="202" text-anchor="middle" font-size="17" font-weight="700" fill="#06181a">Eau</text>
+    <text x="80" y="108" font-size="13" fill="#f2b544" transform="rotate(-60 80 108)">bat</text>
+    <text x="150" y="222" text-anchor="middle" font-size="13" fill="#f2b544">bat</text>
+    <text x="214" y="104" font-size="13" fill="#f2b544" transform="rotate(60 214 104)">bat</text></svg>`;
+  modale({
+    titre: "Le triangle des éléments",
+    contenu: el("div", { class: "triangle-boite" }, el("div", { html: svg }),
+      el("p", {}, "Le feu bat la glace, la glace bat l'eau, l'eau bat le feu. Quand ton dragon frappe l'élément qu'il bat, ses dégâts grimpent. Quand l'élément qui le bat le frappe, il prend plus cher."),
+      el("p", { class: "doux" }, "À chaque tour, toi et ton adversaire choisissez en secret un dragon puis une posture : ATK, c'est la force du coup ; DEF, la protection. Les deux frappent en même temps. Après 9 tours, celui qui a fait le plus de dégâts gagne.")),
+    boutons: [{ texte: "J'ai compris", classe: "principal" }],
+  });
+  parler("Le feu bat la glace, la glace bat l'eau, et l'eau bat le feu. À chaque tour, choisis en secret un dragon puis une posture. Celui qui fait le plus de dégâts en neuf tours gagne.");
+}
 export function etape() { const t = E() && E().tuto; return t ? t.etape : "fini"; }
 export function tutoActif() { const et = etape(); return et !== "fini" && et !== "histoire"; }
 export function enApprentissage() { return etape() !== "fini"; }
@@ -162,7 +246,7 @@ export function afficher() {
   // Pendant un combat, seulement la pastille (le conseil du combat s'affiche ailleurs)
   if (reduite || enCombat) {
     bulle = el("aside", { class: "tuto-bulle reduite", role: "button", tabindex: 0, title: "Afficher le conseil", onclick: () => { reduite = false; afficher(); } },
-      el("div", { class: "portrait", html: RUNE }), el("b", {}, `${MENTOR} · ${et.num}/11`));
+      el("div", { class: "portrait", html: RUNE }), el("b", {}, `${MENTOR} · ${et.num}/${NB_ETAPES}`));
     document.body.append(bulle);
     reserver();
     if (et.cible && (!ctx || ctx.ecran !== et.cible)) document.querySelector(`#nav a[href="#${et.cible}"]`)?.classList.add("tuto-cible");
@@ -172,16 +256,20 @@ export function afficher() {
     el("button", { class: "reduire", "aria-label": "Réduire le conseil", title: "Réduire", onclick: () => { reduite = true; afficher(); } }, "–"),
     el("div", { class: "portrait", html: RUNE }),
     el("div", {},
-      el("b", {}, MENTOR), el("span", { class: "etape" }, `  ·  étape ${et.num}/11`),
+      el("b", {}, MENTOR), el("span", { class: "etape" }, `  ·  étape ${et.num}/${NB_ETAPES}`),
+      el("button", { class: "voix", "aria-label": voixActive() ? "Couper la voix de Lia" : "Activer la voix de Lia", title: "Voix de Lia", onclick: () => { basculerVoix(); afficher(); } }, voixActive() ? "🔊" : "🔇"),
       el("p", {}, et.texte()),
       el("div", { class: "bas" },
         el("button", { class: "passer", onclick: () => modale({ titre: "Passer l'apprentissage ?", contenu: "Tu pourras retrouver toutes les règles dans le Livre.", boutons: [{ texte: "Continuer l'apprentissage" }, { texte: "Passer", classe: "danger", action: () => terminer(true) }] }) }, "Passer l'apprentissage"),
+        et.triangle ? el("button", { class: "btn petit", onclick: () => montrerTriangle() }, "Le triangle des éléments") : null,
         et.bouton ? el("button", { class: "btn principal petit", onclick: et.bouton.action }, et.bouton.texte) : null),
     ),
   );
   document.body.append(bulle);
   reserver();
   if (et.cible && (!ctx || ctx.ecran !== et.cible)) document.querySelector(`#nav a[href="#${et.cible}"]`)?.classList.add("tuto-cible");
+  if (dernierParle !== id) { dernierParle = id; parler(et.texte()); }
+  if (et.triangle && ctx && ctx.ecran === "combat" && !E().tuto.triangleVu) { changer((e) => { e.tuto.triangleVu = true; }); setTimeout(montrerTriangle, 400); }
 }
 export function cacherBulle(c) { if (bulle) bulle.hidden = c; reserver(); }
 
@@ -203,7 +291,7 @@ export function histoire(suite) {
   const pages = [
     ["Ta tablette magique", "Tu es un mage. Ta tablette n'est pas un simple objet : quand tu la touches, elle ouvre un portail vers un autre monde."],
     ["Le monde des dragons", "À travers ta tablette, tu découvres trois îles qui flottent dans le ciel : une île de feu, une île de glace, une île d'eau. Sur un rocher, au milieu, trois œufs t'attendent."],
-    [`Je suis ${MENTOR}`, `Mage des portails, je guide les nouveaux venus. D'autres mages ont une tablette comme la tienne, et ils adorent les duels. Pour leur tenir tête, il te faudra une couvée forte. Commence par choisir un œuf.`],
+    [`Je suis ${MENTOR}`, `Gardienne des portails, je guide les nouveaux venus. D'autres mages ont une tablette comme la tienne, et ils adorent les duels. Pour leur tenir tête, il te faudra une couvée forte. Commence par choisir un œuf.`],
   ];
   let i = 0;
   const z = el("div", { class: "histoire" });

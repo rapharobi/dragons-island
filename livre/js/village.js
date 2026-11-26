@@ -29,6 +29,8 @@ export const BATIMENTS = {
   tourEau: { nom: "Tour à jets d'eau", desc: "Un jet puissant qui repousse l'ennemi loin des bâtiments.", pv: 300, base: { brindilles: 20, pierres: 45 }, mat: "corail", tour: { portee: 4.2, cadence: 1.3, degats: 11, couleur: 0x48c8e0 } },
 };
 const ORDRE = ["entrepot", "verger", "scierie", "carriere", "tourLave", "tourGivre", "tourEau"];
+// Le village s'ouvre avec le chapitre d'histoire « Un village s'éveille » (couvoir niveau 2)
+const ouvert = () => !!(E() && E().recits && E().recits.village);
 function vil() { const e = E(); if (!e.village) e.village = { batiments: [], vague: { numero: 1, prochaine: null, enAttente: null }, compteur: 0 }; return e.village; }
 // L'hôtel du village, c'est le couvoir : son niveau (1 à 5) fixe le nombre et le niveau des bâtiments
 export function niveauHotel() { return E().oeufs.couvoir.niveau + 1; }
@@ -205,7 +207,7 @@ function update(dt) {
   }
   for (const m of V.marqueurs) { m.rotation.y += dt; m.children[0].material.opacity = 0.45 + Math.sin(V.t * 4) * 0.25; }
   const D = moteurIles();
-  const voirLibres = !V.bataille && !(D && D.placement) && D && D.focus && D.focus !== "tout" && D.focus !== "centre";
+  const voirLibres = ouvert() && !V.bataille && !(D && D.placement) && D && D.focus && D.focus !== "tout" && D.focus !== "centre";
   for (const m of V.libres) { m.visible = voirLibres && m.userData.action.ile === D.focus; m.children[0].material.opacity = 0.22 + Math.sin(V.t * 2) * 0.1; }
   if (V.bataille) majBataille(dt * V.bataille.vitesse);
 }
@@ -395,13 +397,14 @@ function ameliorer(uid) {
 
 // ---------- Les vagues ----------
 function verifierVague() {
+  if (!ouvert()) return;
   const v = vil();
   if (!v.vague.prochaine || v.vague.enAttente || V.bataille) return;
   if (maintenant() >= v.vague.prochaine) {
     const iles = [...new Set(v.batiments.map((b) => b.ile))];
     const cible = iles[Math.floor(Math.random() * iles.length)] || "feu";
     changer((s) => { s.village.vague.enAttente = cible; });
-    toast(`Des pillards approchent de l'${NOM_ILE[cible]} ! Ouvre le village pour défendre.`, "mal");
+    toast(`Des pillards approchent de l'${NOM_ILE[cible]} ! Touche « Village » pour défendre.`, "mal");
     Son.crier("feu", 0.9);
   }
 }
@@ -633,7 +636,7 @@ extensions.action.vplace = (a) => construireIci(a);
 extensions.action.vlibre = (a) => { if (V.bataille) return; Son.clic(); construireSur(a.ile, a.place); };
 // Toucher le sol près d'un emplacement libre ouvre aussi « Construire ici »
 extensions.sol = (elx, p) => {
-  if (V.bataille || !E()) return false;
+  if (V.bataille || !E() || !ouvert()) return false;
   const prises = new Set(vil().batiments.map((b) => b.place));
   let best = null, dm = 1.6;
   for (const q of places(elx)) { if (prises.has(q.id)) continue; const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < dm) { dm = d; best = q; } }
@@ -642,7 +645,7 @@ extensions.sol = (elx, p) => {
   return true;
 };
 extensions.action.ennemi = (a) => toucherEnnemi(a);
-extensions.boutons.push(() => el("button", { class: "btn petit", style: { borderColor: "rgba(111,214,138,.55)", color: "#b8f0c8" }, onclick: () => { Son.clic(); ouvrirVillage(); } }, "Village"));
+extensions.boutons.push(() => ouvert() && el("button", { class: "btn petit", style: { borderColor: "rgba(111,214,138,.55)", color: "#b8f0c8" }, onclick: () => { Son.clic(); ouvrirVillage(); } }, "Village"));
 export function lancerVagueTest(elx) { const v = vil(); const iles = [...new Set(v.batiments.map((b) => b.ile))]; lancerBataille(elx && iles.includes(elx) ? elx : iles[0], false); }
 
 export const _places = (elx) => places(elx).length;

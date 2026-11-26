@@ -1081,8 +1081,29 @@ function majEtiquettes() {
 
 // ---------- Écran ----------
 let racineUI = null, ficheUI = null;
+// Où la flèche de Lia doit pointer (position à l'écran), pour le tutoriel
+function cibleTuto(nom) {
+  if (!D || !ctxJeu || ctxJeu.ecran !== "iles" || ctxJeu.moteur.decor !== D) return null;
+  let w = null;
+  if (nom === "dragon") { const d = E().dragons[0]; const v = d && D.dragons.get(d.uid); if (v) { w = new T.Vector3(); v.mobile.getWorldPosition(w); w.y += v.hauteur + 0.4; } }
+  else if (nom === "buisson" || nom === "rocher") {
+    const ile = D.iles[D.focus];
+    if (!ile) return null;
+    let dm = 1e9;
+    for (const n of ile.noeuds) {
+      if (n.objet.userData.action.noeud !== nom || !noeudDispo(n.cle) || !n.objet.visible) continue;
+      const p = n.objet.getWorldPosition(new T.Vector3()); const d = p.distanceTo(D.orbite.cible);
+      if (d < dm) { dm = d; w = p; }
+    }
+    if (w) w.y += 1.3;
+  } else if (nom === "source") { const ile = D.iles[D.focus]; if (ile && ile.source) { w = ile.source.getWorldPosition(new T.Vector3()); w.y += 3.2; } }
+  if (!w) return null;
+  const p = versEcran(w, D.camera);
+  return p.devant ? p : null;
+}
 export function ouvrir(ctx) {
   ctxJeu = ctx;
+  ctx.cibleTuto = cibleTuto;
   if (!D) construireDecor();
   D.fond = false;
   synchroniser();

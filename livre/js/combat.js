@@ -899,6 +899,8 @@ function lancer() {
     const n = Math.max(1, Math.min(3, moi.length));
     const nv = et === "sauvage1" ? 1 : et === "sauvage2" ? 2 : Math.max(1, moyen - 1);
     lui = equipeBot(new Array(n).fill(nv), stadeMax);
+    // Premier combat de l'apprentissage : des dragons sauvages d'un élément que tes dragons battent
+    if (et === "sauvage1") lui = moi.slice(0, n).map((m) => { const proie = ELEMENTS[m.element].bat[0]; const l = DRAGONS.filter((x) => x.element === proie); return membreBot(l[Math.floor(Math.random() * l.length)].id, 1, 0); });
     nomAdv = "Dragons sauvages";
   } else if (prep.mode === "tour") {
     lui = equipeMiroir(run.dragons, bonusTour(run.etage));
@@ -1376,7 +1378,8 @@ function finCombat(raison) {
       for (const m of C.equipes[0]) {
         if (!m.d || (!m.utilise && !apprentissage)) continue;
         // Pendant l'apprentissage, toute l'équipe gagne 40 XP par combat sauvage
-        const xp = apprentissage && C.mode === "sauvage" ? 40 : Math.round(xpCombat(victoire, niveauAdv) * (C.mode === "sauvage" ? 0.7 : 1));
+        // Au début (couvoir niveau 1), l'expérience est doublée
+        const xp = (apprentissage && C.mode === "sauvage" ? 40 : Math.round(xpCombat(victoire, niveauAdv) * (C.mode === "sauvage" ? 0.7 : 1))) * (e.oeufs.couvoir.niveau === 0 ? 2 : 1);
         const r = gagnerXp(m.d, xp);
         progres.push({ nom: m.nom, xp, ...r, niveau: m.d.niveau });
       }
