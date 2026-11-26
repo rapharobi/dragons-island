@@ -464,6 +464,52 @@ export function construireCentre() {
   return { groupe: g, couvoir };
 }
 
+// L'hôtel de ville : le couvoir est entouré d'une forteresse qui couvre tout le rocher central.
+// Une porte face à chaque pont, des tours entre les portes. Niveau 2 : une tourelle qui tire ; niveau 4 : deux ; niveau 5 : trois.
+export function construireForteresse(niveau) {
+  const g = new T.Group();
+  const pierre = mat(0x7a7268, { r: 0.95 }), pierreFoncee = mat(0x5a544c, { r: 0.95 }), toit = mat(0x6a3a5a, { r: 0.8 }), or = mat(0xf2b544, { r: 0.4, m: 0.6, e: 0x6a4200, ei: 0.4 });
+  const R = 2.95, haut = 0.9 + niveau * 0.18;
+  const portes = Object.values(POS_ILES).map((p) => Math.atan2(p.z, p.x));
+  const pres = (a) => portes.some((b) => { let d = Math.abs(a - b) % (Math.PI * 2); d = Math.min(d, Math.PI * 2 - d); return d < 0.34; });
+  // Murailles en blocs, avec créneaux
+  for (let a = 0; a < Math.PI * 2; a += 0.16) {
+    if (pres(a)) continue;
+    const m = mesh(new T.BoxGeometry(0.5, haut, 0.34), pierre);
+    m.position.set(Math.cos(a) * R, haut / 2, Math.sin(a) * R); m.rotation.y = -a + Math.PI / 2; g.add(m);
+    if (Math.round(a / 0.16) % 2 === 0) { const c = mesh(new T.BoxGeometry(0.22, 0.2, 0.36), pierre); c.position.set(Math.cos(a) * R, haut + 0.1, Math.sin(a) * R); c.rotation.y = m.rotation.y; g.add(c); }
+  }
+  // Portes : deux piliers et une arche dorée
+  for (const a of portes) for (const s of [-1, 1]) {
+    const b = a + s * 0.36;
+    const pil = mesh(new T.CylinderGeometry(0.26, 0.3, haut + 0.7, 7), pierreFoncee); pil.position.set(Math.cos(b) * R, (haut + 0.7) / 2, Math.sin(b) * R); g.add(pil);
+    const boule = mesh(new T.SphereGeometry(0.14, 8, 6), or); boule.position.set(Math.cos(b) * R, haut + 0.82, Math.sin(b) * R); g.add(boule);
+  }
+  // Tours entre les portes, avec un toit pointu ; certaines deviennent des tourelles
+  const tourelles = [];
+  const nbTourelles = niveau >= 4 ? 3 : niveau >= 3 ? 2 : niveau >= 1 ? 1 : 0;
+  portes.forEach((a, i) => {
+    const b = a + Math.PI / 3;
+    const h = haut + 1.4 + niveau * 0.15;
+    const tour = mesh(new T.CylinderGeometry(0.46, 0.56, h, 8), pierre); tour.position.set(Math.cos(b) * R, h / 2, Math.sin(b) * R); g.add(tour);
+    const cr = mesh(new T.CylinderGeometry(0.6, 0.52, 0.22, 8), pierreFoncee); cr.position.set(Math.cos(b) * R, h + 0.11, Math.sin(b) * R); g.add(cr);
+    if (i < nbTourelles) {
+      // Tourelle : un cristal qui flotte et vise les pillards
+      const cristal = mesh(new T.OctahedronGeometry(0.3, 0).scale(1, 1.5, 1), mat(0xffd27a, { e: 0xffb030, ei: 1.1, r: 0.2, m: 0.3 }));
+      cristal.position.set(Math.cos(b) * R, h + 0.75, Math.sin(b) * R); g.add(cristal);
+      const l = new T.PointLight(0xffc860, 1, 4); l.position.copy(cristal.position); g.add(l);
+      tourelles.push(cristal);
+    } else {
+      const c = mesh(cone(0.62, 1.0, 8), toit); c.position.set(Math.cos(b) * R, h + 0.22, Math.sin(b) * R); g.add(c);
+    }
+    const drap = mesh(new T.BoxGeometry(0.02, 0.28, 0.42), mat([0xff6a3d, 0x7fd6ff, 0x2fd0c0][i], { r: 0.7, d: true }), false);
+    drap.position.set(Math.cos(b) * R * 1.13, h - 0.2, Math.sin(b) * R * 1.13); drap.rotation.y = -b; g.add(drap);
+  });
+  g.userData.tourelles = tourelles;
+  g.userData.anim = (t) => tourelles.forEach((c, i) => { c.rotation.y = t * 1.4 + i; c.position.y += Math.sin(t * 2 + i) * 0.002; });
+  return g;
+}
+
 // Le couvoir : un autel de pierre avec 1 ou 2 places pour les œufs.
 export function construireCouvoir(niveau, oeufs) {
   const g = new T.Group();

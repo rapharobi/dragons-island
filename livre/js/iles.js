@@ -5,7 +5,7 @@ import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite, versEcran } from "./scene.js";
 import {
   POS_ILES, NIVEAU_EAU, rayonBord, solIle, dansLEau, emplacements, construireIle, construireCentre, construireCouvoir,
-  pont, construireNid, construireNoeud, construireOeuf, construireSource,
+  pont, construireNid, construireNoeud, construireOeuf, construireSource, construireForteresse,
 } from "./monde.js";
 import { mat, mesh, rng } from "./outils3d.js";
 import {
@@ -26,7 +26,7 @@ const T = window.THREE;
 let D = null;
 let ctxJeu = null;
 // Accroches pour d'autres modules (le village) : mise à jour à chaque image, actions au toucher, bouton dans la barre
-export const extensions = { update: [], action: {}, boutons: [], sol: null };
+export const extensions = { update: [], action: {}, boutons: [], sol: null, cibles: [] };
 export function moteurIles() { return D; }
 export const LIEN_LIVRE = window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM";
 
@@ -159,6 +159,7 @@ function construireDecor() {
   }
   const centre = construireCentre();
   scene.add(centre.groupe);
+  const ponts = {};
   for (const elx of ["feu", "glace", "eau"]) {
     const dir = POS_ILES[elx].clone().setY(0).normalize();
     const a = dir.clone().multiplyScalar(3.2).setY(-0.05);
@@ -166,6 +167,7 @@ function construireDecor() {
     const rb = rayonBord(elx, angLocal) - 0.4;
     const b = POS_ILES[elx].clone().sub(dir.clone().multiplyScalar(rb)); b.y += iles[elx].sol(Math.cos(angLocal) * rb, Math.sin(angLocal) * rb) - 0.05;
     scene.add(pont(a, b));
+    ponts[elx] = { a: a.clone(), b: b.clone() };
   }
   for (const elx of ["feu", "glace", "eau"]) {
     NOEUDS[elx].forEach(([type, ang], i) => {
@@ -227,7 +229,7 @@ function construireDecor() {
     });
   }
   D = {
-    scene, camera, orbite, iles, centre, sky, nuages, lum,
+    scene, camera, orbite, iles, centre, sky, nuages, lum, ponts, forteresse: null, forteresseNiv: -1,
     dragons: new Map(),
     couvoir: null, couvoirCle: null,
     focus: null, t: 0, fond: false, suivi: null, placement: null, marqueurs: [], repas: [], rituel: null, eclats: [], meteores: [], secousse: 0, eclipse: 0,
@@ -264,6 +266,7 @@ function construireDecor() {
       }
       majEclats(dt);
       for (const f of extensions.update) f(dt);
+      if (D.forteresse && D.forteresse.userData.anim) D.forteresse.userData.anim(D.t);
       if (D.couvoir) for (const o of D.couvoir.userData.oeufs || []) { o.rotation.y += dt * 0.6; o.position.y = Math.sin(D.t * 2) * 0.03; }
       if (D.rituel) majRituel(dt);
       if (D.fond) orbite.thetaV += dt * 0.035;
@@ -895,6 +898,14 @@ function synchroniser() {
     D.centre.couvoir.add(D.couvoir);
     D.couvoirCle = cleC;
   }
+  // L'hôtel de ville : la forteresse grandit avec le couvoir
+  if (D.forteresseNiv !== c.niveau) {
+    if (D.forteresse) D.centre.groupe.remove(D.forteresse);
+    D.forteresse = construireForteresse(c.niveau);
+    D.forteresse.userData.action = { type: "couvoir" };
+    D.centre.groupe.add(D.forteresse);
+    D.forteresseNiv = c.niveau;
+  }
 }
 
 // ---------- Placement des nids ----------
@@ -949,6 +960,7 @@ function installerClics() {
     const cibles = [];
     for (const ile of Object.values(D.iles)) cibles.push(ile.groupe);
     cibles.push(D.centre.groupe);
+    for (const g of extensions.cibles) cibles.push(g);
     const hits = ray.intersectObjects(cibles, true);
     for (const h of hits) {
       let o = h.object;

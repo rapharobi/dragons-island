@@ -419,44 +419,53 @@ function barre3D(largeur) {
 }
 function regler(b3, k, cam) { const p = b3.userData.plein; p.scale.x = Math.max(0.001, k) * b3.userData.l; p.position.x = -(1 - k) * b3.userData.l / 2; p.material.color.setHex(k > 0.5 ? 0x6fd68a : k > 0.25 ? 0xf2b544 : 0xff5a4a); b3.quaternion.copy(cam.quaternion); }
 
-function lancerBataille(elx, auto) {
+// Une vague : des pillards apparaissent au hasard sur les trois îles. Ils s'en prennent aux bâtiments de leur île,
+// puis traversent le pont pour attaquer le couvoir (l'hôtel de ville). Si le couvoir tombe, la vague est perdue.
+const ILES3 = ["feu", "glace", "eau"];
+const monde = (o) => o.getWorldPosition(new T.Vector3());
+function solMonde(elx, x, z) { const p = POS_ILES[elx]; return p.y + solIle(elx, x - p.x, z - p.z); }
+function lancerBataille(elxIgnore, auto) {
   const D = moteurIles();
   if (V.bataille || !D) return;
   const v = vil();
-  const sur = v.batiments.filter((b) => b.ile === elx);
-  if (!sur.length) { toast(`Aucun bâtiment sur l'${NOM_ILE[elx]} : les pillards n'ont rien à attaquer ici.`, "mal"); return; }
   fermerPanneau(); fermerFiche();
-  focaliser(elx);
+  focaliser("tout");
   const n = v.vague.numero;
-  const ile = D.iles[elx];
-  // Les défenseurs : dragons de l'île en forme
-  const dragons = [...D.dragons.values()].filter((x) => x.element === elx && !x.ko);
+  // Les défenseurs : tous les dragons en forme qui ne sont pas sur le chantier
+  const dragons = [...D.dragons.values()].filter((x) => !x.ko && !x.d.chantier);
   for (const x of dragons) { x.etatAvant = x.etat; x.etat = "bataille"; x.cibleB = null; x.recharge = 0; }
-  // Les bâtiments ont des PV
-  const bats = sur.map((b) => { const o = V.objets.get(b.uid); const pv = BATIMENTS[b.type].pv * (1 + 0.3 * (b.niveau - 1)); const b3 = barre3D(1.2); b3.position.y = 2.6; o.g.add(b3); return { b, o, pv, max: pv, barre: b3, recharge: Math.random() }; });
+  // Les bâtiments et le couvoir ont des PV
+  const bats = v.batiments.map((b) => { const o = V.objets.get(b.uid); if (!o) return null; const pv = BATIMENTS[b.type].pv * (1 + 0.3 * (b.niveau - 1)); const b3 = barre3D(1.2); b3.position.y = 2.6; o.g.add(b3); return { b, o, pv, max: pv, barre: b3, recharge: Math.random(), w: monde(o.g), elx: b.ile }; }).filter(Boolean);
+  const nivC = E().oeufs.couvoir.niveau;
+  const pvC = 420 + 260 * nivC;
+  const bc = barre3D(2.2); bc.position.y = 4.4; D.forteresse.add(bc);
+  const couvoir = { pv: pvC, max: pvC, barre: bc, w: monde(D.forteresse), tourelles: (D.forteresse.userData.tourelles || []).map((c) => ({ c, recharge: Math.random() })) };
   // Les pillards : de jeunes dragons sauvages, plus nombreux et plus solides à chaque vague
-  const nb = Math.min(14, 3 + n), ennemis = [];
-  const autres = DRAGONS.filter((d) => d.element !== elx);
+  const groupe = new T.Group(); D.scene.add(groupe); extensions.cibles.push(groupe);
+  const nb = Math.min(16, 3 + n), ennemis = [];
   for (let i = 0; i < nb; i++) {
+    const elx = ILES3[Math.floor(Math.random() * 3)];
     const brute = i % 4 === 3;
+    const autres = DRAGONS.filter((d) => d.element !== elx);
     const id = autres[Math.floor(Math.random() * autres.length)].id;
     const rig = construireDragon(id, brute ? 1 : 0, {});
     const taille = Math.max(rig.taille.x, rig.taille.z);
-    const ech = (brute ? 1.3 : 0.9) / Math.max(0.6, taille);
+    const ech = (brute ? 1.35 : 0.95) / Math.max(0.6, taille);
     rig.racine.scale.setScalar(ech);
     const m = new T.Group(); m.add(rig.racine);
     const a = Math.random() * 6.28, rb = rayonBord(elx, a) - 1.2;
-    m.position.set(Math.cos(a) * rb, solIle(elx, Math.cos(a) * rb, Math.sin(a) * rb), Math.sin(a) * rb);
-    const zone = new T.Mesh(new T.SphereGeometry(0.9, 6, 4), new T.MeshBasicMaterial({ visible: false })); zone.position.y = 0.5; m.add(zone);
+    const x = POS_ILES[elx].x + Math.cos(a) * rb, z = POS_ILES[elx].z + Math.sin(a) * rb;
+    m.position.set(x, solMonde(elx, x, z), z);
+    const zone = new T.Mesh(new T.SphereGeometry(1.1, 6, 4), new T.MeshBasicMaterial({ visible: false })); zone.position.y = 0.5; m.add(zone);
     m.userData.action = { type: "ennemi", i };
-    const b3 = barre3D(0.8); b3.position.y = rig.taille.y * ech + 0.35; m.add(b3);
+    const b3 = barre3D(0.9); b3.position.y = rig.taille.y * ech + 0.4; m.add(b3);
     m.visible = false;
-    ile.groupe.add(m);
+    groupe.add(m);
     const anim = new Animateur(rig); anim.jouer("marche");
     const pv = (34 + 11 * n) * (brute ? 2.6 : 1);
-    ennemis.push({ m, anim, pv, max: pv, vitesse: brute ? 0.75 : 1.15, degats: (5 + 2 * n) * (brute ? 2 : 1), lent: 0, recharge: 0, arrivee: i * 1.4 + Math.random(), barre: b3, cible: null, mort: false, haut: rig.taille.y * ech });
+    ennemis.push({ m, anim, elx, pv, max: pv, vitesse: brute ? 0.8 : 1.2, degats: (5 + 2 * n) * (brute ? 2 : 1), lent: 0, recharge: 0, arrivee: i * 1.3 + Math.random(), barre: b3, cible: null, chemin: null, mort: false, haut: rig.taille.y * ech });
   }
-  V.bataille = { elx, auto, vitesse: auto ? 2 : 1, n, bats, ennemis, dragons, t: 0, tirs: [], fini: false, coupDeMain: 0 };
+  V.bataille = { auto, vitesse: auto ? 2 : 1, n, bats, couvoir, ennemis, dragons, groupe, t: 0, tirs: [], fini: false, coupDeMain: 0 };
   Son.crier("eau", 1);
   const bandeau = el("div", { class: "vl-bandeau panneau", id: "vl-bandeau" });
   document.getElementById("ecran").append(bandeau);
@@ -468,20 +477,20 @@ function majBandeau() {
   if (!B || !b) return;
   const restants = B.ennemis.filter((e) => !e.mort).length;
   b.innerHTML = "";
-  b.append(el("b", {}, `Vague ${B.n}`), el("span", {}, `${restants} pillard${restants > 1 ? "s" : ""}`), el("span", { class: "num doux" }, `${Math.max(0, Math.ceil(120 - B.t))} s`),
+  b.append(el("b", {}, `Vague ${B.n}`), el("span", {}, `${restants} pillard${restants > 1 ? "s" : ""}`), el("span", { class: "num doux" }, `couvoir ${Math.max(0, Math.round((B.couvoir.pv / B.couvoir.max) * 100))} %`), el("span", { class: "num doux" }, `${Math.max(0, Math.ceil(150 - B.t))} s`),
     el("button", { class: "btn petit", onclick: () => { B.vitesse = B.vitesse >= 2 ? 1 : 2; majBandeau(); } }, `× ${B.vitesse}`));
 }
-// Toucher un pillard : coup de la tablette, et les dragons le prennent pour cible
+// Toucher un pillard : coup de la tablette, et les dragons de son île le prennent pour cible
 function toucherEnnemi(a) {
   const B = V.bataille;
   if (!B || B.auto) return;
   const e = B.ennemis[a.i];
   if (!e || e.mort) return;
-  for (const x of B.dragons) x.cibleB = e;
+  for (const x of B.dragons) if (x.element === e.elx) x.cibleB = e;
   if (B.coupDeMain <= 0) {
     B.coupDeMain = 0.45;
     blesser(e, 6 + B.n);
-    particule(e.m.parent, e.m.position.clone().add(new T.Vector3(0, e.haut * 0.6, 0)), 0xd8b0ff, new T.Vector3(0, 1.2, 0), { e: true, vie: 0.5, grossit: 3, taille: 2.5 });
+    particule(B.groupe, e.m.position.clone().add(new T.Vector3(0, e.haut * 0.6, 0)), 0xd8b0ff, new T.Vector3(0, 1.2, 0), { e: true, vie: 0.5, grossit: 3, taille: 2.5 });
     Son.impact("glace", false);
   }
 }
@@ -495,100 +504,135 @@ function blesser(e, d) {
     majBandeau();
   }
 }
-function plusProche(liste, p, filtre = () => true) { let m = null, dm = 1e9; for (const x of liste) { if (!filtre(x)) continue; const q = x.m ? x.m.position : x.o.g.position; const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < dm) { dm = d; m = x; } } return [m, dm]; }
+function tirer(B, depart, e, degats, type, source) {
+  const couleur = type === "couvoir" ? 0xffd27a : BATIMENTS[type].tour.couleur;
+  const boule = mesh(new T.IcosahedronGeometry(0.17, 1), mat(couleur, { e: couleur, ei: 1 }), false);
+  boule.position.copy(depart); B.groupe.add(boule);
+  B.tirs.push({ boule, dep: depart.clone(), e, t: 0, duree: type === "couvoir" ? 0.6 : 0.45, type, degats, source });
+}
 function majBataille(dt) {
   const B = V.bataille, D = moteurIles();
   if (!B || B.fini) return;
   B.t += dt; B.coupDeMain -= dt;
-  const sol = (x, z) => solIle(B.elx, x, z);
   if (Math.floor(B.t) !== Math.floor(B.t - dt)) majBandeau();
-  // Pillards : avancent vers le bâtiment le plus proche et le frappent
+  regler(B.couvoir.barre, Math.max(0, B.couvoir.pv / B.couvoir.max), D.camera);
+  // Pillards : bâtiments de leur île d'abord, puis le pont et le couvoir
   for (const e of B.ennemis) {
-    if (e.mort) continue;
-    if (B.t < e.arrivee) continue;
+    if (e.mort || B.t < e.arrivee) continue;
     e.m.visible = true;
     e.anim.update(dt);
     regler(e.barre, e.pv / e.max, D.camera);
-    if (!e.cible || e.cible.pv <= 0) [e.cible] = plusProche(B.bats, e.m.position, (b) => b.pv > 0);
-    if (!e.cible) continue;
-    const q = e.cible.o.g.position, p = e.m.position;
-    const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
-    e.m.rotation.y = Math.atan2(dx, dz);
     e.lent = Math.max(0, e.lent - dt);
-    if (d > 1.3) {
-      const v = e.vitesse * (e.lent > 0 ? 0.45 : 1) * dt;
-      p.x += (dx / d) * v; p.z += (dz / d) * v; p.y = sol(p.x, p.z);
-      e.anim.jouer("marche");
-    } else {
-      e.recharge -= dt;
-      if (e.recharge <= 0) {
-        e.recharge = 1.1;
-        e.anim.jouer("attaque");
-        e.cible.pv -= e.degats;
-        particule(e.cible.o.g.parent, q.clone().add(new T.Vector3((Math.random() - 0.5), 0.6, (Math.random() - 0.5))), 0xa08a70, new T.Vector3(0, 1.4, 0), { geo: new T.TetrahedronGeometry(0.08, 0), g: -6, vie: 0.8, taille: 1.4 });
-        if (Math.random() < 0.4) Son.recolte("bois");
-        if (e.cible.pv <= 0) { e.cible.o.g.scale.y *= 0.45; e.cible.barre.visible = false; Son.impact("feu", true); D.secousse = Math.max(D.secousse || 0, 0.4); }
+    const p = e.m.position;
+    if (!e.chemin && (!e.cible || e.cible.pv <= 0)) {
+      let best = null, dm = 1e9;
+      for (const b of B.bats) if (b.pv > 0 && b.elx === e.elx) { const d = Math.hypot(b.w.x - p.x, b.w.z - p.z); if (d < dm) { dm = d; best = b; } }
+      e.cible = best;
+      if (!best) {
+        // Plus rien à piller sur l'île : direction le couvoir, par le pont
+        const pt = D.ponts[e.elx];
+        const dir = new T.Vector3(pt.a.x, 0, pt.a.z).normalize();
+        e.chemin = [pt.b.clone(), pt.a.clone(), new T.Vector3(dir.x * 3.3, B.couvoir.w.y + 0.05, dir.z * 3.3)];
+        e.depuis = p.clone();
       }
     }
+    let q, rayon;
+    if (e.chemin) { q = e.chemin[0]; rayon = e.chemin.length === 1 ? 0.3 : 0.25; }
+    else if (e.cible) { q = e.cible.w; rayon = 1.3; }
+    else continue;
+    const dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
+    e.m.rotation.y = Math.atan2(dx, dz);
+    if (d > rayon) {
+      const pas = Math.min(d, e.vitesse * (e.lent > 0 ? 0.45 : 1) * dt);
+      p.x += (dx / d) * pas; p.z += (dz / d) * pas;
+      if (e.chemin) { const tot = Math.hypot(q.x - e.depuis.x, q.z - e.depuis.z) || 1; const k = 1 - Math.min(1, Math.hypot(q.x - p.x, q.z - p.z) / tot); p.y = e.depuis.y + (q.y - e.depuis.y) * k; }
+      else p.y = solMonde(e.elx, p.x, p.z);
+      e.anim.jouer("marche");
+      continue;
+    }
+    if (e.chemin && e.chemin.length > 1) { e.depuis = e.chemin.shift(); continue; }
+    // Au contact : il frappe
+    e.recharge -= dt;
+    if (e.recharge > 0) continue;
+    e.recharge = 1.1;
+    e.anim.jouer("attaque");
+    if (Math.random() < 0.4) Son.recolte("bois");
+    if (e.chemin) {
+      B.couvoir.pv -= e.degats;
+      particule(B.groupe, p.clone().add(new T.Vector3(0, 0.6, 0)), 0xa08a70, new T.Vector3(0, 1.4, 0), { geo: new T.TetrahedronGeometry(0.08, 0), g: -6, vie: 0.8, taille: 1.4 });
+      if (B.couvoir.pv <= 0) { D.secousse = Math.max(D.secousse || 0, 0.8); Son.impact("feu", true); }
+    } else {
+      e.cible.pv -= e.degats;
+      particule(B.groupe, e.cible.w.clone().add(new T.Vector3((Math.random() - 0.5), 0.6, (Math.random() - 0.5))), 0xa08a70, new T.Vector3(0, 1.4, 0), { geo: new T.TetrahedronGeometry(0.08, 0), g: -6, vie: 0.8, taille: 1.4 });
+      if (e.cible.pv <= 0) { e.cible.o.g.scale.y *= 0.45; e.cible.barre.visible = false; Son.impact("feu", true); D.secousse = Math.max(D.secousse || 0, 0.4); }
+    }
   }
-  // Tours : visent le pillard le plus proche à portée
+  const vivants = (filtre) => B.ennemis.filter((x) => !x.mort && B.t >= x.arrivee && filtre(x));
+  const plusProcheDe = (w, portee, filtre = () => true) => { let m = null, dm = portee; for (const x of vivants(filtre)) { const d = x.m.position.distanceTo(w); if (d < dm) { dm = d; m = x; } } return m; };
+  // Tours des îles
   for (const b of B.bats) {
     regler(b.barre, Math.max(0, b.pv / b.max), D.camera);
     const tr = BATIMENTS[b.b.type].tour;
     if (!tr || b.pv <= 0) continue;
     b.recharge -= dt;
     if (b.recharge > 0) continue;
-    const [e, d] = plusProche(B.ennemis, b.o.g.position, (x) => !x.mort && B.t >= x.arrivee);
-    if (!e || d > tr.portee * (1 + 0.08 * (b.b.niveau - 1))) continue;
+    const e = plusProcheDe(b.w, tr.portee * (1 + 0.08 * (b.b.niveau - 1)) + 1);
+    if (!e) continue;
     b.recharge = tr.cadence;
-    const dep = b.o.g.position.clone().add(new T.Vector3(0, 2.25 * b.o.g.scale.y, 0));
-    const boule = mesh(new T.IcosahedronGeometry(0.16, 1), mat(tr.couleur, { e: tr.couleur, ei: 1 }), false);
-    boule.position.copy(dep); b.o.g.parent.add(boule);
-    B.tirs.push({ boule, dep, e, t: 0, duree: 0.45, type: b.b.type, degats: tr.degats * (1 + 0.35 * (b.b.niveau - 1)), tour: b });
+    tirer(B, b.w.clone().add(new T.Vector3(0, 2.25 * b.o.g.scale.y, 0)), e, tr.degats * (1 + 0.35 * (b.b.niveau - 1)), b.b.type, b);
+  }
+  // Tourelles du couvoir (dès le niveau 2)
+  const nivC = E().oeufs.couvoir.niveau;
+  for (const t of B.couvoir.tourelles) {
+    t.recharge -= dt;
+    if (t.recharge > 0) continue;
+    const w = monde(t.c);
+    const e = plusProcheDe(w, 9);
+    if (!e) continue;
+    t.recharge = 1.1;
+    tirer(B, w, e, 12 + 6 * nivC, "couvoir", null);
   }
   for (let i = B.tirs.length - 1; i >= 0; i--) {
     const s = B.tirs[i];
     s.t += dt;
     const k = Math.min(1, s.t / s.duree);
     const vise = s.e.m.position.clone().add(new T.Vector3(0, s.e.haut * 0.5, 0));
-    s.boule.position.lerpVectors(s.dep, vise, k); s.boule.position.y += Math.sin(k * Math.PI) * 0.8;
+    s.boule.position.lerpVectors(s.dep, vise, k); s.boule.position.y += Math.sin(k * Math.PI) * 0.9;
     if (k < 1) continue;
     s.boule.parent && s.boule.parent.remove(s.boule);
     B.tirs.splice(i, 1);
     blesser(s.e, s.degats);
-    const couleur = BATIMENTS[s.type].tour.couleur;
-    for (let j = 0; j < 8; j++) particule(s.e.m.parent, vise, couleur, new T.Vector3((Math.random() - 0.5) * 2, Math.random() * 2, (Math.random() - 0.5) * 2), { e: true, vie: 0.5, grossit: 1.5, taille: 1.4, frein: 0.3 });
+    const couleur = s.type === "couvoir" ? 0xffd27a : BATIMENTS[s.type].tour.couleur;
+    for (let j = 0; j < 8; j++) particule(B.groupe, vise, couleur, new T.Vector3((Math.random() - 0.5) * 2, Math.random() * 2, (Math.random() - 0.5) * 2), { e: true, vie: 0.5, grossit: 1.5, taille: 1.4, frein: 0.3 });
     if (s.type === "tourLave") { for (const o of B.ennemis) if (o !== s.e && !o.mort && o.m.position.distanceTo(s.e.m.position) < 1.4) blesser(o, s.degats * 0.5); Son.impact("feu", false); }
     else if (s.type === "tourGivre") { s.e.lent = 2.2; Son.impact("glace", false); }
-    else { const p = s.e.m.position, t0 = s.tour.o.g.position; const dx = p.x - t0.x, dz = p.z - t0.z, d = Math.hypot(dx, dz) || 1; p.x += (dx / d) * 1.3; p.z += (dz / d) * 1.3; p.y = sol(p.x, p.z); Son.impact("eau", false); }
+    else if (s.type === "tourEau" && !s.e.chemin) { const p = s.e.m.position, t0 = s.source.w; const dx = p.x - t0.x, dz = p.z - t0.z, d = Math.hypot(dx, dz) || 1; p.x += (dx / d) * 1.3; p.z += (dz / d) * 1.3; p.y = solMonde(s.e.elx, p.x, p.z); Son.impact("eau", false); }
+    else Son.impact("feu", false);
   }
-  // Dragons défenseurs : foncent sur leur cible (ou le pillard le plus proche) et soufflent
+  // Dragons défenseurs : foncent sur les pillards de leur île
   for (const x of B.dragons) {
     if (x.ko) continue;
+    const base = POS_ILES[x.element];
     const p = x.mobile.position;
-    if (!x.cibleB || x.cibleB.mort || B.t < x.cibleB.arrivee) [x.cibleB] = plusProche(B.ennemis, p, (e) => !e.mort && B.t >= e.arrivee);
+    const w = new T.Vector3(p.x + base.x, p.y + base.y, p.z + base.z);
+    if (!x.cibleB || x.cibleB.mort || x.cibleB.chemin) x.cibleB = plusProcheDe(w, 1e9, (e) => e.elx === x.element && !e.chemin);
     const e = x.cibleB;
-    if (!e) { x.anim.jouer("repos"); continue; }
-    const q = e.m.position, dx = q.x - p.x, dz = q.z - p.z, d = Math.hypot(dx, dz);
+    if (!e) { x.anim.jouer(enEauVillage(x) ? "nage" : "repos"); continue; }
+    const q = e.m.position, dx = q.x - w.x, dz = q.z - w.z, d = Math.hypot(dx, dz);
     x.mobile.rotation.y = Math.atan2(dx, dz);
     const portee = 1.2 + x.taille * 0.4;
-    if (d > portee) { const v = 1.9 * dt; p.x += (dx / d) * v; p.z += (dz / d) * v; x.anim.jouer("marche"); }
+    if (d > portee) { const pas = 1.9 * dt; p.x += (dx / d) * pas; p.z += (dz / d) * pas; x.anim.jouer("marche"); }
     else {
       x.recharge -= dt;
-      if (x.recharge <= 0) {
-        x.recharge = 1.2;
-        x.anim.jouer("attaque");
-        if (x.proche) souffler(x);
-        blesser(e, 8 + x.d.niveau * 2.6);
-      }
+      if (x.recharge <= 0) { x.recharge = 1.2; x.anim.jouer("attaque"); souffler(x); blesser(e, 8 + x.d.niveau * 2.6); }
     }
   }
-  // Fin : tous les pillards sont tombés, ou plus de bâtiment debout, ou le temps est écoulé
+  // Fin : tous les pillards sont tombés, ou le couvoir est tombé, ou le temps est écoulé
   const restants = B.ennemis.filter((e) => !e.mort).length;
-  const debout = B.bats.filter((b) => b.pv > 0).length;
   if (!restants) finBataille(true);
-  else if (!debout || B.t > 120) finBataille(false);
+  else if (B.couvoir.pv <= 0 || B.t > 150) finBataille(false);
 }
+const enEauVillage = (x) => x.habitat === "surface" || x.habitat === "fond";
 function finBataille(victoire) {
   const B = V.bataille;
   if (!B || B.fini) return;
@@ -606,16 +650,18 @@ function finBataille(victoire) {
       // Les pillards emportent une part des ressources (moins avec des entrepôts) et vident les fermes
       const part = 0.12 * (1 - protection());
       for (const k of ["rations", "brindilles", "pierres"]) { const p = Math.floor((r[k] || 0) * part); r[k] -= p; if (p) gains.push(`−${p} ${k}`); }
-      for (const b of v.batiments) if (b.ile === B.elx && BATIMENTS[b.type].produit) { majProduction(b); b.stock = 0; }
+      for (const b of v.batiments) if (BATIMENTS[b.type].produit) { majProduction(b); b.stock = 0; }
     }
     if (v.vague.enAttente) { v.vague.enAttente = null; v.vague.prochaine = maintenant() + 4 * H; }
-    noter(`Vague ${n} sur l'${NOM_ILE[B.elx]} : ${victoire ? "repoussée" : "les pillards ont gagné"}.`);
+    noter(`Vague ${n} : ${victoire ? "repoussée" : "les pillards ont gagné"}.`);
   });
   if (victoire) Son.victoire(); else Son.defaite();
   setTimeout(() => {
     // Tout se répare après l'attaque, les dragons reprennent leur vie
     for (const b of B.bats) { b.barre.parent && b.barre.parent.remove(b.barre); }
     for (const e of B.ennemis) e.m.parent && e.m.parent.remove(e.m);
+    B.groupe.parent && B.groupe.parent.remove(B.groupe); extensions.cibles.splice(extensions.cibles.indexOf(B.groupe), 1);
+    B.couvoir.barre.parent && B.couvoir.barre.parent.remove(B.couvoir.barre);
     for (const t of B.tirs) t.boule.parent && t.boule.parent.remove(t.boule);
     for (const x of B.dragons) { x.etat = "nid"; x.cible = x.maison.clone(); x.vitesse = 0.9; if (!x.ko) x.anim.jouer(victoire ? "joie" : "repos"); }
     V.bataille = null; V.cle = null;
@@ -623,9 +669,9 @@ function finBataille(victoire) {
     V.objets.clear(); synchro();
     const bd = document.getElementById("vl-bandeau"); if (bd) bd.remove();
     modale({ titre: victoire ? `Vague ${n} repoussée !` : `Les pillards ont gagné`, contenu: el("div", { class: "vl-fin" },
-      el("p", { style: { margin: 0 } }, victoire ? "Tes tours et tes dragons ont protégé le village." : `Ils ont pillé les fermes de l'${NOM_ILE[B.elx]}${protection() ? `, mais tes entrepôts ont protégé ${Math.round(protection() * 100)} % de tes réserves` : ""}. Construis des tours et améliore-les !`),
+      el("p", { style: { margin: 0 } }, victoire ? "Tes tours et tes dragons ont protégé le village." : `Ils ont atteint le couvoir et pillé les fermes${protection() ? `, mais tes entrepôts ont protégé ${Math.round(protection() * 100)} % de tes réserves` : ""}. Construis des tours et améliore-les !`),
       gains.length ? el("p", { class: "doux", style: { margin: 0 } }, gains.join(" · ")) : null),
-      boutons: [{ texte: "Fermer" }, { texte: "Voir le village", classe: "principal", action: () => ouvrirVillage(B.elx) }] });
+      boutons: [{ texte: "Fermer" }, { texte: "Voir le village", classe: "principal", action: () => ouvrirVillage() }] });
   }, 1500);
 }
 
