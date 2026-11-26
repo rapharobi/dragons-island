@@ -456,7 +456,10 @@ export function noeudDispo(cle) { return !etat.noeuds[cle] || maintenant() >= et
 export function recolter(cle, gains) {
   if (!noeudDispo(cle)) return false;
   for (const [k, v] of Object.entries(gains)) etat.ressources[k] = (etat.ressources[k] || 0) + v;
-  etat.noeuds[cle] = maintenant() + REPOUSSE_MIN * 60 * 1000;
+  const elx = String(cle).split("-")[0];
+  const fertileIle = etat.fertilite && etat.fertilite[elx] > maintenant();
+  const saleIle = etat.crottes && etat.crottes[elx] && etat.crottes[elx].length >= 6;
+  etat.noeuds[cle] = maintenant() + REPOUSSE_MIN * 60 * 1000 * (fertileIle ? 0.5 : saleIle ? 1.5 : 1);
   return true;
 }
 export function recolterFerme(el) {

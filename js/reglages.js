@@ -2,7 +2,7 @@
 import { E, changer, lieuSauvegarde, reinitialiser } from "./etat.js";
 import { COUVOIR } from "./regles.js";
 import { el, styles, toast, modale } from "./ui.js";
-import { Son, Musique, reglerSon, initAudio } from "./son.js";
+import { Son, Musique, reglerSon, reglerVolumes, initAudio } from "./son.js";
 import { pleinEcranPossible, basculerPleinEcran } from "./portail.js";
 
 let ctxJeu = null, ui = null;
@@ -15,6 +15,9 @@ styles("reglages", `
 .rg .opt p { margin: 0; font-size: 12px; color: var(--doux); line-height: 1.5; }
 .rg .seg { display: flex; gap: 6px; flex-wrap: wrap; }
 .rg .seg button { padding: 8px 12px; border-radius: 9px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); font-weight: 600; font-size: 13px; }
+.rg .vol { display: grid; grid-template-columns: 90px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
+.rg .vol input { width: 100%; accent-color: var(--ambre); }
+.rg .vol b { text-align: right; }
 .rg .seg button.actif { border-color: var(--ambre); color: var(--ambre); background: rgba(242,181,68,.12); }
 `);
 
@@ -35,6 +38,18 @@ function rendre() {
   p.append(el("div", {}, el("div", { class: "etiquette" }, "Préférences"), el("h2", {}, "Réglages")));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Faire éclore les œufs"),
     el("p", {}, `Les œufs éclosent avec le temps : ${COUVOIR[0].heures} h par œuf, ${COUVOIR[1].heures} h pour les deux œufs du grand couvoir. Les braises d'éclosion de la boutique les font avancer plus vite.`)));
+  // Volumes séparés : musique, bruitages, voix de Lia
+  const curseur = (cle, nom, appliquer) => {
+    const val = Math.round((r[cle] ?? 1) * 100);
+    const aff = el("b", { class: "num" }, `${val} %`);
+    return el("label", { class: "vol" }, el("span", {}, nom), el("input", { type: "range", min: 0, max: 100, step: 5, value: val, id: "vol-" + cle,
+      oninput: (ev) => { const v = +ev.target.value / 100; aff.textContent = `${Math.round(v * 100)} %`; r[cle] = v; appliquer(v); },
+      onchange: (ev) => { const v = +ev.target.value / 100; changer((s) => { s.reglages[cle] = v; }); if (cle === "volEffets") Son.clic(); } }), aff);
+  };
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Volumes"),
+    curseur("volMusique", "Musique", (v) => { initAudio(); reglerVolumes(r.volEffets ?? 1, v); }),
+    curseur("volEffets", "Bruitages", (v) => { initAudio(); reglerVolumes(v, r.volMusique ?? 1); }),
+    curseur("volVoix", "Voix de Lia", () => {})));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Son"),
     seg([[true, "Bruitages activés"], [false, "Bruitages coupés"]], r.son, (v) => { changer((s) => { s.reglages.son = v; }); initAudio(); reglerSon(v, E().reglages.musique); }),
     seg([[true, "Musique activée"], [false, "Musique coupée"]], r.musique, (v) => { changer((s) => { s.reglages.musique = v; }); initAudio(); reglerSon(E().reglages.son, v); })));

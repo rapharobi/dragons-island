@@ -2,6 +2,8 @@
 // mélangés à des sons fabriqués en direct. Si un navigateur ne lit pas les fichiers OGG, les sons fabriqués prennent le relais.
 let ctx = null, maitre, busEffets, busMusique, reverb, bruitBuf;
 let sonActif = true, musiqueActive = true;
+// Volumes réglables séparément (0 à 1)
+let volEffets = 1, volMusique = 1;
 
 export function initAudio() {
   if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
@@ -11,8 +13,8 @@ export function initAudio() {
   maitre = ctx.createGain(); maitre.gain.value = 0.8;
   const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
   maitre.connect(comp); comp.connect(ctx.destination);
-  busEffets = ctx.createGain(); busEffets.gain.value = sonActif ? 0.9 : 0; busEffets.connect(maitre);
-  busMusique = ctx.createGain(); busMusique.gain.value = musiqueActive ? 0.32 : 0; busMusique.connect(maitre);
+  busEffets = ctx.createGain(); busEffets.gain.value = sonActif ? 0.9 * volEffets : 0; busEffets.connect(maitre);
+  busMusique = ctx.createGain(); busMusique.gain.value = musiqueActive ? 0.32 * volMusique : 0; busMusique.connect(maitre);
   // Réverbération : réponse impulsionnelle générée
   reverb = ctx.createConvolver();
   const n = ctx.sampleRate * 2.6, ir = ctx.createBuffer(2, n, ctx.sampleRate);
@@ -27,8 +29,12 @@ export function initAudio() {
 export function reglerSon(son, musique) {
   sonActif = son; musiqueActive = musique;
   if (!ctx) return;
-  busEffets.gain.setTargetAtTime(son ? 0.9 : 0, ctx.currentTime, 0.05);
-  busMusique.gain.setTargetAtTime(musique ? 0.32 : 0, ctx.currentTime, 0.3);
+  busEffets.gain.setTargetAtTime(son ? 0.9 * volEffets : 0, ctx.currentTime, 0.05);
+  busMusique.gain.setTargetAtTime(musique ? 0.32 * volMusique : 0, ctx.currentTime, 0.3);
+}
+export function reglerVolumes(effets, musique) {
+  volEffets = Math.max(0, Math.min(1, effets ?? 1)); volMusique = Math.max(0, Math.min(1, musique ?? 1));
+  reglerSon(sonActif, musiqueActive);
 }
 
 function env(g, t, a, d, pic = 1, fin = 0.0001) {

@@ -3,7 +3,7 @@ import { charger, E, surChangement, mettreAJour, energie } from "./etat.js";
 import { Moteur } from "./scene.js";
 import { enregistrerElements } from "./modele.js";
 import { DRAGONS, ENERGIE_MAX, MATERIAUX } from "./regles.js";
-import { initAudio, Musique, reglerSon, Son } from "./son.js";
+import { initAudio, Musique, reglerSon, reglerVolumes, Son } from "./son.js";
 import { el, icone, toast, modale } from "./ui.js";
 import { ecranAccueil } from "./portail.js";
 import * as Iles from "./iles.js";
@@ -13,6 +13,7 @@ import * as Boutique from "./boutique.js";
 import * as Reglages from "./reglages.js";
 import * as Pilotage from "./pilotage.js";
 import "./village.js";
+import "./crottes.js";
 import { verifierRecits } from "./recit.js";
 import { verifierExpedition } from "./expeditions.js";
 import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto, accueillir, signaler } from "./tuto.js";
@@ -82,7 +83,7 @@ function jaillir(k, d) {
   puce.animate([{ transform: "scale(1)" }, { transform: "scale(1.12)" }, { transform: "scale(1)" }], { duration: 380 });
   clearTimeout(f._t); f._t = setTimeout(() => { f.remove(); }, 1900);
 }
-const PUCES = [["rations", "Rations"], ["brindilles", "Brindilles"], ["pierres", "Pierres"], ["obsidienne", "Obsidienne (île de Feu)"], ["givrite", "Givrite (île de Glace)"], ["corail", "Corail (île d'Eau)"], ["coeurs", "Cœurs de dragon"], ["rations_feu", "Piments de lave"], ["rations_glace", "Baies de givre"], ["rations_eau", "Poissons des abysses"], ["braises", "Braises d'éclosion"]];
+const PUCES = [["rations", "Rations"], ["brindilles", "Brindilles"], ["pierres", "Pierres"], ["obsidienne", "Obsidienne (île de Feu)"], ["givrite", "Givrite (île de Glace)"], ["corail", "Corail (île d'Eau)"], ["coeurs", "Cœurs de dragon"], ["rations_feu", "Piments de lave"], ["rations_glace", "Baies de givre"], ["rations_eau", "Poissons des abysses"], ["braises", "Braises d'éclosion"], ["engrais_feu", "Engrais de feu"], ["engrais_glace", "Engrais de glace"], ["engrais_eau", "Engrais d'eau"]];
 // À quoi sert chaque ressource (MATERIAUX dit déjà comment on l'obtient)
 const USAGES = {
   energie: ["Énergie", "Sert à lancer les duels de mage, la tour du nid et à réveiller les sources.", "Se recharge toute seule de 1 par heure, jusqu'à 100. Le Grand couvoir et les sources l'améliorent."],
@@ -98,6 +99,9 @@ const USAGES = {
   rations_glace: ["Baies de givre", "Font gagner 40 XP à un dragon de glace et le soignent de 30 %. Au-delà du niveau 10, elles le font monter de niveau."],
   rations_eau: ["Poissons des abysses", "Font gagner 40 XP à un dragon d'eau et le soignent de 30 %. Au-delà du niveau 10, ils le font monter de niveau."],
   braises: ["Braises d'éclosion", "Chaque braise fait avancer un œuf du couvoir d'un quart."],
+  engrais_feu: ["Engrais de feu", "5 engrais rendent l'île de Glace ou l'île d'Eau fertile pendant 6 h : ressources qui repoussent deux fois plus vite, fermes +50 %."],
+  engrais_glace: ["Engrais de glace", "5 engrais rendent l'île de Feu ou l'île d'Eau fertile pendant 6 h : ressources qui repoussent deux fois plus vite, fermes +50 %."],
+  engrais_eau: ["Engrais d'eau", "5 engrais rendent l'île de Feu ou l'île de Glace fertile pendant 6 h : ressources qui repoussent deux fois plus vite, fermes +50 %."],
 };
 function infoRessource(k) {
   const e = E();
@@ -163,6 +167,7 @@ async function demarrer() {
   }
   await charger();
   const e = E();
+  reglerVolumes(e.reglages.volEffets ?? 1, e.reglages.volMusique ?? 1);
   reglerSon(e.reglages.son, e.reglages.musique);
   surChangement((etatNeuf, source) => {
     majHud();

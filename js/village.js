@@ -56,7 +56,8 @@ function majProduction(b) {
   if (!d.produit) return;
   const t = maintenant();
   const max = d.stock * b.niveau * bonusEntrepot();
-  b.stock = Math.min(max, (b.stock || 0) + ((t - (b.maj || t)) / H) * d.parHeure * b.niveau);
+  const bonusFertile = E().fertilite && E().fertilite[b.ile] > t ? 1.5 : 1;
+  b.stock = Math.min(max, (b.stock || 0) + ((t - (b.maj || t)) / H) * d.parHeure * b.niveau * bonusFertile);
   b.maj = t;
 }
 function stockMax(b) { const d = BATIMENTS[b.type]; return d.stock * b.niveau * bonusEntrepot(); }
@@ -230,7 +231,8 @@ styles("village", `
 .vl-bandeau b { font-family: var(--titre); color: #ff9a7a; }
 .vl-fin { display: grid; gap: 8px; }
 `);
-function fermerPanneau() { if (V.panneau) { V.panneau.remove(); V.panneau = null; } }
+const hudLigne = (on) => { document.body.classList.toggle("hud-ligne", on); window.__jeu && window.__jeu.majHauteurHud && window.__jeu.majHauteurHud(); };
+function fermerPanneau() { if (V.panneau) { V.panneau.remove(); V.panneau = null; hudLigne(false); } }
 function panneau(titre, sous, ...contenu) {
   fermerFiche(); fermerPanneau(); arreterPlacement();
   const p = el("section", { class: "vl-p panneau" },
@@ -238,6 +240,7 @@ function panneau(titre, sous, ...contenu) {
     ...contenu);
   document.getElementById("ecran").append(p);
   V.panneau = p;
+  hudLigne(true);
   return p;
 }
 export function ouvrirVillage(elx) {

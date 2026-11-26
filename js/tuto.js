@@ -202,6 +202,7 @@ export function parler(texte) {
     const u = new SpeechSynthesisUtterance(texte.replace(/[«»]/g, ""));
     const v = voixFr(); if (v) u.voice = v;
     u.lang = "fr-FR"; u.rate = 1.04; u.pitch = 1.15;
+    u.volume = Math.max(0, Math.min(1, E().reglages.volVoix ?? 1));
     speechSynthesis.speak(u);
   } catch (e) { /* pas de voix sur ce navigateur */ }
 }
