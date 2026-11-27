@@ -5,12 +5,12 @@ import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite, versEcran } from "./scene.js";
 import {
   POS_ILES, NIVEAU_EAU, rayonBord, solIle, dansLEau, emplacements, construireIle, construireCentre, construireCouvoir,
-  pont, construireNid, construireNoeud, construireOeuf, construireSource, construireForteresse,
+  pont, construireNid, construireNoeud, construireOeuf, construireSource, construireForteresse, RAYON_CENTRE,
 } from "./monde.js";
 import { mat, mesh, rng } from "./outils3d.js";
 import {
   E, changer, nourrir, nourrirElement, payer, assez, energie, recolter, noeudDispo, maintenant, noter, recolterSource, manqueSource,
-  attendPercee, depenserEnergie,
+  attendPercee, depenserEnergie, avancement,
 } from "./etat.js";
 import {
   PAR_ID, ELEMENTS, NIDS, SOURCES, PRODUCTION_SOURCE, CONDITIONS_SOURCE, NOMS_HABITAT, COULEUR_HABITAT, habitatDe, MATERIAUX,
@@ -162,7 +162,7 @@ function construireDecor() {
   const ponts = {};
   for (const elx of ["feu", "glace", "eau"]) {
     const dir = POS_ILES[elx].clone().setY(0).normalize();
-    const a = dir.clone().multiplyScalar(3.2).setY(-0.05);
+    const a = dir.clone().multiplyScalar(RAYON_CENTRE - 0.25).setY(-0.05);
     const angLocal = Math.atan2(-dir.z, -dir.x);
     const rb = rayonBord(elx, angLocal) - 0.4;
     const b = POS_ILES[elx].clone().sub(dir.clone().multiplyScalar(rb)); b.y += iles[elx].sol(Math.cos(angLocal) * rb, Math.sin(angLocal) * rb) - 0.05;
@@ -892,7 +892,7 @@ function synchroniser() {
   if (cleC !== D.couvoirCle) {
     if (D.couvoir) D.centre.couvoir.remove(D.couvoir);
     D.couvoir = construireCouvoir(c.niveau);
-    D.couvoir.userData.action = { type: "couvoir" };
+    D.couvoir.userData.action = { type: "couv", quoi: "oeufs" };
     D.couvoir.userData.oeufs = [];
     c.slots.forEach((s, i) => { const o = construireOeuf(s.oeuf.element, 0.55); D.couvoir.userData.nids[i].add(o); D.couvoir.userData.oeufs.push(o); });
     D.centre.couvoir.add(D.couvoir);
@@ -1007,7 +1007,7 @@ function action(a, objet) {
     if (!noeudDispo(a.cle)) { toast(`Ça repousse : encore ${fmtDuree(e.noeuds[a.cle] - maintenant())}.`); return; }
     lancerRecolte(a, objet);
   } else if (a.type === "source") { Son.clic(); focaliser(a.element, false); ficheSource(a.element); signaler("source"); }
-  else if (a.type === "couvoir") { Son.clic(); if (E().oeufs.couvoir.ruine) { focaliser("centre"); ficheRuine(); } else ctxJeu.aller("couvoir"); }
+  else if (a.type === "couvoir") { Son.clic(); if (E().oeufs.couvoir.ruine) { focaliser("centre"); ficheRuine(); } else if (extensions.couvoir) extensions.couvoir(); }
 }
 
 // La caméra se rapproche du dragon et le suit
@@ -1052,7 +1052,7 @@ export function focaliser(elx, rapproche = true) {
   Object.assign(s.shadow.camera, { left: -z, right: z, top: z, bottom: -z });
   s.shadow.camera.updateProjectionMatrix();
   if (elx === "tout") D.orbite.viser(new T.Vector3(0, 0, 0), 64, D.orbite.thetaV, 0.95);
-  else if (elx === "centre") D.orbite.viser(new T.Vector3(0, 0.8, 0), window.innerWidth / window.innerHeight < 0.8 ? 19 : 12, D.orbite.thetaV, 1.05);
+  else if (elx === "centre") D.orbite.viser(new T.Vector3(0, 0.6, 0), window.innerWidth / window.innerHeight < 0.8 ? 19 : 15, D.orbite.thetaV, 0.86);
   else {
     const p = POS_ILES[elx];
     const theta = Math.atan2(p.x, p.z);
@@ -1200,7 +1200,8 @@ function ficheRuine() {
 function cibleTuto(nom) {
   if (!D || !ctxJeu || ctxJeu.ecran !== "iles" || ctxJeu.moteur.decor !== D) return null;
   let w = null;
-  if (nom === "couvoir") { w = new T.Vector3(0, 2.4, 0); }
+  if (nom === "couvoir") { w = new T.Vector3(0, 3.2, 0); }
+  else if (extensions.cibleNom && extensions.cibleNom(nom)) { w = extensions.cibleNom(nom); }
   else if (nom === "libre") { w = extensions.cibleLibre ? extensions.cibleLibre() : null; }
   else if (nom === "dragon") { const d = E().dragons[E().dragons.length - 1]; const v = d && D.dragons.get(d.uid); if (v) { w = new T.Vector3(); v.mobile.getWorldPosition(w); w.y += v.hauteur + 0.4; } }
   else if (nom === "buisson" || nom === "rocher") {
@@ -1218,7 +1219,7 @@ function cibleTuto(nom) {
   const p = versEcran(w, D.camera);
   return p.devant ? p : null;
 }
-export function ouvrir(ctx) {
+export function ouvrir(ctx, params = {}) {
   ctxJeu = ctx;
   ctx.cibleTuto = cibleTuto;
   if (!D) construireDecor();
@@ -1235,6 +1236,7 @@ export function ouvrir(ctx) {
   if (!D.focus || (D.focus !== "tout" && D.focus !== "centre" && !ileVisible(D.focus))) { const premier = E().dragons[0]; focaliser(premier ? PAR_ID[premier.id].element : "centre"); } else focaliser(D.focus);
   ctx.majHud();
   signaler("ecran", "iles");
+  if (params.couvoir && extensions.couvoir && !E().oeufs.couvoir.ruine) setTimeout(() => extensions.couvoir(params.quoi), 0);
 }
 export function fermer() { finirPlacement(); calqueEtiq = null; ficheUI = null; fermerListe(); etiquettes.clear(); if (D) D.suivi = null; ctxJeu.moteur.definirZone(null); }
 
@@ -1246,7 +1248,8 @@ function majBoutons() {
   for (const b of extensions.boutons) { const x = b(); if (x) c.append(x); }
   for (const [id, nom] of [["tout", "Vue d'ensemble"], ["feu", "Île de Feu"], ["glace", "Île de Glace"], ["eau", "Île d'Eau"], ["centre", "Couvoir"]].filter(([k]) => k === "tout" || k === "centre" || ileVisible(k))) {
     const cls = id === "feu" || id === "glace" || id === "eau" ? id : "";
-    c.append(el("button", { class: `btn petit ${D.focus === id && !D.suivi ? "actif" : ""} ${cls}`, style: cls ? { color: `var(--${cls})` } : null, onclick: () => { Son.clic(); if (id === "centre" && D.focus === "centre") { ctxJeu.aller("couvoir"); return; } fermerFiche(); focaliser(id); } }, nom));
+    const nOeufs = id === "centre" ? E().oeufs.choix + E().oeufs.couvoir.slots.filter((s) => avancement(s) >= 1).length : 0;
+    c.append(el("button", { class: `btn petit ${D.focus === id && !D.suivi ? "actif" : ""} ${cls}`, "data-id": id, style: cls ? { color: `var(--${cls})` } : null, onclick: () => { Son.clic(); fermerFiche(); if (id === "centre" && extensions.couvoir && !E().oeufs.couvoir.ruine) { extensions.couvoir(); return; } focaliser(id); } }, nom, nOeufs ? el("span", { class: "pastille" }, nOeufs) : null));
   }
 }
 
@@ -1815,4 +1818,5 @@ function ficheSource(elx) {
 }
 
 export function rafraichir() { if (D) synchroniser(); }
-export { souffler, particule, fermerFiche, majBoutons };
+export { souffler, particule, fermerFiche, majBoutons, nouvelleFiche, enTete, ctxJeuIles };
+function ctxJeuIles() { return ctxJeu; }

@@ -94,6 +94,8 @@ export function lieuSauvegarde() { return stockage ? stockage.nom : "navigateur"
 function migrer(o) {
   // Anciennes parties : toutes les îles sont déjà là
   if (!("ilesVisibles" in o)) o.ilesVisibles = null;
+  // La propreté (crottes, aspirateurs, engrais) a été retirée du jeu
+  delete o.crottes; delete o.fertilite; delete o.proprete; delete o.aspirateurs; delete o.nettoyeurs; if (o.ressources) for (const k of ["engrais_feu", "engrais_glace", "engrais_eau"]) delete o.ressources[k];
   const base = nouvellePartie();
   for (const k of Object.keys(base)) if (o[k] === undefined) o[k] = base[k];
   for (const k of Object.keys(base.ressources)) if (o.ressources[k] === undefined) o.ressources[k] = 0;
@@ -458,10 +460,7 @@ export function noeudDispo(cle) { return !etat.noeuds[cle] || maintenant() >= et
 export function recolter(cle, gains) {
   if (!noeudDispo(cle)) return false;
   for (const [k, v] of Object.entries(gains)) etat.ressources[k] = (etat.ressources[k] || 0) + v;
-  const elx = String(cle).split("-")[0];
-  const fertileIle = etat.fertilite && etat.fertilite[elx] > maintenant();
-  const saleIle = etat.crottes && etat.crottes[elx] && etat.crottes[elx].length >= 6;
-  etat.noeuds[cle] = maintenant() + REPOUSSE_MIN * 60 * 1000 * (fertileIle ? 0.5 : saleIle ? 1.5 : 1);
+  etat.noeuds[cle] = maintenant() + REPOUSSE_MIN * 60 * 1000;
   return true;
 }
 export function recolterFerme(el) {

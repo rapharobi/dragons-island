@@ -10,6 +10,7 @@ import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement }
 import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } from "./tuto.js";
 import { Son, Musique } from "./son.js";
 import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang, difficulte } from "./ligues.js";
+import { ouvrirArchipel, cibleArchipel, ILES_COMBAT } from "./archipel.js";
 import { lancerAttaque, niveauVillage } from "./attaque.js";
 
 const T = window.THREE;
@@ -484,7 +485,8 @@ function choixOrdinateur(moi, lui, hasard = 0.12) {
 // ---------- Préparation ----------
 let prep = { mode: "bot", equipe: [], niveauAmi: 10 };
 // Lancé par Lia pendant le guide : { tours, eux, faible, uids, nom, titre, texte }
-export function combatGuide(ctx, conf) { ctx.aller("combat"); prep.mode = "guide"; prep.guide = conf; lancer(); }
+export function combatGuide(ctx, conf) { ctx.aller("combat", { mode: "guide" }); prep.mode = "guide"; prep.guide = conf; lancer(); }
+function montrerArene() { ctxJeu.moteur.montrer(D); D.orbite.viser(new T.Vector3(0, 0.9, 0), 11, 0.6, 1.1); D.orbite.auto = 0.08; }
 export function ouvrir(ctx, params = {}) {
   ctxJeu = ctx;
   if (!D) construireArene();
@@ -509,8 +511,18 @@ export function ouvrir(ctx, params = {}) {
     for (let k = 0; eq.length < Math.min(7, dispo.length); k++) { const l = parEl[["feu", "glace", "eau"][k % 3]]; if (l.length) eq.push(l.shift()); }
     prep.equipe = eq.map((d) => d.uid);
   }
+  ctx.cibleArchipel = cibleArchipel;
+  const rejoindre = params.rejoindre && codeValide(params.rejoindre);
+  if (rejoindre) prep.ile = "amis";
+  else if (params.mode) { prep.mode = params.mode; prep.ile = (ILES_COMBAT.find((i) => i.modes.includes(params.mode)) || {}).id || null; }
+  else {
+    // L'archipel des combats : on choisit une île, puis on prépare le combat dans l'arène
+    ouvrirArchipel(ctx, ui, (ile, mode) => { prep.ile = ile; prep.mode = mode; montrerArene(); rendrePrep(); if (mode === "ligne") montrerBlocLigne(); signaler("ile_combat", ile); });
+    return;
+  }
+  montrerArene();
   rendrePrep();
-  if (params.rejoindre && codeValide(params.rejoindre) && (!L || L.code !== params.rejoindre)) rejoindreLigne(params.rejoindre);
+  if (rejoindre && (!L || L.code !== params.rejoindre)) rejoindreLigne(params.rejoindre);
 }
 export function fermer() {
   ctxJeu.moteur.definirZone(null);
@@ -535,9 +547,10 @@ function rendrePrep() {
   ui.innerHTML = "";
   const e = E();
   const zone = el("div", { class: "cb-prep" });
+  const ileDef = ILES_COMBAT.find((i) => i.id === prep.ile);
   const gauche = el("section", { class: "panneau" },
-    el("div", {}, el("div", { class: "etiquette" }, "Arène"), el("h2", {}, "Combat")),
-    el("p", { class: "doux", style: { margin: 0 } }, `9 tours. À chaque tour, chacun choisit en secret un dragon puis une posture. Les deux frappent en même temps. Celui qui a infligé le plus de dégâts à la fin gagne. Les PV perdus restent perdus après le combat.`),
+    el("div", {}, el("button", { class: "cv-retour", onclick: () => { Son.clic(); ctxJeu.aller("combat"); } }, "← L'archipel des combats"), el("h2", { style: ileDef ? { color: ileDef.c } : null }, ileDef ? ileDef.nom : "Combat")),
+    ["village", "tour"].includes(prep.mode) ? null : el("p", { class: "doux", style: { margin: 0 } }, `9 tours. À chaque tour, chacun choisit en secret un dragon puis une posture. Les deux frappent en même temps. Celui qui a infligé le plus de dégâts à la fin gagne. Les PV perdus restent perdus après le combat.`),
   );
   const et = etapeTuto();
   let modes = [
@@ -545,12 +558,13 @@ function rendrePrep() {
     ["ligne", "Défi en ligne (code ami)", "Chacun sur son téléphone : crée une partie et envoie le code à ton ami, ou entre le sien. Combat amical : gratuit, sans expérience, et tes dragons ne perdent pas de PV."],
     ["village", "Attaquer un village", `Tes dragons partent à l'assaut d'un village ennemi : ses tours tirent, toi tu choisis les cibles. Détruis son couvoir pour gagner du butin (et parfois un œuf). Village niveau ${niveauVillage()}. Coûte 3 d'énergie.`],
     ["tour", "La tour du nid", `Mode roguelite : tu entres sans dragon, tu choisis 3 œufs, et tu grimpes ${ETAGES} étages contre une IA de plus en plus forte. Au sommet : un œuf et un œuf mystère UL. Coûte ${COUT_TOUR} d'énergie par ascension.`],
-    ["sauvage", "Dragons sauvages", "Des dragons sauvages rôdent autour des îles. Idéal pour apprendre. Gratuit pendant l'apprentissage."],
+    ["sauvage", "Dragons sauvages", "Des dragons sauvages plus faibles que les tiens (2 niveaux de moins) : de l'expérience et des rations sans trop de risques. Coûte 2 d'énergie."],
     ["ami", "Défi entre amis", "Sur le même appareil : chacun choisit à son tour, sans regarder. L'écart de niveau est permis. Gratuit."],
   ];
   if (et === "sauvage1" || et === "sauvage2") modes = modes.filter((m) => m[0] === "sauvage" || m[0] === "ligne");
   if (et === "mage") modes = modes.filter((m) => m[0] === "bot" || m[0] === "ligne");
-  if (et !== "sauvage1" && et !== "sauvage2") modes = modes.filter((m) => m[0] !== "sauvage");
+  // Seulement les modes de l'île choisie dans l'archipel
+  if (ileDef && et !== "sauvage1" && et !== "sauvage2" && et !== "mage") modes = modes.filter((m) => ileDef.modes.includes(m[0]));
   // Le classé contre les mages s'ouvre avec 7 dragons, dont un au niveau 5 (sauf le duel de l'apprentissage)
   const classeOuvert = et === "mage" || (e.dragons.length >= 7 && e.dragons.some((d) => d.niveau >= 5));
   if (!classeOuvert) modes = modes.map((m) => m[0] === "bot" ? ["bot_ferme", m[1], `Il te faut 7 dragons, dont au moins un au niveau 5 (tu en as ${e.dragons.length}). En attendant : la tour du nid et les défis entre amis.`] : m);
@@ -888,6 +902,7 @@ function membreJoueur(d) {
 }
 
 function lancer() {
+  if (ctxJeu && ctxJeu.moteur.decor !== D) montrerArene();
   const e = E();
   const cout = coutMode(prep.mode);
   if (cout) {
@@ -946,7 +961,7 @@ function lancer() {
     }
   } else if (prep.mode === "sauvage") {
     const n = Math.max(1, Math.min(3, moi.length));
-    const nv = et === "sauvage1" ? 1 : et === "sauvage2" ? 2 : Math.max(1, moyen - 1);
+    const nv = et === "sauvage1" ? 1 : et === "sauvage2" ? 2 : Math.max(1, moyen - 2);
     lui = equipeBot(new Array(n).fill(nv), stadeMax);
     // Premier combat de l'apprentissage : des dragons sauvages d'un élément que tes dragons battent
     if (et === "sauvage1") lui = moi.slice(0, n).map((m) => { const proie = ELEMENTS[m.element].bat[0]; const l = DRAGONS.filter((x) => x.element === proie); return membreBot(l[Math.floor(Math.random() * l.length)].id, 1, 0); });

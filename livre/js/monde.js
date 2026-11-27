@@ -9,6 +9,8 @@ export const POS_ILES = {
   eau: new T.Vector3(Math.cos(Math.PI / 2 + 4.188) * DIST_ILES, 0.6, -Math.sin(Math.PI / 2 + 4.188) * DIST_ILES),
 };
 export const RAYON_ILE = 12;
+// Le rocher central (couvoir et hôtel de ville) : assez grand pour la cour et ses ateliers
+export const RAYON_CENTRE = 5.4;
 export const GRAINES = { feu: 11, glace: 23, eau: 37 };
 
 // Contour irrégulier (organique) : rayon relatif selon l'angle
@@ -148,7 +150,13 @@ function socleIle(rayon, theme, graine, plat = false) {
   dessous.rotateX(Math.PI);
   const pd = dessous.attributes.position;
   for (let i = 0; i < pd.count; i++) { const x = pd.getX(i), z = pd.getZ(i); const k = bord(graine, Math.atan2(z, x)); pd.setX(i, x * k); pd.setZ(i, z * k); }
+  // Le bord du haut reste collé au flanc (sans bosses), sinon on voit le fond du lagon par les trous
+  const hautCone = rayon * 0.75, bordHaut = [];
+  for (let i = 0; i < pd.count; i++) if (pd.getY(i) > hautCone - 0.01) bordHaut.push([i, pd.getX(i), pd.getZ(i)]);
   bosseler(dessous, rayon * 0.14, graine);
+  // Il remonte un peu dans le flanc (qui descend jusqu'à −1,2) mais jamais au-dessus du sol
+  for (const [i, x, z] of bordHaut) pd.setXYZ(i, x * 1.02, hautCone + 0.35, z * 1.02);
+  pd.needsUpdate = true; dessous.computeVertexNormals();
   const geoDs = peindre(dessous, (c) => new T.Color(theme.dessous).lerp(new T.Color(theme.cote), Math.max(0, Math.min(1, 1 + c.y / (rayon * 0.6)))).multiplyScalar(0.85 + r() * 0.3));
   const m2 = mesh(geoDs, mat(0xffffff, { vc: true, r: 1 }), false);
   m2.position.y = -1.2 - rayon * 0.75;
@@ -460,7 +468,7 @@ export function construireSource(element, niveau) {
 // Rocher central avec le couvoir et des ponts de cordes vers les îles.
 export function construireCentre() {
   const g = new T.Group();
-  g.add(socleIle(3.4, { dessus: [0x5a5248, 0x4e483f, 0x666056, 0x5a5248], cote: 0x3a342e, dessous: 0x2a2622, roche: 0x4a443c }, 5, true));
+  g.add(socleIle(RAYON_CENTRE, { dessus: [0x5a5248, 0x4e483f, 0x666056, 0x5a5248], cote: 0x3a342e, dessous: 0x2a2622, roche: 0x4a443c }, 5, true));
   const couvoir = new T.Group();
   g.add(couvoir);
   return { groupe: g, couvoir };
@@ -468,33 +476,33 @@ export function construireCentre() {
 
 // L'hôtel de ville : le couvoir est entouré d'une forteresse qui couvre tout le rocher central.
 // Une porte face à chaque pont, des tours entre les portes. Niveau 2 : une tourelle qui tire ; niveau 4 : deux ; niveau 5 : trois.
-export function construireForteresse(niveau, ruine = false) {
+export function construireForteresse(niveau, ruine = false, R = 4.75) {
   const g = new T.Group();
   const pierre = mat(0x7a7268, { r: 0.95 }), pierreFoncee = mat(0x5a544c, { r: 0.95 }), toit = mat(0x6a3a5a, { r: 0.8 }), or = mat(0xf2b544, { r: 0.4, m: 0.6, e: 0x6a4200, ei: 0.4 });
-  const R = 2.95, haut = 0.9 + niveau * 0.18;
+  const haut = 1.0 + niveau * 0.22, pas = 0.62 / R, ouverture = 1.15 / R;
   const portes = Object.values(POS_ILES).map((p) => Math.atan2(p.z, p.x));
-  const pres = (a) => portes.some((b) => { let d = Math.abs(a - b) % (Math.PI * 2); d = Math.min(d, Math.PI * 2 - d); return d < 0.34; });
+  const pres = (a) => portes.some((b) => { let d = Math.abs(a - b) % (Math.PI * 2); d = Math.min(d, Math.PI * 2 - d); return d < ouverture; });
   // Murailles en blocs, avec créneaux
-  for (let a = 0; a < Math.PI * 2; a += 0.16) {
+  for (let a = 0; a < Math.PI * 2; a += pas) {
     if (pres(a)) continue;
-    const m = mesh(new T.BoxGeometry(0.5, haut, 0.34), pierre);
+    const m = mesh(new T.BoxGeometry(0.66, haut, 0.4), pierre);
     m.position.set(Math.cos(a) * R, haut / 2, Math.sin(a) * R); m.rotation.y = -a + Math.PI / 2; g.add(m);
-    if (Math.round(a / 0.16) % 2 === 0) { const c = mesh(new T.BoxGeometry(0.22, 0.2, 0.36), pierre); c.position.set(Math.cos(a) * R, haut + 0.1, Math.sin(a) * R); c.rotation.y = m.rotation.y; g.add(c); }
+    if (Math.round(a / pas) % 2 === 0) { const c = mesh(new T.BoxGeometry(0.26, 0.24, 0.42), pierre); c.position.set(Math.cos(a) * R, haut + 0.12, Math.sin(a) * R); c.rotation.y = m.rotation.y; g.add(c); }
   }
   // Portes : deux piliers et une arche dorée
   for (const a of portes) for (const s of [-1, 1]) {
-    const b = a + s * 0.36;
-    const pil = mesh(new T.CylinderGeometry(0.26, 0.3, haut + 0.7, 7), pierreFoncee); pil.position.set(Math.cos(b) * R, (haut + 0.7) / 2, Math.sin(b) * R); g.add(pil);
-    const boule = mesh(new T.SphereGeometry(0.14, 8, 6), or); boule.position.set(Math.cos(b) * R, haut + 0.82, Math.sin(b) * R); g.add(boule);
+    const b = a + s * (ouverture + 0.02);
+    const pil = mesh(new T.CylinderGeometry(0.3, 0.36, haut + 0.8, 7), pierreFoncee); pil.position.set(Math.cos(b) * R, (haut + 0.7) / 2, Math.sin(b) * R); g.add(pil);
+    const boule = mesh(new T.SphereGeometry(0.17, 8, 6), or); boule.position.set(Math.cos(b) * R, haut + 0.95, Math.sin(b) * R); g.add(boule);
   }
   // Tours entre les portes, avec un toit pointu ; certaines deviennent des tourelles
   const tourelles = [];
   const nbTourelles = niveau >= 4 ? 3 : niveau >= 3 ? 2 : niveau >= 1 ? 1 : 0;
   portes.forEach((a, i) => {
     const b = a + Math.PI / 3;
-    const h = haut + 1.4 + niveau * 0.15;
-    const tour = mesh(new T.CylinderGeometry(0.46, 0.56, h, 8), pierre); tour.position.set(Math.cos(b) * R, h / 2, Math.sin(b) * R); g.add(tour);
-    const cr = mesh(new T.CylinderGeometry(0.6, 0.52, 0.22, 8), pierreFoncee); cr.position.set(Math.cos(b) * R, h + 0.11, Math.sin(b) * R); g.add(cr);
+    const h = haut + 1.7 + niveau * 0.22;
+    const tour = mesh(new T.CylinderGeometry(0.62, 0.74, h, 8), pierre); tour.position.set(Math.cos(b) * R, h / 2, Math.sin(b) * R); g.add(tour);
+    const cr = mesh(new T.CylinderGeometry(0.8, 0.7, 0.26, 8), pierreFoncee); cr.position.set(Math.cos(b) * R, h + 0.11, Math.sin(b) * R); g.add(cr);
     if (i < nbTourelles) {
       // Tourelle : un cristal qui flotte et vise les pillards
       const cristal = mesh(new T.OctahedronGeometry(0.3, 0).scale(1, 1.5, 1), mat(0xffd27a, { e: 0xffb030, ei: 1.1, r: 0.2, m: 0.3 }));
@@ -502,7 +510,7 @@ export function construireForteresse(niveau, ruine = false) {
       const l = new T.PointLight(0xffc860, 1, 4); l.position.copy(cristal.position); g.add(l);
       tourelles.push(cristal);
     } else {
-      const c = mesh(cone(0.62, 1.0, 8), toit); c.position.set(Math.cos(b) * R, h + 0.22, Math.sin(b) * R); g.add(c);
+      const c = mesh(cone(0.84, 1.35, 8), toit); c.position.set(Math.cos(b) * R, h + 0.26, Math.sin(b) * R); g.add(c);
     }
     const drap = mesh(new T.BoxGeometry(0.02, 0.28, 0.42), mat([0xff6a3d, 0x7fd6ff, 0x2fd0c0][i], { r: 0.7, d: true }), false);
     drap.position.set(Math.cos(b) * R * 1.13, h - 0.2, Math.sin(b) * R * 1.13); drap.rotation.y = -b; g.add(drap);
@@ -757,3 +765,4 @@ export function construireOeuf(element, taille = 1) {
   grp.userData.coque = oeuf;
   return grp;
 }
+export { sapin, palmier, arbreRond, arbreMort };

@@ -295,9 +295,10 @@ export function ouvrir(ctx, params = {}) {
   // Pendant le guide, les 3 premiers œufs se choisissent sur l'écran d'intro
   intro = !!params.intro || E().intro || ["oeuf1", "oeuf2", "oeuf3"].includes(etapeTuto());
   if (params.celebrer) { ctx.moteur.montrer(D, null); Musique.jouer("couvoir"); ui = document.getElementById("ecran"); ui.innerHTML = ""; ctx.cacherInterface(true); celebrer(params.celebrer, params.apres); return; }
-  ctx.moteur.montrer(D, window.innerWidth > 560 ? { x: 0.32, y: 0, l: 0.68, h: 1 } : { x: 0, y: 0, l: 1, h: 0.5 });
+  ctx.moteur.montrer(D, null);
   Musique.jouer("couvoir");
   ui = document.getElementById("ecran");
+  if (params.eclore) { ui.innerHTML = ""; afficherCouvoir(); faireEclore(); return; }
   if (E().oeufs.couvoir.ruine) {
     // Le couvoir est encore en ruine : on le répare depuis les îles
     ui.innerHTML = ""; ctx.moteur.definirZone(null);
@@ -306,7 +307,8 @@ export function ouvrir(ctx, params = {}) {
       el("button", { class: "btn principal", onclick: () => ctx.aller("iles") }, "Aller aux ruines")));
   }
   else if (intro) { ctx.cacherInterface(true); ctx.moteur.definirZone(null); ecranIntro(); }
-  else { mode = E().oeufs.choix > 0 && params.choisir ? "choix" : "couvoir"; rendre(); }
+  else if (E().oeufs.choix > 0) { mode = "choix"; rendre(); }
+  else { retourHub(); return; }
   clearInterval(minuteurUI);
   minuteurUI = setInterval(() => { if (!intro && mode === "couvoir") majProgression(); }, 1000);
   if (!intro) signaler("ecran", "couvoir");
@@ -325,6 +327,12 @@ function celebrer(id, apres) {
   });
 }
 export function fermer() { clearInterval(minuteurUI); ctxJeu.moteur.definirZone(null); }
+function retourHub() { ctxJeu.cacherInterface(false); setTimeout(() => ctxJeu.aller("iles", { couvoir: true }), 0); }
+// Faut-il vraiment l'écran du couvoir (une cérémonie) ? Sinon on reste sur la carte des îles.
+export function ceremonie(params = {}) {
+  const e = E();
+  return !!(params.intro || params.celebrer || params.eclore || params.choisir || e.intro || ["oeuf1", "oeuf2", "oeuf3"].includes(etapeTuto()));
+}
 
 function ecranIntro() {
   ui.innerHTML = "";
@@ -367,6 +375,49 @@ function ecranIntro() {
 
 let blocProgression = null;
 const batisseurs = new Set();
+let refaireHub = null;
+const refaire = () => (refaireHub ? refaireHub() : rendre());
+export function initHub(ctx) { ctxJeu = ctx; }
+// Contenu d'une fiche du couvoir, sur la carte : « oeufs », « chantier », « livre », « quai », « sablier »
+export function blocHub(quoi, refaireFiche) {
+  refaireHub = refaireFiche;
+  const e = E();
+  if (quoi === "oeufs") { blocProgression = el("div", { class: "carte" }); setTimeout(majProgression, 0); return blocProgression; }
+  if (quoi === "chantier") return blocChantier();
+  if (quoi === "quai") return blocExpedition(refaire, e.tuto && e.tuto.etape === "expedition");
+  if (quoi === "sablier") {
+    const mi = e.oeufs.minuteur;
+    const chaine = el("div", { class: "chaine" });
+    for (let k = mi.compte + 1; k <= mi.compte + 6; k++) chaine.append(el("span", { class: k === mi.compte + 1 ? "ici" : "" }, `${attenteOeuf(k)} h`));
+    const b = el("div", { class: "carte" },
+      el("div", { class: "ligne" }, el("span", {}, "Prochain œuf"), el("b", { class: "num", id: "couv-minuteur" }, mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "dès ton 3e dragon")),
+      el("div", { class: "doux", style: { fontSize: "12px" } }, "Les attentes suivantes :"), chaine,
+      el("div", { class: "doux", style: { fontSize: "12px" } }, `Œufs reçus : ${mi.compte}. Il y a aussi une petite chance chaque jour d'un œuf gratuit.`));
+    if (e.oeufs.reserve.length) {
+      const r = el("div", { class: "chaine" });
+      for (const o of e.oeufs.reserve) r.append(el("span", { style: { color: ELEMENTS[o.element].couleur } }, ELEMENTS[o.element].nom));
+      b.append(el("div", { class: "ligne" }, el("span", {}, "En attente d'une place"), el("b", { class: "num" }, e.oeufs.reserve.length)), r);
+    }
+    return b;
+  }
+  if (quoi === "livre") {
+    const vus = e.livre.vus.length;
+    const coll = el("div", { class: "carte" }, el("div", { class: "ligne" }, el("span", {}, "Dragons découverts"), el("b", { class: "num" }, `${vus}/21`)), barre(vus, 21, ""),
+      el("a", { class: "btn petit", href: window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM", target: "_blank", rel: "noopener" }, "Ouvrir le Livre des dragons"));
+    if (livreComplet() && !e.livre.ulChoisi) coll.append(boutonUL());
+    return coll;
+  }
+  return el("div");
+}
+export function majHub() { majProgression(); }
+function boutonUL() {
+  const e = E();
+  return el("button", { class: "btn principal petit", onclick: () => {
+    const liste = el("div", { style: { display: "grid", gap: "6px" } });
+    for (const d of e.dragons) liste.append(el("button", { class: "btn", onclick: () => { changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = true; x.ulPossede = true; s.livre.ulDebloque = true; s.livre.ulChoisi = d.id; }); Son.evolution(); toast(`${PAR_ID[d.id].nom} devient UL !`, "bon"); modale({ titre: "Version UL", contenu: "Sa nouvelle robe t'attend sur son île." }); refaire(); return false; } }, `${PAR_ID[d.id].nom} · Nv ${d.niveau}`));
+    modale({ titre: "Choisis ton dragon UL", contenu: el("div", {}, el("p", { class: "doux" }, "Tu as complété le Livre ! Un de tes dragons reçoit une robe Ultime, rare. Seule l'apparence change."), liste), boutons: [{ texte: "Plus tard" }] });
+  } }, "Choisir mon dragon UL");
+}
 function blocChantier() {
   const e = E();
   const niv = e.oeufs.couvoir.niveau;
@@ -384,7 +435,7 @@ function blocChantier() {
       el("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap" } },
         el("button", { class: "btn petit principal", disabled: (e.ressources.gemmes || 0) < gem, onclick: () => {
           let ok = false; changer((s) => { if ((s.ressources.gemmes || 0) >= gem) { s.ressources.gemmes -= gem; finirChantier(); ok = true; } });
-          if (ok) { Son.evolution(); toast(`${COUVOIR[ch.niveau].nom} terminé !`, "bon"); rendre(); }
+          if (ok) { Son.evolution(); toast(`${COUVOIR[ch.niveau].nom} terminé !`, "bon"); refaire(); }
         } }, icone("gemmes"), `Finir maintenant · ${gem}`)));
     return b;
   }
@@ -403,7 +454,7 @@ function blocChantier() {
   const choix = el("div", { style: { display: "flex", gap: "5px", flexWrap: "wrap" } });
   for (const d of [...e.dragons].sort((x, y) => y.niveau - x.niveau)) {
     const on = batisseurs.has(d.uid);
-    choix.append(el("button", { class: "btn petit" + (on ? " principal" : ""), disabled: !!d.expedition, onclick: () => { on ? batisseurs.delete(d.uid) : batisseurs.add(d.uid); Son.clic(); rendre(); } }, `${PAR_ID[d.id].nom} · ${d.niveau}`));
+    choix.append(el("button", { class: "btn petit" + (on ? " principal" : ""), disabled: !!d.expedition, onclick: () => { on ? batisseurs.delete(d.uid) : batisseurs.add(d.uid); Son.clic(); refaire(); } }, `${PAR_ID[d.id].nom} · ${d.niveau}`));
   }
   const nb = batisseurs.size;
   b.append(el("div", { class: "doux", style: { fontSize: "12px" } }, `Choisis tes bâtisseurs : ${nb ? `chantier de ${fmtDuree(dureeChantier(n, nb))} avec ${nb} dragon${nb > 1 ? "s" : ""}` : `${c.heures - 1} h avec un seul dragon, une heure de moins par dragon en plus`}.`), choix);
@@ -417,7 +468,7 @@ function blocChantier() {
       for (const d of s.dragons) if (batisseurs.has(d.uid)) d.chantier = true;
       lance = true;
     });
-    if (lance) { batisseurs.clear(); Son.recolte("bois"); toast("Le chantier commence !", "bon"); rendre(); }
+    if (lance) { batisseurs.clear(); Son.recolte("bois"); toast("Le chantier commence !", "bon"); refaire(); }
   } }, "Lancer le chantier"));
   return b;
 }
@@ -507,9 +558,9 @@ function majProgression() {
           : el("button", { class: "btn petit", onclick: () => { ctxJeu.aller("boutique"); } }, icone("braises"), "Accélérer avec des braises"),
         el("span", { class: "doux", style: { fontSize: "12px" } }, `${nb} braise${nb > 1 ? "s" : ""}`)));
     }
-    if (D.couvoir && D.couvoir.userData.oeufs[i]) { D.couvoir.userData.oeufs[i].userData.av = av; D.couvoir.userData.oeufs[i].userData.pret = pret; }
+    if (D && D.couvoir && D.couvoir.userData.oeufs && D.couvoir.userData.oeufs[i]) { D.couvoir.userData.oeufs[i].userData.av = av; D.couvoir.userData.oeufs[i].userData.pret = pret; }
   });
-  if (unPret) b.append(el("button", { class: "btn principal", onclick: () => faireEclore() }, def.places > 1 ? "Faire éclore les œufs prêts" : "Faire éclore"));
+  if (unPret) b.append(el("button", { class: "btn principal", onclick: () => ctxJeu.aller("couvoir", { eclore: true }) }, def.places > 1 ? "Faire éclore les œufs prêts" : "Faire éclore"));
 }
 
 function faireEclore() {
@@ -523,7 +574,7 @@ function faireEclore() {
   ctxJeu.cacherInterface(true);
   ui.innerHTML = "";
   const suite = (k) => {
-    if (k >= res.length) { ctxJeu.cacherInterface(false); rendre(); signaler("eclosion"); return; }
+    if (k >= res.length) { signaler("eclosion"); retourHub(); return; }
     const { d, double } = res[k];
     const src = PAR_ID[d.id];
     animerEclosion(src.element, d.id, double, () => {
@@ -558,10 +609,9 @@ function rendreChoix() {
       Son.ok();
       changer(() => choisirOeuf(elx));
       toast(`Œuf ${elx === "eau" ? "d'" : "de "}${ELEMENTS[elx].nom} ajouté au couvoir.`, "bon");
-      mode = E().oeufs.choix > 0 ? "choix" : "couvoir";
-      rendre();
+      if (E().oeufs.choix > 0) { mode = "choix"; rendre(); } else retourHub();
     }) }, el("b", {}, ELEMENTS[elx].nom), el("small", {}, complet ? "Double au hasard" : `${7 - E().dragons.filter((d) => PAR_ID[d.id].element === elx && true).map((d) => d.id).filter((v, i, a) => a.indexOf(v) === i).length} à découvrir`)));
   }
-  z.append(el("button", { class: "plus-tard", onclick: () => { mode = "couvoir"; rendre(); } }, el("b", {}, "Plus tard")));
+  z.append(el("button", { class: "plus-tard", onclick: () => retourHub() }, el("b", {}, "Plus tard")));
   ui.append(z);
 }

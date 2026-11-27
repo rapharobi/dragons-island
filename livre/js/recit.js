@@ -25,14 +25,6 @@ const CHAPITRES = [
     ],
   },
   {
-    id: "crottes",
-    quand: (e) => e.tuto.etape === "fini" && e.crottes && Object.values(e.crottes).some((l) => l.length >= 2),
-    pages: [
-      ["Une drôle d'odeur…", "Tes dragons mangent bien… et ça se voit. Des crottes apparaissent sur les îles, avec leurs mouches. Une île trop sale fait repousser ses ressources moins vite."],
-      [`${MENTOR}`, "Touche une crotte pour la ramasser, nomme un dragon nettoyeur, ou fabrique un aspirateur-robot (bouton « Propreté »). Et garde tout : les crottes d'une île sont un formidable engrais… pour une autre île !"],
-    ],
-  },
-  {
     id: "tour",
     quand: (e) => e.tuto.etape === "fini" && e.dragons.length >= 6 && e.oeufs.couvoir.niveau >= 1,
     pages: [

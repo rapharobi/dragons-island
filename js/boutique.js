@@ -11,7 +11,7 @@ import { utiliserCode } from "./codes.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null;
-const vue = { uid: null, ul: false };
+const vue = { uid: null, ul: false, cat: "gemmes", cle: null };
 
 styles("boutique", `
 .bq-panneau { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: min(430px, 40vw); padding: 16px; overflow: auto; display: grid; gap: 12px; align-content: start; }
@@ -47,6 +47,44 @@ styles("boutique", `
 .bq-code-champ { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(190,120,255,.5); background: rgba(255,255,255,.05); color: inherit; font: 13px var(--mono); }
 .bq-ruban { justify-self: start; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1208; background: var(--ambre); border-radius: 6px; padding: 1px 6px; }
 .bq-apercu { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); top: calc(var(--hud) + var(--tuto, 0px) + 10px); padding: 5px 12px; border-radius: 999px; background: rgba(13,14,19,.75); border: 1px solid var(--trait); font-size: 12px; color: var(--doux); white-space: nowrap; }
+.bq2 { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: min(450px, 42vw); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.bq2-tete { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.bq2-tete h2 { font-size: 24px; }
+.bq2 .bq-solde { padding: 7px 12px; cursor: pointer; color: inherit; }
+.bq2 .bq-solde b { font-size: 17px; }
+.bq2 .bq-solde svg { width: 20px; height: 20px; }
+.bq2-onglets { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.bq2-onglets button { flex: none; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); color: var(--doux); font-weight: 600; font-size: 13px; }
+.bq2-onglets button.actif { color: #1a1208; background: var(--ambre); border-color: var(--ambre); }
+.bq-liste { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; overflow: auto; align-content: start; flex: 1; min-height: 0; padding: 6px 2px 2px; }
+.bq-carte { position: relative; display: grid; justify-items: center; gap: 2px; padding: 10px 6px 9px; border-radius: 14px; border: 1px solid var(--trait); background: rgba(255,255,255,.04); color: var(--texte); text-align: center; transition: transform .15s, border-color .15s, background .15s; border-bottom: 3px solid var(--el, transparent); }
+.bq-carte:hover { transform: translateY(-2px); }
+.bq-carte.actif { border-color: var(--ambre); background: rgba(242,181,68,.12); box-shadow: 0 0 0 1px rgba(242,181,68,.4) inset, 0 6px 18px rgba(242,181,68,.18); }
+.bq-carte.deja { opacity: .5; }
+.bq-carte .ic svg { width: 28px; height: 28px; }
+.bq-carte b { font-family: var(--titre); font-size: 13px; line-height: 1.1; }
+.bq-carte small { font: 11px var(--mono); color: var(--doux); }
+.bq-carte .prix { font: 700 12px var(--mono); color: var(--ambre); display: inline-flex; align-items: center; gap: 3px; }
+.bq-carte .prix.g { color: #e8c8ff; }
+.bq-carte .prix svg { width: 13px; height: 13px; }
+.bq-carte i { position: absolute; top: -7px; right: -4px; font-style: normal; font-size: 9.5px; font-weight: 700; background: #b45cff; color: #fff; border-radius: 6px; padding: 1px 5px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.bq2-achat { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid rgba(242,181,68,.4); background: linear-gradient(135deg, rgba(242,181,68,.1), rgba(255,255,255,.02)); flex: none; animation: entre .2s; }
+.bq2-achat b { font-family: var(--titre); font-size: 16px; }
+.bq2-achat p { margin: 2px 0 0; font-size: 12px; color: var(--doux); }
+.bq2-achat .contenu { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; margin-top: 4px; }
+.bq2-achat .contenu span { display: inline-flex; align-items: center; gap: 4px; }
+.bq2-achat .contenu svg { width: 15px; height: 15px; }
+.bq2-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.bq2-actions .btn.principal { min-width: 46%; justify-content: center; }
+.bq2-code summary { cursor: pointer; font-size: 12px; color: var(--doux); }
+.bq2-code .bq-code { margin-top: 6px; }
+@media (max-width: 760px) {
+  .bq2 { left: var(--bord-g); right: var(--bord-d); width: auto; top: auto; bottom: calc(var(--bas) + 76px); max-height: 56vh; padding: 12px; gap: 8px; }
+  .bq2-tete h2 { font-size: 20px; } .bq2-tete .etiquette { display: none; }
+  .bq-liste { display: flex; overflow-x: auto; overflow-y: hidden; flex: none; scroll-snap-type: x proximity; padding-top: 8px; }
+  .bq-carte { flex: 0 0 104px; scroll-snap-align: start; }
+  .bq2-achat p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+}
 @media (max-width: 420px) { .bq-gemmes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .bq-panneau { left: var(--bord-g); right: var(--bord-d); width: auto; top: calc(var(--hud) + var(--tuto, 0px) + 25vh); bottom: calc(var(--bas) + 78px); } }
 `);
@@ -150,31 +188,6 @@ function objetVitrine(type) {
   g.traverse((c) => { if (c.userData.maj) majs.push(c.userData.maj); });
   return { g, majs };
 }
-function montrerObjet(type) {
-  const cle = "objet|" + type;
-  if (cle === D.cle) return;
-  D.cle = cle; D.anim = null;
-  while (D.support.children.length) D.support.remove(D.support.children[0]);
-  const o = objetVitrine(type);
-  D.support.add(o.g); D.majs = o.majs;
-  const etroit = window.innerWidth / window.innerHeight < 0.8 ? 2.1 : 1;
-  D.orbite.viser(new T.Vector3(0, 0.8, 0), 5.4 * etroit, 0.7, 1.2);
-}
-// Quelle section est à l'écran : la vitrine change avec elle
-const SECTIONS = [["gemmes", "bq-gemmes"], ["packs", "bq-packs"], ["braises", "bq-braises"], ["ressources", "bq-res"], ["ul", "bq-ul"]];
-function majVitrine() {
-  const p = document.querySelector(".bq-panneau");
-  if (!p || !D) return;
-  // En bas de la liste, c'est la dernière section (les versions UL) qui compte
-  const ligne = p.scrollTop + p.clientHeight >= p.scrollHeight - 6 ? 1e9 : p.scrollTop + p.clientHeight * 0.4;
-  let cur = "gemmes";
-  for (const [k, id] of SECTIONS) { const s = document.getElementById(id); if (s && s.offsetTop <= ligne) cur = k; }
-  const d = E().dragons.find((x) => x.uid === vue.uid);
-  const leg = document.querySelector(".bq-apercu");
-  if (cur === "ul" && d) { montrer(d, vue.ul); if (leg) { leg.hidden = false; leg.textContent = `${PAR_ID[d.id].nom} · ${vue.ul ? "version UL" : "version normale"}`; } }
-  else { montrerObjet(cur); if (leg) leg.hidden = true; }
-}
-
 function montrer(d, ul) {
   const st = Math.max(1, stadeEffectif(d));
   const cle = `${d.id}|${ul}|${st}`;
@@ -185,7 +198,7 @@ function montrer(d, ul) {
   D.support.add(rig.racine);
   D.anim = new Animateur(rig); D.anim.jouer("joie");
   const h = rig.taille.y, l = Math.max(rig.taille.x, rig.taille.z);
-  const etroit = window.innerWidth / window.innerHeight < 0.8 ? 2.4 : 1;
+  const etroit = window.innerWidth / window.innerHeight < 0.8 ? 1.7 : 1;
   D.orbite.viser(new T.Vector3(0, h * 0.45, 0), Math.max(2.4, Math.max(h * 1.4, l) * 1.5) * etroit, 0.7, 1.2);
 }
 
@@ -195,12 +208,14 @@ export function ouvrir(ctx, params = {}) {
   ui = document.getElementById("ecran");
   Musique.jouer("livre");
   const e = E();
-  if (params.uid) { vue.uid = params.uid; vue.ul = true; } else vue.ul = false;
+  if (params.uid) { vue.uid = params.uid; vue.ul = true; vue.cat = "ul"; vue.cle = "u" + params.uid; } else vue.ul = false;
   if (!vue.uid || !e.dragons.some((d) => d.uid === vue.uid)) vue.uid = e.dragons[0] ? e.dragons[0].uid : null;
+  // Arrivée depuis une fiche : directement le bon rayon
+  if (params.voir === "gemmes") { vue.cat = "gemmes"; vue.cle = null; }
+  else if (params.voir === "braises") { vue.cat = "braises"; vue.cle = null; }
+  else if (params.voir) { vue.cat = "ressources"; vue.cle = null; const r = RESSOURCES.find((x) => x.ic === params.voir); if (r) vue.cle = "r" + r.nom; }
+  D.cle = null;
   rendre();
-  // Arrivée depuis une fiche : on descend directement à la bonne section
-  const cible = params.voir === "gemmes" ? "bq-gemmes" : params.voir ? "bq-res" : params.uid ? "bq-ul" : null;
-  if (cible) setTimeout(() => { const b = document.getElementById(cible), p = document.querySelector(".bq-panneau"); if (b && p) p.scrollTo({ top: Math.max(0, b.offsetTop - 70), behavior: "smooth" }); }, 60);
 }
 export function fermer() { ctxJeu.moteur.definirZone(null); }
 
@@ -302,73 +317,208 @@ function payer(prix, nom, donner) {
     } }],
   });
 }
-function montrerGemmes() {
-  const b = document.getElementById("bq-gemmes"), p = document.querySelector(".bq-panneau");
-  if (b && p) p.scrollTo({ top: Math.max(0, b.offsetTop - 70), behavior: "smooth" });
+function montrerGemmes() { vue.cat = "gemmes"; vue.cle = null; rendre(); }
+
+
+// ---------- Modèles de la vitrine : un objet propre à chaque article ----------
+const matTissu = (c) => new T.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true });
+const matBois = () => new T.MeshStandardMaterial({ color: 0x7a4220, roughness: 0.7, flatShading: true });
+// Un tas de gemmes en monticule
+function tasGemmes(n, rayon, haut, couleurs = [0xb45cff, 0xd08aff, 0x7fd6ff, 0xff6ad8]) {
+  const g = new T.Group();
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * rayon;
+    const p = gemme(couleurs[i % couleurs.length], 0.06 + Math.random() * 0.06);
+    p.position.set(Math.cos(a) * r, (1 - r / rayon) * haut + Math.random() * 0.05, Math.sin(a) * r); p.rotation.set(Math.random(), Math.random() * 6, Math.random());
+    g.add(p);
+  }
+  return g;
+}
+// Coffre : taille, ouverture, cerclages dorés, contenu qui déborde
+function coffre(taille, contenu) {
+  const g = new T.Group(), bois = matBois();
+  const L = 1.3 * taille, H = 0.6 * taille, P = 0.85 * taille;
+  const c = new T.Group(); c.position.y = H / 2; g.add(c);
+  c.add(new T.Mesh(new T.BoxGeometry(L, H, P), bois));
+  for (const x of [-0.38, 0, 0.38]) { const b = new T.Mesh(new T.BoxGeometry(0.07 * taille, H + 0.02, P + 0.02), matOr()); b.position.x = x * L; c.add(b); }
+  const serrure = new T.Mesh(new T.BoxGeometry(0.16 * taille, 0.2 * taille, 0.05), matOr()); serrure.position.set(0, 0.1 * taille, P / 2 + 0.01); c.add(serrure);
+  const couvercle = new T.Group(); couvercle.position.set(0, H / 2, -P / 2); c.add(couvercle);
+  couvercle.add(new T.Mesh(new T.CylinderGeometry(P / 2, P / 2, L, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 0, P / 2), bois));
+  for (const x of [-0.38, 0.38]) { const b = new T.Mesh(new T.CylinderGeometry(P / 2 + 0.02, P / 2 + 0.02, 0.07 * taille, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(x * L, 0, P / 2), matOr()); couvercle.add(b); }
+  couvercle.rotation.x = -1.95;
+  if (contenu) { contenu.position.y = H / 2 - 0.05; c.add(contenu); }
+  return { g, couvercle, H };
+}
+function bourse(pleine) {
+  const g = new T.Group();
+  const sac = new T.Mesh(new T.SphereGeometry(0.42, 12, 9), matTissu(0x8a5a32)); sac.scale.set(1, pleine ? 0.95 : 0.8, 1); sac.position.y = 0.36; g.add(sac);
+  const col = new T.Mesh(new T.CylinderGeometry(0.14, 0.22, 0.22, 10), matTissu(0x7a4a28)); col.position.y = 0.76; g.add(col);
+  const lien = new T.Mesh(new T.TorusGeometry(0.16, 0.025, 5, 16), matOr()); lien.rotation.x = Math.PI / 2; lien.position.y = 0.72; g.add(lien);
+  const haut = tasGemmes(pleine ? 7 : 3, 0.12, 0.08); haut.position.y = 0.86; g.add(haut);
+  if (pleine) { const sol = tasGemmes(10, 0.9, 0.05); sol.position.y = 0.02; g.add(sol); }
+  return g;
+}
+function objetGemmes(niv) {
+  const g = new T.Group(), majs = [];
+  const lum = (c, i, y) => { const l = new T.PointLight(c, i, 6); l.position.y = y; g.add(l); return l; };
+  let haut = 1;
+  if (niv <= 1) g.add(bourse(niv === 1));
+  else {
+    const taille = [0, 0, 0.6, 0.85, 1.15, 1.5][niv];
+    const contenu = tasGemmes([0, 0, 14, 26, 45, 70][niv], 0.45 * taille, 0.35 * taille);
+    const c = coffre(taille, contenu); g.add(c.g); haut = c.H + 0.4;
+    if (niv >= 4) { const tas = tasGemmes(niv === 5 ? 60 : 30, niv === 5 ? 1.7 : 1.3, niv === 5 ? 0.35 : 0.2); g.add(tas); }
+    if (niv === 5) {
+      // La couronne au sommet et des rayons de lumière
+      const cour = new T.Group(); cour.position.y = c.H + 0.85; g.add(cour);
+      cour.add(new T.Mesh(new T.CylinderGeometry(0.28, 0.28, 0.16, 12, 1, true), matOr()));
+      for (let k = 0; k < 6; k++) { const p = new T.Mesh(new T.ConeGeometry(0.06, 0.18, 4), matOr()); const a = (k / 6) * 6.28; p.position.set(Math.cos(a) * 0.28, 0.16, Math.sin(a) * 0.28); cour.add(p); const gm = gemme([0xff4a6a, 0x7fd6ff, 0x8aff8a][k % 3], 0.04); gm.position.set(Math.cos(a) * 0.29, 0.02, Math.sin(a) * 0.29); cour.add(gm); }
+      const rayons = new T.Group(); rayons.position.y = c.H; g.add(rayons);
+      for (let k = 0; k < 7; k++) { const r = new T.Mesh(new T.ConeGeometry(0.22, 3.2, 4, 1, true).translate(0, 1.6, 0), new T.MeshBasicMaterial({ color: 0xe0b0ff, transparent: true, opacity: 0.16, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide })); r.rotation.z = (k - 3) * 0.22; rayons.add(r); }
+      majs.push((t) => { cour.rotation.y = t * 0.8; cour.position.y = c.H + 0.85 + Math.sin(t * 1.6) * 0.06; rayons.rotation.y = t * 0.3; rayons.children.forEach((r, i) => { r.material.opacity = 0.1 + Math.max(0, Math.sin(t * 2 + i)) * 0.12; }); });
+      haut = c.H + 1.4;
+    }
+    majs.push((t) => { c.couvercle.rotation.x = -1.95 + Math.sin(t * 1.4) * 0.05; });
+  }
+  const l = lum(0xc08aff, 1.2 + niv * 0.45, haut + 0.3);
+  g.add(etincelles(12 + niv * 8, 0.8 + niv * 0.25, haut + 0.4, 0xffffff));
+  majs.push((t) => { l.intensity = 1.2 + niv * 0.45 + Math.sin(t * 3) * 0.3; });
+  return { g, majs, haut };
+}
+function objetPack(n, taille, coeur) {
+  const g = new T.Group(), majs = [];
+  const oeufs = new T.Group();
+  const couls = [0xff7a3a, 0x7fd6ff, 0x2fd0c0];
+  for (let i = 0; i < n; i++) { const o = oeuf(couls[i % 3]); const k = n <= 3 ? (i - 1) * 0.33 : ((i % 4) - 1.5) * 0.26; o.position.set(k * taille, 0.1 + Math.floor(i / 4) * 0.12, ((Math.floor(i / 4) % 2) - 0.5) * 0.18 * taille); o.scale.setScalar(Math.min(1, 0.8 + taille * 0.15)); oeufs.add(o); }
+  const c = coffre(taille, oeufs); g.add(c.g);
+  if (coeur) { const h = new T.Mesh(new T.SphereGeometry(0.16, 10, 8), new T.MeshStandardMaterial({ color: 0xff3a5a, emissive: 0xff1a3a, emissiveIntensity: 0.8, roughness: 0.3, flatShading: true })); h.position.set(0.9 * taille, 0.2, 0.5); g.add(h); majs.push((t) => { h.scale.setScalar(1 + Math.max(0, Math.sin(t * 5)) * 0.15); }); }
+  for (let i = 0; i < 8 + n * 2; i++) { const p = piece(); const a = Math.random() * 6.28, r = 0.6 * taille + 0.3 + Math.random() * 0.6; p.position.set(Math.cos(a) * r, 0.02 + Math.random() * 0.04, Math.sin(a) * r); g.add(p); }
+  const l = new T.PointLight(0xffc86a, 2, 6); l.position.y = c.H + 0.6; g.add(l);
+  g.add(etincelles(16 + n * 2, 1 + taille * 0.4, 1.4, 0xffe8a0));
+  majs.push((t) => { c.couvercle.rotation.x = -1.95 + Math.sin(t * 1.5) * 0.06; l.intensity = 1.7 + Math.sin(t * 4) * 0.35; oeufs.children.forEach((o, i) => { o.position.y = 0.1 + Math.floor(i / 4) * 0.12 + Math.sin(t * 2 + i) * 0.03; }); });
+  return { g, majs, haut: c.H + 0.8 };
+}
+function objetBraises(n) {
+  const o = objetVitrine("braises");
+  // Plus de braises dans le tas pour les gros lots
+  const extra = n >= 80 ? 14 : n >= 30 ? 7 : 0;
+  for (let i = 0; i < extra; i++) {
+    const m = new T.Mesh(new T.DodecahedronGeometry(0.1 + Math.random() * 0.1, 0), new T.MeshStandardMaterial({ color: 0x2a1610, emissive: 0xff5a0a, emissiveIntensity: 0.7, roughness: 0.8, flatShading: true }));
+    const a = Math.random() * 6.28, r = 0.6 + Math.random() * 0.5; m.position.set(Math.cos(a) * r, 0.1, Math.sin(a) * r); o.g.add(m);
+  }
+  return { ...o, haut: 1.2 };
+}
+// Ressources : un petit tas ou un objet qui dit ce qu'on achète
+function objetRessource(ic) {
+  const g = new T.Group(), majs = [];
+  const tas = (fab, n, r) => { for (let i = 0; i < n; i++) { const m = fab(i); const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * r; m.position.set(Math.cos(a) * d, m.position.y + (1 - d / r) * 0.25, Math.sin(a) * d); m.rotation.y = Math.random() * 6; g.add(m); } };
+  const std = (c, o = {}) => new T.MeshStandardMaterial({ color: c, roughness: o.r ?? 0.7, metalness: o.m ?? 0.05, emissive: o.e ?? 0, emissiveIntensity: o.ei ?? 0, flatShading: true });
+  if (ic === "energie") return objetVitrine("ressources");
+  if (ic === "oeuf") { const cous = new T.Mesh(new T.CylinderGeometry(0.55, 0.6, 0.18, 12), matTissu(0x8a2a4a)); cous.position.y = 0.09; g.add(cous); const o = oeuf(0xf2e6cc); o.scale.setScalar(1.9); o.position.y = 0.55; g.add(o); majs.push((t) => { o.rotation.y = t; o.position.y = 0.55 + Math.sin(t * 2) * 0.04; }); }
+  else if (ic === "rations") tas((i) => { const v = new T.Group(); v.add(new T.Mesh(new T.SphereGeometry(0.14, 8, 6).scale(1.3, 0.8, 1), std(0x9a3a22))); const os = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.28, 5).rotateZ(Math.PI / 2), std(0xf0e6d0)); os.position.x = 0.2; v.add(os); v.position.y = 0.1; return v; }, 12, 0.7);
+  else if (ic === "brindilles") tas(() => { const b = new T.Mesh(new T.CylinderGeometry(0.03, 0.04, 0.7, 5).rotateZ(Math.PI / 2), std(0x8a6a44)); b.position.y = 0.05; return b; }, 26, 0.55);
+  else if (ic === "pierres") tas(() => { const p = new T.Mesh(new T.DodecahedronGeometry(0.12 + Math.random() * 0.08, 0), std(0x8a8478)); p.position.y = 0.1; return p; }, 18, 0.7);
+  else if (ic === "obsidienne" || ic === "givrite" || ic === "corail") {
+    const c = { obsidienne: [0x2a1a2a, 0xff4a1a], givrite: [0xbfeaff, 0x5ab0e8], corail: [0xff7aa8, 0xff4a7a] }[ic];
+    for (let i = 0; i < 9; i++) { const m = new T.Mesh(new T.OctahedronGeometry(0.16 + Math.random() * 0.14, 0).scale(0.6, 1.8, 0.6), std(c[0], { r: 0.2, m: 0.3, e: c[1], ei: 0.35 })); const a = (i / 9) * 6.28, d = i === 0 ? 0 : 0.35 + Math.random() * 0.2; m.position.set(Math.cos(a) * d, 0.3, Math.sin(a) * d); m.rotation.set((Math.random() - 0.5) * 0.6, 0, (Math.random() - 0.5) * 0.6); g.add(m); }
+  }
+  else if (ic === "rations_feu") tas(() => { const p = new T.Mesh(new T.ConeGeometry(0.07, 0.32, 6).rotateZ(Math.PI / 2), std(0xd8261a, { e: 0x6a0a00, ei: 0.4 })); p.position.y = 0.08; return p; }, 16, 0.55);
+  else if (ic === "rations_glace") tas(() => { const p = new T.Mesh(new T.IcosahedronGeometry(0.08, 0), std(0x7fd6ff, { e: 0x2a6a9a, ei: 0.4 })); p.position.y = 0.08; return p; }, 30, 0.55);
+  else if (ic === "rations_eau") tas(() => { const p = new T.Group(); p.add(new T.Mesh(new T.SphereGeometry(0.1, 8, 6).scale(1.8, 0.8, 0.7), std(0x2f9fb0))); const q = new T.Mesh(new T.ConeGeometry(0.08, 0.12, 4).rotateZ(Math.PI / 2), std(0x2f9fb0)); q.position.x = -0.22; p.add(q); p.position.y = 0.09; return p; }, 12, 0.6);
+  else if (ic === "coeurs") { const h = new T.Mesh(new T.SphereGeometry(0.32, 12, 10), std(0xff3a5a, { r: 0.3, e: 0xff1a3a, ei: 0.8 })); h.position.y = 0.7; g.add(h); majs.push((t) => { h.scale.setScalar(1 + Math.max(0, Math.sin(t * 5)) * 0.14); h.rotation.y = t; }); }
+  const l = new T.PointLight(0xffe0b0, 1.4, 5); l.position.y = 1.3; g.add(l);
+  g.add(etincelles(14, 0.9, 1.2, 0xfff2b0));
+  g.traverse((c) => { if (c.userData.maj) majs.push(c.userData.maj); });
+  return { g, majs, haut: 1 };
 }
 
-function article({ nom, ic, prix, texte, onclick, classe = "", ruban = null, contenu = null, deja = null }) {
-  return el("div", { class: `article ${classe} ${deja ? "deja" : ""}`, role: "button", tabindex: 0, onclick: () => { if (!deja) onclick(); } },
-    ruban ? el("span", { class: "bq-ruban" }, ruban) : null, ruban ? el("span") : null,
-    el("b", {}, ic ? el("span", { style: { display: "inline-flex", alignItems: "center", gap: "6px" } }, icone(ic), nom) : nom),
-    deja ? el("span", { class: "prix" }, deja) : prixG(prix),
-    contenu ? el("div", { class: "contenu" }, contenu.map(([i, t]) => el("span", {}, icone(i), t))) : null,
-    texte ? el("small", {}, texte) : null);
+// Quel article est montré ? On reconstruit la vitrine seulement quand il change
+function montrerArticle(art) {
+  if (!art) return;
+  if (art.cat === "ul") { const d = E().dragons.find((x) => x.uid === art.uid); if (d) montrer(d, vue.ul); return; }
+  const cle = "art|" + art.cle;
+  if (cle === D.cle) return;
+  D.cle = cle; D.anim = null;
+  while (D.support.children.length) D.support.remove(D.support.children[0]);
+  const o = art.modele();
+  D.support.add(o.g); D.majs = o.majs || [];
+  o.g.traverse((c) => { if (c.userData.maj && !D.majs.includes(c.userData.maj)) D.majs.push(c.userData.maj); });
+  // Petit bond d'arrivée
+  o.g.scale.setScalar(0.4); D.majs.push((t, dt) => { if (o.g.scale.x < 1) o.g.scale.setScalar(Math.min(1, o.g.scale.x + dt * 3.5)); });
+  const etroit = window.innerWidth / window.innerHeight < 0.8 ? 2.05 : 1;
+  const h = o.haut || 1.2;
+  D.orbite.viser(new T.Vector3(0, h * 0.5, 0), (3.4 + h * 1.5) * etroit, 0.7, 1.15);
+}
+
+// ---------- Les articles ----------
+const CATS = [["gemmes", "Gemmes"], ["packs", "Packs"], ["braises", "Braises"], ["ressources", "Ressources"], ["ul", "Robes UL"]];
+const NOMS_GEMMES = ["Petite bourse", "Bourse pleine", "Coffret", "Coffre", "Grand coffre", "Coffre du dragon-roi"];
+function articles(cat) {
+  const e = E();
+  if (cat === "gemmes") return GEMMES.map((g, i) => ({ cat, cle: "g" + i, nom: `${NOMS_GEMMES[i]} · ${nb(g.n)} gemmes`, court: NOMS_GEMMES[i], sous: nb(g.n), ic: "gemmes", prixTxt: g.prix, ruban: g.bonus,
+    texte: `${nb(g.n)} gemmes${g.bonus ? ` (${g.bonus} offertes)` : ""}. Pour les obtenir, demande un code au créateur du jeu : chaque code ne marche qu'une fois.`,
+    modele: () => objetGemmes(i), acheter: () => acheterGemmes(g) }));
+  if (cat === "packs") return PACKS.map((pk, i) => {
+    const deja = pk.unique && e.achats && e.achats[pk.id];
+    return { cat, cle: "p" + pk.id, nom: pk.nom, court: pk.nom.replace("Pack du ", "").replace("Pack de l'", "").replace(/^./, (c) => c.toUpperCase()), sous: pk.contenu[0][1], ic: "oeuf", prix: pk.prix, ruban: pk.ruban, texte: pk.texte, contenu: pk.contenu, deja: deja ? "Déjà acheté" : null,
+      modele: () => objetPack([3, 6, 12][i], [0.75, 1, 1.3][i], i === 2), acheter: () => payer(pk.prix, pk.nom, (s) => { pk.donner(s); s.achats = s.achats || {}; s.achats[pk.id] = (s.achats[pk.id] || 0) + 1; }) };
+  });
+  if (cat === "braises") return BRAISES.map(([n, prix, txt]) => ({ cat, cle: "b" + n, nom: `${n} braises d'éclosion`, court: `${n} braises`, sous: "", ic: "braises", prix,
+    texte: `${txt} Une braise fait avancer un œuf d'un quart : 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`, modele: () => objetBraises(n), acheter: () => payer(prix, `${n} braises d'éclosion`, (s) => { s.ressources.braises = (s.ressources.braises || 0) + n; }) }));
+  if (cat === "ressources") return RESSOURCES.map((r) => ({ cat, cle: "r" + r.nom, nom: r.nom, court: r.nom.replace(/^\d+ /, "").replace("Recharge d'", "").replace(/^./, (c) => c.toUpperCase()), sous: (r.nom.match(/^\d+/) || [""])[0], ic: r.ic, prix: r.prix, texte: r.texte, modele: () => objetRessource(r.ic), acheter: () => payer(r.prix, r.nom, r.donner) }));
+  if (cat === "ul") return e.dragons.map((d) => ({ cat, cle: "u" + d.uid, uid: d.uid, nom: `${PAR_ID[d.id].nom} UL`, court: PAR_ID[d.id].nom, sous: d.ulPossede ? "✦ possédée" : "", ic: "oeuf", prix: d.ulPossede ? null : PRIX_UL, el: PAR_ID[d.id].element,
+    texte: "Une robe rare, aux reflets métalliques et aux couleurs uniques. Seule l'apparence change : aucun avantage en combat.",
+    acheter: () => d.ulPossede ? (changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = !x.ul; }), Son.achat(), rendre()) : payer(PRIX_UL, `${PAR_ID[d.id].nom} UL`, (s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ulPossede = true; x.ul = true; }) }));
+  return [];
 }
 
 function rendre() {
-  const ancien = document.querySelector(".bq-panneau");
-  const defile = ancien ? ancien.scrollTop : 0;
+  const ancien = document.querySelector(".bq-liste");
+  const defile = ancien ? [ancien.scrollLeft, ancien.scrollTop] : [0, 0];
   ui.innerHTML = "";
   const e = E();
   const large = window.innerWidth > 760;
-  ctxJeu.moteur.montrer(D, large ? { x: 0, y: 0, l: 1 - Math.min(450, window.innerWidth * 0.42) / window.innerWidth, h: 1 } : { x: 0, y: 0.08, l: 1, h: 0.26 });
-  const p = el("section", { class: "bq-panneau panneau" });
-  p.append(el("div", {}, el("div", { class: "etiquette" }, "Marché des dragonniers"), el("h2", {}, "Boutique")));
-  // Solde
-  p.append(el("div", { class: "bq-solde" }, el("span", { class: "doux" }, "Tes gemmes"), el("b", {}, icone("gemmes"), nb(e.ressources.gemmes || 0))));
-  // Gemmes
-  p.append(el("div", { class: "etiquette", id: "bq-gemmes" }, "Acheter des gemmes"));
-  p.append(el("div", { class: "bq-gemmes" }, GEMMES.map((g) => el("button", { onclick: () => acheterGemmes(g) }, g.bonus ? el("i", {}, g.bonus) : null, icone("gemmes"), el("b", {}, nb(g.n)), el("span", {}, g.prix)))));
-  p.append(el("div", { class: "bq-note" }, "Les gemmes s'obtiennent avec un code à usage unique, donné par le créateur du jeu. Tout le reste de la boutique se paie en gemmes."));
-  p.append(el("div", { class: "etiquette" }, "J'ai un code"), champCode());
-  // Packs de démarrage
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-packs" }, "Packs de démarrage"));
-  for (const pk of PACKS) {
-    const deja = pk.unique && e.achats && e.achats[pk.id] ? "déjà acheté" : null;
-    p.append(article({ nom: pk.nom, prix: pk.prix, texte: pk.texte, contenu: pk.contenu, ruban: pk.ruban, classe: `pack ${pk.vedette ? "vedette" : ""}`, deja,
-      onclick: () => payer(pk.prix, pk.nom, (s) => { pk.donner(s); s.achats = s.achats || {}; s.achats[pk.id] = (s.achats[pk.id] || 0) + 1; }) }));
+  if (!CATS.some(([k]) => k === vue.cat)) vue.cat = "gemmes";
+  const liste = articles(vue.cat);
+  if (!liste.some((a) => a.cle === vue.cle)) vue.cle = liste[0] ? liste[0].cle : null;
+  const art = liste.find((a) => a.cle === vue.cle);
+  const p = el("section", { class: "bq2 panneau" });
+  // En-tête : solde et code
+  p.append(el("div", { class: "bq2-tete" }, el("div", {}, el("div", { class: "etiquette" }, "Marché des dragonniers"), el("h2", {}, "Boutique")),
+    el("button", { class: "bq-solde", onclick: () => { vue.cat = "gemmes"; vue.cle = "g0"; Son.clic(); rendre(); } }, icone("gemmes"), el("b", {}, nb(e.ressources.gemmes || 0)))));
+  // Onglets
+  p.append(el("div", { class: "bq2-onglets" }, CATS.map(([k, nom]) => el("button", { class: vue.cat === k ? "actif" : "", onclick: () => { Son.clic(); vue.cat = k; vue.cle = null; rendre(); } }, nom))));
+  // Les articles : on touche pour voir l'objet dans la vitrine
+  const l = el("div", { class: "bq-liste" });
+  for (const a of liste) {
+    l.append(el("button", { class: `bq-carte ${a.cle === vue.cle ? "actif" : ""} ${a.deja ? "deja" : ""}`, style: a.el ? { "--el": ELEMENTS[a.el].couleur } : null, onclick: () => { Son.clic(); vue.cle = a.cle; if (a.cat === "ul") { vue.uid = a.uid; } rendre(); } },
+      a.ruban ? el("i", {}, a.ruban) : null,
+      el("span", { class: "ic" }, icone(a.ic)), el("b", {}, a.court), a.sous ? el("small", {}, a.sous) : null,
+      el("span", { class: "prix" + (a.prixTxt ? "" : " g") }, a.deja ? a.deja : a.prixTxt ? a.prixTxt : a.prix ? [icone("gemmes"), nb(a.prix)] : "à toi")));
   }
-  // Accélérer l'éclosion
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-braises" }, "Accélérer l'éclosion"));
-  p.append(el("div", { class: "bq-note", style: { background: "rgba(255,138,60,.08)", borderColor: "rgba(255,138,60,.35)", color: "#ffd2b0" } },
-    `Une braise fait avancer un œuf du couvoir d'un quart (environ ${Math.round(COUVOIR[0].heures * 60 / 4)} minutes). 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`));
-  for (const [n, prix, txt] of BRAISES) p.append(article({ nom: `${n} braises d'éclosion`, ic: "braises", prix, texte: txt, onclick: () => payer(prix, `${n} braises d'éclosion`, (s) => { s.ressources.braises = (s.ressources.braises || 0) + n; }) }));
-  // Ressources
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-res" }, "Ressources et énergie"));
-  for (const r of RESSOURCES) p.append(article({ nom: r.nom, ic: r.ic, prix: r.prix, texte: r.texte, onclick: () => payer(r.prix, r.nom, r.donner) }));
-  // Versions UL (Ultime) : une robe rare pour chacun de tes dragons
-  const d = e.dragons.find((x) => x.uid === vue.uid);
-  p.append(el("div", { class: "etiquette", style: { marginTop: "8px" }, id: "bq-ul" }, "Versions UL (Ultime)"));
-  p.append(el("div", { class: "bq-note", style: { background: "rgba(180,92,255,.1)", borderColor: "rgba(190,120,255,.4)", color: "#ecd8ff" } },
-    "Une robe rare, aux reflets métalliques et aux couleurs uniques. Seule l'apparence change : aucun avantage en combat."));
-  if (d) {
-    const src = PAR_ID[d.id];
-    const choix = el("div", { class: "bq-dragons" });
-    for (const x of e.dragons) choix.append(el("button", { class: `${PAR_ID[x.id].element} ${x.uid === vue.uid ? "actif" : ""}`, onclick: () => { vue.uid = x.uid; vue.ul = true; rendre(); } }, PAR_ID[x.id].nom, x.ulPossede ? " ✦" : ""));
-    p.append(choix);
-    p.append(el("div", { class: "bq-dragons" },
-      el("button", { class: !vue.ul ? "actif" : "", onclick: () => { vue.ul = false; Son.clic(); rendre(); } }, "Voir normale"),
-      el("button", { class: vue.ul ? "actif" : "", onclick: () => { vue.ul = true; Son.evolution(); rendre(); } }, "Voir UL")));
-    p.append(el("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" } },
-      d.ulPossede
-        ? el("button", { class: "btn principal", onclick: () => { changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = !x.ul; }); Son.achat(); toast(d.ul ? `${src.nom} porte sa robe UL.` : `${src.nom} reprend sa robe normale.`, "bon"); rendre(); } }, d.ul ? "Remettre la robe normale" : "Porter la robe UL")
-        : el("button", { class: "btn principal", onclick: () => payer(PRIX_UL, `${src.nom} UL`, (s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ulPossede = true; x.ul = true; }) }, icone("gemmes"), `${src.nom} UL · ${nb(PRIX_UL)} gemmes`),
-    ));
-  } else p.append(el("p", { class: "doux" }, "Fais éclore un dragon pour voir sa version UL."));
-  ui.append(el("div", { class: "bq-apercu", hidden: true }));
+  if (!liste.length) l.append(el("p", { class: "doux" }, vue.cat === "ul" ? "Fais éclore un dragon pour voir sa robe UL." : "Rien ici pour l'instant."));
+  p.append(l);
+  // Barre d'achat de l'article choisi
+  if (art) {
+    const barreAchat = el("div", { class: "bq2-achat" },
+      el("div", {}, el("b", {}, art.nom), el("p", {}, art.texte),
+        art.contenu ? el("div", { class: "contenu" }, art.contenu.map(([i, t]) => el("span", {}, icone(i), t))) : null));
+    const actions = el("div", { class: "bq2-actions" });
+    if (art.cat === "ul") {
+      const d = e.dragons.find((x) => x.uid === art.uid);
+      actions.append(el("button", { class: "btn petit", onclick: () => { vue.ul = !vue.ul; Son.evolution(); D.cle = null; rendre(); } }, vue.ul ? "Voir la robe normale" : "Voir la robe UL"));
+      actions.append(el("button", { class: "btn principal", onclick: art.acheter }, d && d.ulPossede ? (d.ul ? "Remettre la robe normale" : "Porter la robe UL") : [icone("gemmes"), `Acheter · ${nb(PRIX_UL)}`]));
+    } else actions.append(el("button", { class: "btn principal", disabled: !!art.deja, onclick: art.acheter }, art.deja ? art.deja : art.prixTxt ? `Acheter · ${art.prixTxt}` : [icone("gemmes"), `Acheter · ${nb(art.prix)}`]));
+    barreAchat.append(actions);
+    p.append(barreAchat);
+  }
+  if (vue.cat === "gemmes") p.append(el("details", { class: "bq2-code" }, el("summary", {}, "J'ai déjà un code"), champCode()));
   ui.append(p);
-  p.scrollTop = defile;
-  p.addEventListener("scroll", majVitrine, { passive: true });
-  majVitrine();
+  ctxJeu.moteur.montrer(D, large ? { x: 0, y: 0, l: 1 - Math.min(470, window.innerWidth * 0.42) / window.innerWidth, h: 1 } : { x: 0, y: 0.02, l: 1, h: Math.max(0.2, (p.getBoundingClientRect().top - 8) / window.innerHeight - 0.02) });
+  l.scrollLeft = defile[0]; l.scrollTop = defile[1];
+  // Garde l'article choisi visible dans la liste
+  const actif = l.querySelector(".bq-carte.actif");
+  if (actif && !large) { const r = actif.getBoundingClientRect(), rl = l.getBoundingClientRect(); if (r.left < rl.left || r.right > rl.right) l.scrollLeft += r.left - rl.left - 20; }
+  if (art && art.cat === "ul") { const d = e.dragons.find((x) => x.uid === art.uid); if (d) montrer(d, vue.ul); }
+  else montrerArticle(art);
 }

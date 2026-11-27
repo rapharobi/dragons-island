@@ -72,7 +72,7 @@ function etapesIle(k) {
   const suite = k < 3 ? `oeuf${k + 1}` : "eclore";
   return {
     [`oeuf${k}`]: {
-      cible: "couvoir",
+      cible: "iles", vise: () => "couvoir",
       entree: k > 1 ? (e) => recompenseIle(e) : null,
       texte: () => (k === 1 ? "Trois œufs dormaient sous les ruines ! Touche celui que tu veux, puis confirme : il va éclore." : `Bravo, l'île est à toi ! Il reste ${4 - k} œuf${4 - k > 1 ? "s" : ""} au couvoir : choisis le prochain.`),
       quand: (n) => n === "ile_revelee", suite: `mini${k}`,
@@ -107,15 +107,15 @@ const ETAPES = {
   },
   ...etapesIle(1), ...etapesIle(2), ...etapesIle(3),
   eclore: {
-    cible: "couvoir",
+    cible: "iles", vise: () => (E().oeufs.choix > 0 ? "autel" : "oeufs"),
     entree: (e) => { recompenseIle(e); e.oeufs.choix += 2; e.ressources.braises = (e.ressources.braises || 0) + 8; },
-    texte: () => `Les trois îles sont libres ! En récompense, deux nouveaux œufs t'attendent au couvoir, avec 8 braises : 4 braises font éclore un œuf tout de suite. Tu as ${E().dragons.length}/5 dragons.`,
+    texte: () => `Les trois îles sont libres ! En récompense, deux nouveaux œufs t'attendent sur l'autel du couvoir, avec 8 braises : 4 braises font éclore un œuf tout de suite dans la couveuse. Tu as ${E().dragons.length}/5 dragons.`,
     fini: () => E().dragons.length >= 5, suite: "chantier",
   },
   chantier: {
-    cible: "couvoir",
+    cible: "iles", vise: () => "chantier",
     entree: (e) => { e.ressources.gemmes = (e.ressources.gemmes || 0) + 30; },
-    texte: () => { const r = E().ressources; return `Cinq dragons ! Le couvoir peut grandir. Il faut 40 brindilles (${Math.min(40, r.brindilles)}) et 40 pierres (${Math.min(40, r.pierres)}) : récolte sur tes îles si besoin. Puis choisis tes bâtisseurs et lance le chantier : 6 h, une heure de moins par dragon. Je t'ai donné 30 gemmes pour le finir tout de suite.`; },
+    texte: () => { const r = E().ressources; return `Cinq dragons ! Le couvoir peut grandir. Il faut 40 brindilles (${Math.min(40, r.brindilles)}) et 40 pierres (${Math.min(40, r.pierres)}) : récolte sur tes îles si besoin. Puis touche l'architecte dans la cour du couvoir, choisis tes bâtisseurs et lance le chantier : 6 h, une heure de moins par dragon. Je t'ai donné 30 gemmes pour le finir tout de suite.`; },
     fini: () => E().oeufs.couvoir.niveau >= 1, suite: "batir",
   },
   batir: {
@@ -137,20 +137,20 @@ const ETAPES = {
     quand: (n) => n === "vague_finie", suite: "attaque",
   },
   attaque: {
-    cible: "combat",
-    texte: () => "À ton tour d'attaquer ! Dans Combat, choisis « Attaquer un village », garde ton équipe, puis lance l'assaut. Touche un bâtiment pour que tes dragons le visent ; le couvoir au centre fait gagner.",
+    cible: "combat", viseCombat: () => "villages",
+    texte: () => "À ton tour d'attaquer ! Dans Combat, touche les Villages volants, garde ton équipe, puis lance l'assaut. Touche un bâtiment pour que tes dragons le visent ; le couvoir au centre fait gagner.",
     quand: (n, d) => n === "attaque_finie" && d && d.victoire, suite: "expedition",
   },
   expedition: {
-    cible: "couvoir",
+    cible: "iles", vise: () => (E().oeufs.choix > 0 ? "autel" : E().oeufs.couvoir.slots.length ? "oeufs" : "quai"),
     entree: (e) => { e.ressources.braises = (e.ressources.braises || 0) + 4; },
-    texte: () => `Le butin contenait un œuf ! Fais-le éclore au couvoir (4 braises offertes). Puis envoie une expédition chercher un autre œuf : pour cette première, quelques minutes suffisent. Tu as ${E().dragons.length}/7 dragons.`,
+    texte: () => `Le butin contenait un œuf ! Fais-le éclore au couvoir (4 braises offertes). Puis envoie le dirigeable du couvoir en expédition chercher un autre œuf : pour cette première, quelques minutes suffisent. Tu as ${E().dragons.length}/7 dragons.`,
     fini: () => E().dragons.length >= 7, suite: "ligue",
   },
   ligue: {
-    cible: "combat",
+    cible: "combat", viseCombat: () => "arene",
     entree: (e) => { const m = [...e.dragons].sort((a, b) => b.niveau - a.niveau)[0]; if (m && m.niveau < 5) fixerNiveau(m, 5); soignerTout(); },
-    texte: () => "Sept dragons, et ton meilleur atteint le niveau 5 : le duel classé s'ouvre ! Tu entres en ligue Bronze. Chaque victoire rapporte des trophées : Argent à 400, Or à 900… Va dans Combat, « Duel de mage (classé) ».",
+    texte: () => "Sept dragons, et ton meilleur atteint le niveau 5 : le duel classé s'ouvre ! Tu entres en ligue Bronze. Chaque victoire rapporte des trophées : Argent à 400, Or à 900… Va dans Combat et touche l'Arène.",
     quand: (n, d) => n === "combat_fini" && d && d.mode === "bot", suite: "fin",
   },
   fin: {
@@ -220,6 +220,7 @@ function placerFleche() {
       const a = document.querySelector(`#nav a[href="#${et.cible}"]`);
       if (a && !document.getElementById("nav").hidden) { const r = a.getBoundingClientRect(); p = { x: r.left + r.width / 2, y: r.top - 4 }; }
     } else if (et.vise && ctx.cibleTuto && ctx.ecran === "iles" && !document.querySelector(".fiche-ile")) p = ctx.cibleTuto(et.vise());
+    else if (et.viseCombat && ctx.cibleArchipel && ctx.ecran === "combat" && !document.querySelector(".ar-fiche")) p = ctx.cibleArchipel(et.viseCombat());
   }
   fleche.hidden = !p;
   if (p) { fleche.style.left = Math.round(p.x) + "px"; fleche.style.top = Math.round(p.y) + "px"; }
