@@ -50,7 +50,7 @@ export function infliger(n) {
     B.pv = Math.max(0, B.pv - Math.round(n)); B.combats++;
     const fait = 1 - B.pv / B.max;
     PALIERS.forEach((p, i) => { if (fait >= p.k - 1e-9 && !B.paliers.includes(i)) { B.paliers.push(i); p.donner(e.ressources, e); gains.push(`Palier ${Math.round(p.k * 100)} % : ${p.texte}`); } });
-    if (B.pv <= 0 && !B.mort) { B.mort = true; B.tues = (B.tues || 0) + 1; e.bossTues = (e.bossTues || 0) + 1; if (!e.oeufNoir) { e.oeufNoir = { t: maintenant(), ou: "boss" }; gains.push("Dans les cendres du dragon-roi : un étrange œuf noir…"); } }
+    if (B.pv <= 0 && !B.mort) { B.mort = true; B.tues = (B.tues || 0) + 1; e.bossTues = (e.bossTues || 0) + 1; }
   });
   return gains;
 }

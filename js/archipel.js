@@ -52,6 +52,7 @@ export const ILES_COMBAT = [
   { id: "tour", nom: "La Tour du nid", c: "#b48aff", pos: [-4, -16], modes: ["tour"], texte: "Roguelite : entre sans dragon, choisis 3 œufs et grimpe 21 étages. Au sommet, un œuf mystère UL.", lore: "Plantée sur le pic du nord, ses dragons-gardiens ne dorment jamais." },
   { id: "villages", nom: "Les Villages volants", c: "#ff8a5a", pos: [7, -10], modes: ["village"], texte: "Un archipel de villages de mages : attaque-les, détruis leurs bâtiments et surtout leur couvoir.", lore: "Au large du nord-est, des îlots flottent au-dessus des nuages." },
   { id: "port", nom: "Le Port des dirigeables", c: "#6fd6c8", pos: [10, -1], modes: [], texte: "Envoie tes dragons en expédition chercher des œufs, à bord des dirigeables.", lore: "Les ballons rouges partent vers les terres inconnues." },
+  { id: "legendes", nom: "Le Portail des Légendes", c: "#ffd27a", pos: [7, 13], modes: ["histoire", "village"], texte: "Le mode histoire. À chaque niveau de l'île Mère, une nouvelle quête s'ouvre : 5 étapes qui alternent duels de dragons et attaques de bases, jusqu'au chef. Tout au bout attend le boss final.", lore: "Un portail de pierre plus vieux que le continent. Ceux qui le franchissent écrivent la légende." },
   { id: "boss", nom: "Le Volcan du dragon-roi", c: "#ff5a4a", pos: [-2, 17], modes: ["boss"], texte: "Chaque semaine, un dragon géant se réveille. Chaque combat lui retire des PV ; abats-le avant dimanche pour les meilleures récompenses.", lore: "Le sol tremble quand il respire." },
 ];
 export function lieu(id) { return ILES_COMBAT.find((l) => l.id === id); }
@@ -257,7 +258,25 @@ function volcan() {
     fumee.forEach((p, i) => { const k = (t * 0.2 + i / 6) % 1; p.position.set(Math.sin(t * 0.5 + i) * 0.4 * k, 1 + k * 3, Math.cos(i) * 0.3 * k); p.scale.setScalar(0.8 + k * 2.4); p.material.opacity = 0.45 * (1 - k); });
   } };
 }
-const FABRIQUES = { arene, hall, amis: auberge, sauvage: foret, tour, villages, port, boss: volcan };
+function portail() {
+  const g = new T.Group();
+  const pierre = mat(0x8a8070, { r: 0.9 }), or = mat(0xf2b544, { r: 0.35, m: 0.6, e: 0x7a4a00, ei: 0.5 });
+  g.add(mesh(new T.CylinderGeometry(1.6, 1.8, 0.25, 10).translate(0, 0.12, 0), mat(0x6a6458)));
+  for (const s of [-1, 1]) { g.add(mesh(new T.BoxGeometry(0.45, 2.4, 0.45).translate(s * 1, 1.45, 0), pierre)); g.add(mesh(new T.OctahedronGeometry(0.16, 0).translate(s * 1, 2.85, 0), or)); }
+  const arche = mesh(new T.TorusGeometry(1, 0.22, 6, 16, Math.PI), pierre); arche.position.y = 2.65; g.add(arche);
+  for (let k = 0; k < 5; k++) { const a = (k / 4) * Math.PI; const r = mesh(new T.BoxGeometry(0.1, 0.1, 0.05), mat(0xffd27a, { e: 0xffb040, ei: 1.4 }), false); r.position.set(Math.cos(a) * 1, 2.65 + Math.sin(a) * 1, 0.24); g.add(r); }
+  // Le voile du portail, qui tourbillonne
+  const voile = mesh(new T.CircleGeometry(0.85, 24), new T.MeshBasicMaterial({ color: 0xffc860, transparent: true, opacity: 0.45, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }), false);
+  voile.position.set(0, 1.8, 0); voile.scale.y = 1.25; g.add(voile);
+  const lum = new T.PointLight(0xffc860, 1.4, 6, 2); lum.position.set(0, 1.8, 0.4); g.add(lum);
+  const etincelles = [];
+  for (let k = 0; k < 10; k++) { const e = mesh(new T.OctahedronGeometry(0.05, 0), new T.MeshBasicMaterial({ color: 0xfff0c0 }), false); g.add(e); etincelles.push(e); }
+  return { g, haut: 3.4, anim: (t) => {
+    voile.rotation.z = t * 0.8; voile.material.opacity = 0.35 + Math.sin(t * 2.2) * 0.12; lum.intensity = 1.2 + Math.sin(t * 2.2) * 0.4;
+    etincelles.forEach((e, i) => { const a = t * 1.5 + i * 0.63; const r = 0.4 + (i % 3) * 0.2; e.position.set(Math.cos(a) * r, 1.8 + Math.sin(a) * r * 1.2, 0.1); });
+  } };
+}
+const FABRIQUES = { legendes: portail, arene, hall, amis: auberge, sauvage: foret, tour, villages, port, boss: volcan };
 
 // Un chemin plat posé sur le relief
 function ruban(pts, l, m) {

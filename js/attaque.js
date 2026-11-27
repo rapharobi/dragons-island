@@ -232,7 +232,7 @@ export function lancerAttaque(ctx, dragons, opts = {}) {
   const adv = opts.compo ? { nom: opts.compo.n, t: opts.compo.t || 0 } : adversaire();
   const nom = opts.nom || `Village de ${adv.nom}`;
   // Revanche ou village d'ami : pas de « chercher un autre »
-  if (opts.compo || opts.revanche) { demarrer(ctx, dragons, opts, opts.compo ? Math.max(1, opts.compo.c * 2) : n, moy, nom); return; }
+  if (opts.compo || opts.revanche || opts.histoire) { demarrer(ctx, dragons, opts, opts.compo ? Math.max(1, opts.compo.c * 2) : n, moy, nom); return; }
   // L'adversaire trouvé : on peut en chercher un autre
   modale({
     titre: "Adversaire trouvé !",
