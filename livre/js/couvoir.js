@@ -281,7 +281,7 @@ function animerEclosion(element, id, double, apres) {
       const anim = new Animateur(rig);
       anim.jouer("joie");
       D.nouveau = { rig, anim };
-      setTimeout(() => { Son.crier(element, 0); anim.jouer("rugir"); }, 700);
+      setTimeout(() => { Son.crier(element, 0, id, "joie"); anim.jouer("rugir"); }, 700);
       setTimeout(() => apres && apres(), 1500);
       lum.intensity = 3;
     }

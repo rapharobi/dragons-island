@@ -76,11 +76,11 @@ function places(elx) {
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     const y = solIle(elx, x, z);
     if (elx === "eau" ? y < 0.1 || dansLEau(elx, x, z) : elx === "glace" ? y > 2.4 : false) continue;
-    if (nids.some((n) => Math.hypot(n.x - x, n.z - z) < 1.8)) continue;
+    if (nids.some((n) => Math.hypot(n.x - x, n.z - z) < 2.1)) continue;
     if (ile.noeuds.some((n) => Math.hypot(n.objet.position.x - x, n.objet.position.z - z) < 1.3)) continue;
     if (ile.obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 0.7)) continue;
     if (ile.obstSource && Math.hypot(ile.obstSource.x - x, ile.obstSource.z - z) < ile.obstSource.r + 1.4) continue;
-    if (l.some((p) => Math.hypot(p.x - x, p.z - z) < 2.05)) continue;
+    if (l.some((p) => Math.hypot(p.x - x, p.z - z) < 2.6)) continue;
     l.push({ id: `${elx}-p${l.length}`, x, z, y });
   }
   PLACES[elx] = l;
@@ -90,9 +90,20 @@ function places(elx) {
 // ---------- Modèles 3D des bâtiments ----------
 function modele(type, niveau, elx) {
   const g = new T.Group();
-  const bois = mat(0x8a5a32, { r: 0.85 }), boisFonce = mat(0x5a3820, { r: 0.9 }), pierre = mat(0x8a8478, { r: 0.95 }), toit = mat(elx === "feu" ? 0x7a2a1a : elx === "glace" ? 0x3a5a8a : 0x2a7a6a, { r: 0.8 });
-  const boite = (sx, sy, sz, m, x = 0, y = 0, z = 0) => { const b = mesh(new T.BoxGeometry(sx, sy, sz), m); b.position.set(x, y + sy / 2, z); g.add(b); return b; };
-  const toitPrisme = (l, p, h, y) => { const t = mesh(new T.CylinderGeometry(0.001, p * 0.75, h, 4, 1).rotateY(Math.PI / 4).scale(l / (p * 1.06), 1, 1), toit); t.position.y = y + h / 2; g.add(t); return t; };
+  const anims = [];
+  const bois = mat(0x8a5a32, { r: 0.85 }), boisFonce = mat(0x5a3820, { r: 0.9 }), boisClair = mat(0xb08050, { r: 0.85 }), pierre = mat(0x8a8478, { r: 0.95 }), pierreFoncee = mat(0x6a645a, { r: 0.95 });
+  const toit = mat(elx === "feu" ? 0x8a2a1a : elx === "glace" ? 0x3a5a9a : 0x2a7a6a, { r: 0.75 });
+  const metal = mat(0xb8b8c0, { m: 0.7, r: 0.3 }), fenetreM = mat(0xffd27a, { e: 0xffb040, ei: 1.1 });
+  const boite = (sx, sy, sz, m, x = 0, y = 0, z = 0, parent = g) => { const b = mesh(new T.BoxGeometry(sx, sy, sz), m); b.position.set(x, y + sy / 2, z); parent.add(b); return b; };
+  const cyl = (r1, r2, h, m, x = 0, y = 0, z = 0, seg = 8, parent = g) => { const c = mesh(new T.CylinderGeometry(r1, r2, h, seg), m); c.position.set(x, y + h / 2, z); parent.add(c); return c; };
+  const toitPrisme = (l, p, h, y, x = 0, z = 0) => { const t = mesh(new T.CylinderGeometry(0.001, p * 0.75, h, 4, 1).rotateY(Math.PI / 4).scale(l / (p * 1.06), 1, 1), toit); t.position.set(x, y + h / 2, z); g.add(t); return t; };
+  const fenetre = (x, y, z, ry = 0) => { const f = mesh(new T.PlaneGeometry(0.18, 0.22), fenetreM, false); f.position.set(x, y, z); f.rotation.y = ry; g.add(f); return f; };
+  // Fumée qui sort d'une cheminée, en boucle
+  const fumee = (x, y, z) => {
+    const puffs = [];
+    for (let i = 0; i < 5; i++) { const p = new T.Mesh(new T.IcosahedronGeometry(0.12, 0), new T.MeshBasicMaterial({ color: 0xb8b0a8, transparent: true, opacity: 0.5, depthWrite: false })); g.add(p); puffs.push(p); }
+    anims.push((t) => puffs.forEach((p, i) => { const k = (t * 0.35 + i / 5) % 1; p.position.set(x + Math.sin(t + i) * 0.08 * k, y + k * 1.3, z + k * 0.2); p.scale.setScalar(0.6 + k * 1.6); p.material.opacity = 0.45 * (1 - k); }));
+  };
   if (type === "hotel") {
     boite(1.9, 0.35, 1.6, pierre);
     boite(1.5, 0.9, 1.25, bois, 0, 0.35);
@@ -100,46 +111,120 @@ function modele(type, niveau, elx) {
     boite(0.3, 0.45, 0.05, boisFonce, 0, 0.35, 0.64);
     const mat2 = mesh(new T.CylinderGeometry(0.025, 0.025, 1.1, 5), boisFonce); mat2.position.set(0.6, 2.2, 0); g.add(mat2);
     const drapeau = mesh(new T.BoxGeometry(0.4, 0.25, 0.02), mat(0xf2b544, { r: 0.6, e: 0x5a3a00, ei: 0.3 })); drapeau.position.set(0.82, 2.6, 0); g.add(drapeau);
-    g.userData.anim = (t) => { drapeau.rotation.y = Math.sin(t * 3) * 0.25; };
+    anims.push((t) => { drapeau.rotation.y = Math.sin(t * 3) * 0.25; });
   } else if (type === "entrepot") {
-    boite(1.6, 0.75, 1.1, bois);
-    toitPrisme(1.75, 1.2, 0.55, 0.75);
-    boite(0.5, 0.55, 0.05, boisFonce, 0, 0, 0.56);
-    for (let i = 0; i < 3; i++) boite(0.3, 0.3, 0.3, boisFonce, 0.95, i === 2 ? 0.3 : 0, i === 1 ? 0.35 : -0.2);
+    // Grange à étage, portes doubles, croisillons, poulie qui monte les caisses
+    boite(1.9, 0.12, 1.4, pierreFoncee);
+    boite(1.7, 1.15, 1.2, bois, 0, 0.12);
+    toitPrisme(1.95, 1.4, 0.75, 1.27);
+    for (const s of [-1, 1]) { const p = boite(0.36, 0.62, 0.04, boisFonce, s * 0.19, 0.12, 0.62); p.rotation.y = s * 0.15; }
+    for (const s of [-1, 1]) { const c = mesh(new T.BoxGeometry(0.05, 0.85, 0.03), boisFonce); c.position.set(s * 0.55, 0.7, 0.61); c.rotation.z = s * 0.7; g.add(c); const c2 = c.clone(); c2.rotation.z = -s * 0.7; g.add(c2); }
+    fenetre(0, 1.05, 0.61);
+    const poutre = boite(0.08, 0.08, 0.6, boisFonce, 0, 1.45, 0.85);
+    const corde = mesh(new T.CylinderGeometry(0.01, 0.01, 1, 3), mat(0x3a2a1a), false); g.add(corde);
+    const caisse = boite(0.26, 0.26, 0.26, boisClair, 0, 0, 1.1);
+    for (let i = 0; i < 4; i++) boite(0.3, 0.3, 0.3, i % 2 ? boisClair : bois, 1.05 + (i % 2) * 0.05, i > 1 ? 0.3 : 0, -0.3 + (i % 2) * 0.36);
+    for (let i = 0; i < 3; i++) cyl(0.13, 0.13, 0.36, boisFonce, -1.05, 0, -0.35 + i * 0.3, 10);
+    anims.push((t) => { const k = (Math.sin(t * 0.8) + 1) / 2; caisse.position.y = 0.13 + k * 1.15; corde.position.set(0, (1.45 + caisse.position.y + 0.13) / 2, 1.1); corde.scale.y = Math.max(0.05, 1.45 - caisse.position.y - 0.13); caisse.rotation.y = Math.sin(t * 1.6) * 0.2; });
+    void poutre;
   } else if (type === "verger") {
-    boite(1.7, 0.06, 1.3, mat(0x5a3a22, { r: 1 }));
-    for (const [x, z] of [[-0.5, -0.3], [0.45, -0.25], [0, 0.35]]) {
-      const tr = mesh(new T.CylinderGeometry(0.05, 0.07, 0.5, 5), boisFonce); tr.position.set(x, 0.3, z); g.add(tr);
-      const f = mesh(new T.IcosahedronGeometry(0.32, 0), mat(elx === "glace" ? 0x4a8a6a : 0x3a9a3a, { r: 0.9 })); f.position.set(x, 0.72, z); g.add(f);
-      for (let k = 0; k < 3; k++) { const p = mesh(new T.SphereGeometry(0.06, 5, 4), mat(0xd83a2a, { r: 0.5 }), false); p.position.set(x + Math.cos(k * 2) * 0.25, 0.7 + (k - 1) * 0.08, z + Math.sin(k * 2) * 0.25); g.add(p); }
+    // Verger clos : arbres qui se balancent, fruits qui mûrissent, panier et épouvantail
+    boite(2.2, 0.06, 1.8, mat(0x5a3a22, { r: 1 }));
+    const fruit = elx === "glace" ? 0x7fd6ff : elx === "feu" ? 0xff4a1a : 0xd83a2a;
+    const arbres = [];
+    for (const [x, z] of [[-0.6, -0.45], [0.55, -0.4], [-0.55, 0.45], [0.6, 0.4]]) {
+      const a = new T.Group(); a.position.set(x, 0, z); g.add(a);
+      cyl(0.06, 0.09, 0.6, boisFonce, 0, 0.06, 0, 6, a);
+      const f = mesh(new T.IcosahedronGeometry(0.36, 0), mat(elx === "glace" ? 0x4a8a6a : 0x3a9a3a, { r: 0.9 })); f.position.y = 0.88; a.add(f);
+      const f2 = mesh(new T.IcosahedronGeometry(0.24, 0), mat(elx === "glace" ? 0x5a9a7a : 0x4aaa4a, { r: 0.9 })); f2.position.set(0.18, 1.08, 0.1); a.add(f2);
+      const fruits = [];
+      for (let k = 0; k < 5; k++) { const p = mesh(new T.SphereGeometry(0.06, 6, 4), mat(fruit, { r: 0.4, e: fruit, ei: 0.15 }), false); p.position.set(Math.cos(k * 1.3) * 0.3, 0.78 + (k % 3) * 0.12, Math.sin(k * 1.3) * 0.3); a.add(p); fruits.push(p); }
+      arbres.push({ a, fruits, ph: x * 3 + z });
     }
-    for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.28; const p = mesh(new T.BoxGeometry(0.06, 0.3, 0.06), boisFonce); p.position.set(Math.cos(a) * 0.95, 0.15, Math.sin(a) * 0.75); g.add(p); }
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * 6.28; const p = mesh(new T.BoxGeometry(0.06, 0.32, 0.06), boisFonce); p.position.set(Math.cos(a) * 1.15, 0.16, Math.sin(a) * 0.95); g.add(p); }
+    const panier = cyl(0.16, 0.12, 0.16, boisClair, 0.05, 0.06, 0.05, 10);
+    for (let k = 0; k < 4; k++) { const p = mesh(new T.SphereGeometry(0.06, 6, 4), mat(fruit, { r: 0.4 }), false); p.position.set(0.02 + (k % 2) * 0.07, 0.24, 0.02 + Math.floor(k / 2) * 0.07); g.add(p); }
+    const epou = new T.Group(); epou.position.set(-1.0, 0, 0.0); g.add(epou);
+    cyl(0.03, 0.03, 0.8, boisFonce, 0, 0, 0, 5, epou); const bras = mesh(new T.BoxGeometry(0.5, 0.04, 0.04), boisFonce); bras.position.y = 0.6; epou.add(bras);
+    const tete = mesh(new T.SphereGeometry(0.09, 6, 5), mat(0xe8c890)); tete.position.y = 0.86; epou.add(tete); const chap = mesh(new T.ConeGeometry(0.13, 0.14, 6), mat(0x6a4a2a)); chap.position.y = 0.97; epou.add(chap);
+    anims.push((t) => { for (const a of arbres) { a.a.rotation.z = Math.sin(t * 1.2 + a.ph) * 0.04; a.fruits.forEach((p, k) => p.scale.setScalar(0.7 + ((t * 0.12 + k * 0.2 + a.ph) % 1) * 0.5)); } epou.rotation.y = Math.sin(t * 0.6) * 0.3; });
+    void panier;
   } else if (type === "scierie") {
-    boite(1.1, 0.6, 0.9, bois, -0.25, 0, -0.1);
-    toitPrisme(1.25, 1.0, 0.45, 0.6).position.x = -0.25;
-    for (let i = 0; i < 4; i++) { const b = mesh(new T.CylinderGeometry(0.12, 0.12, 1.0, 7).rotateZ(Math.PI / 2), mat(0x9a6a3a, { r: 0.9 })); b.position.set(0.55, 0.12 + (i > 2 ? 0.22 : 0), -0.35 + (i % 3) * 0.25); b.rotation.y = Math.PI / 2; g.add(b); }
-    const lame = mesh(new T.CylinderGeometry(0.28, 0.28, 0.03, 12).rotateX(Math.PI / 2), mat(0xc8c8c8, { m: 0.7, r: 0.3 })); lame.position.set(-0.25, 0.45, 0.47); g.add(lame);
-    g.userData.anim = (t) => { lame.rotation.z = t * 4; };
+    // Atelier, grande scie circulaire, tapis où avance une bûche, sciure et fumée
+    boite(1.5, 0.12, 1.3, pierreFoncee, -0.25, 0, -0.15);
+    boite(1.3, 0.85, 1.1, bois, -0.25, 0.12, -0.15);
+    toitPrisme(1.5, 1.25, 0.6, 0.97, -0.25, -0.15);
+    fenetre(-0.25, 0.65, 0.41);
+    cyl(0.09, 0.11, 0.6, pierreFoncee, -0.7, 1.2, -0.4, 6); fumee(-0.7, 1.85, -0.4);
+    // Tapis et scie
+    boite(0.5, 0.42, 1.9, boisFonce, 0.75, 0, 0);
+    const lame = mesh(new T.CylinderGeometry(0.34, 0.34, 0.03, 16).rotateZ(Math.PI / 2), metal); lame.position.set(0.75, 0.6, 0.2); g.add(lame);
+    for (let k = 0; k < 8; k++) { const d = mesh(new T.ConeGeometry(0.04, 0.08, 3), metal, false); d.position.set(0, Math.cos(k * 0.785) * 0.36, Math.sin(k * 0.785) * 0.36); d.rotation.x = k * 0.785; lame.add(d); }
+    const buche = mesh(new T.CylinderGeometry(0.13, 0.13, 0.8, 8).rotateX(Math.PI / 2), mat(0x9a6a3a, { r: 0.9 })); buche.position.set(0.75, 0.55, 0); g.add(buche);
+    const sciure = [];
+    for (let i = 0; i < 6; i++) { const p = mesh(new T.TetrahedronGeometry(0.035, 0), mat(0xe0b878), false); g.add(p); sciure.push(p); }
+    for (let i = 0; i < 5; i++) { const b = mesh(new T.BoxGeometry(0.9, 0.06, 0.18), boisClair); b.position.set(-0.3, 0.03 + i * 0.065, 0.75); g.add(b); }
+    anims.push((t) => {
+      lame.rotation.x = -t * 9;
+      const k = (t * 0.25) % 1; buche.position.z = -0.9 + k * 1.4; buche.scale.z = k > 0.75 ? 1 - (k - 0.75) * 2 : 1;
+      sciure.forEach((p, i) => { const u = (t * 1.6 + i / 6) % 1; p.position.set(0.75 + Math.sin(i * 2) * 0.25 * u, 0.6 + u * 0.4 - u * u * 0.6, 0.2 + u * 0.4); p.rotation.set(t * 5, i, 0); p.visible = k > 0.35 && k < 0.95; });
+    });
   } else if (type === "carriere") {
-    for (let i = 0; i < 6; i++) { const p = mesh(new T.DodecahedronGeometry(0.22 + (i % 3) * 0.08, 0), pierre); p.position.set(Math.cos(i * 1.1) * 0.45, 0.18 + (i === 0 ? 0.2 : 0), Math.sin(i * 1.1) * 0.35); p.rotation.set(i, i * 2, 0); g.add(p); }
-    boite(0.5, 0.25, 0.35, boisFonce, 0.75, 0.1, 0.4);
-    for (const s of [-1, 1]) { const ro = mesh(new T.CylinderGeometry(0.09, 0.09, 0.05, 8).rotateX(Math.PI / 2), boisFonce); ro.position.set(0.75 + s * 0.18, 0.09, 0.6); g.add(ro); }
-    const manche = mesh(new T.CylinderGeometry(0.02, 0.02, 0.6, 4), boisFonce); manche.position.set(-0.3, 0.5, 0.2); manche.rotation.z = 0.6; g.add(manche);
+    // Falaise de pierre, grue à godet, wagonnet sur rails, pioche qui frappe
+    for (let i = 0; i < 7; i++) { const p = mesh(new T.DodecahedronGeometry(0.3 + (i % 3) * 0.12, 0), i % 2 ? pierre : pierreFoncee); p.position.set(-0.5 + Math.cos(i * 0.9) * 0.45, 0.25 + (i < 3 ? 0.35 : 0), -0.4 + Math.sin(i * 0.9) * 0.3); p.rotation.set(i, i * 2, 0); g.add(p); }
+    // Rails et wagonnet
+    for (const s of [-0.14, 0.14]) boite(1.9, 0.03, 0.04, metal, 0.15, 0, 0.6 + s);
+    for (let i = 0; i < 8; i++) boite(0.06, 0.02, 0.4, boisFonce, -0.75 + i * 0.26, 0, 0.6);
+    const wagon = new T.Group(); wagon.position.set(0, 0.08, 0.6); g.add(wagon);
+    boite(0.42, 0.24, 0.32, metal, 0, 0.06, 0, wagon);
+    for (let k = 0; k < 3; k++) { const p = mesh(new T.DodecahedronGeometry(0.08, 0), pierre); p.position.set((k - 1) * 0.11, 0.33, 0); wagon.add(p); }
+    for (const [x, z] of [[-0.14, -0.16], [0.14, -0.16], [-0.14, 0.16], [0.14, 0.16]]) { const r = mesh(new T.CylinderGeometry(0.07, 0.07, 0.04, 8).rotateX(Math.PI / 2), boisFonce); r.position.set(x, 0.04, z); wagon.add(r); }
+    // Grue à godet
+    cyl(0.05, 0.06, 1.7, boisFonce, 0.85, 0, -0.45, 6);
+    const bras = new T.Group(); bras.position.set(0.85, 1.7, -0.45); g.add(bras);
+    const fl = mesh(new T.BoxGeometry(1.2, 0.06, 0.06), boisFonce); fl.position.x = -0.45; bras.add(fl);
+    const godet = mesh(new T.BoxGeometry(0.22, 0.16, 0.22), metal); bras.add(godet);
+    const cable = mesh(new T.CylinderGeometry(0.008, 0.008, 1, 3), mat(0x222222), false); bras.add(cable);
+    // Pioche
+    const pioche = new T.Group(); pioche.position.set(-0.1, 0.35, 0.05); g.add(pioche);
+    const manche = mesh(new T.CylinderGeometry(0.02, 0.02, 0.55, 4), boisFonce); manche.position.y = 0.27; pioche.add(manche);
+    const fer = mesh(new T.BoxGeometry(0.32, 0.04, 0.04), metal); fer.position.y = 0.55; pioche.add(fer);
+    anims.push((t) => {
+      wagon.position.x = Math.sin(t * 0.6) * 0.65;
+      bras.rotation.y = Math.sin(t * 0.4) * 0.9;
+      const h = 0.7 + Math.sin(t * 1.2) * 0.45; godet.position.set(-0.95, -h, 0); cable.position.set(-0.95, -h / 2, 0); cable.scale.y = h;
+      pioche.rotation.z = -0.4 - Math.abs(Math.sin(t * 3)) * 0.9;
+    });
   } else {
-    // Tour de défense : socle de pierre, fût, et au sommet son cœur élémentaire
+    // Tour de défense : socle, fût avec meurtrières, escalier en spirale, cœur élémentaire et anneaux
     const tr = BATIMENTS[type].tour;
-    const fut = mesh(new T.CylinderGeometry(0.42, 0.55, 1.6, 7), pierre); fut.position.y = 0.8; g.add(fut);
-    const crenaux = mesh(new T.CylinderGeometry(0.58, 0.5, 0.25, 7), pierre); crenaux.position.y = 1.72; g.add(crenaux);
-    for (let i = 0; i < 7; i++) { const c = mesh(new T.BoxGeometry(0.16, 0.18, 0.16), pierre); const a = (i / 7) * 6.28; c.position.set(Math.cos(a) * 0.5, 1.93, Math.sin(a) * 0.5); g.add(c); }
-    const coeur = mesh(type === "tourGivre" ? new T.OctahedronGeometry(0.28, 0).scale(1, 1.5, 1) : new T.IcosahedronGeometry(0.26, 0), mat(tr.couleur, { e: tr.couleur, ei: 1, r: 0.2, m: 0.2 }));
-    coeur.position.y = 2.25; g.add(coeur);
-    const l = new T.PointLight(tr.couleur, 0.8, 3.5); l.position.y = 2.25; g.add(l);
+    cyl(0.75, 0.85, 0.3, pierreFoncee, 0, 0, 0, 8);
+    const fut = cyl(0.48, 0.62, 2.1, pierre, 0, 0.3, 0, 8);
+    for (let i = 0; i < 10; i++) { const a = (i / 10) * 6.28 * 1.5; boite(0.22, 0.05, 0.12, pierreFoncee, Math.cos(a) * 0.6, 0.4 + i * 0.18, Math.sin(a) * 0.6).rotation.y = -a; }
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * 6.28; const m = mesh(new T.PlaneGeometry(0.08, 0.26), fenetreM, false); m.position.set(Math.cos(a) * 0.56, 1.5, Math.sin(a) * 0.56); m.rotation.y = -a + Math.PI / 2; g.add(m); }
+    cyl(0.72, 0.6, 0.28, pierreFoncee, 0, 2.4, 0, 8);
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * 6.28; boite(0.18, 0.22, 0.18, pierre, Math.cos(a) * 0.62, 2.68, Math.sin(a) * 0.62); }
+    const coeur = mesh(type === "tourGivre" ? new T.OctahedronGeometry(0.32, 0).scale(1, 1.6, 1) : new T.IcosahedronGeometry(0.3, 0), mat(tr.couleur, { e: tr.couleur, ei: 1.2, r: 0.2, m: 0.2 }));
+    coeur.position.y = 3.2; g.add(coeur);
+    const anneaux = [0, 1].map((i) => { const a = mesh(new T.TorusGeometry(0.5 + i * 0.12, 0.025, 5, 28), mat(tr.couleur, { e: tr.couleur, ei: 0.8 }), false); a.position.y = 3.2; g.add(a); return a; });
+    const l = new T.PointLight(tr.couleur, 1, 4.5); l.position.y = 3.2; g.add(l);
     g.userData.coeur = coeur;
-    g.userData.anim = (t) => { coeur.rotation.y = t * 1.5; coeur.position.y = 2.25 + Math.sin(t * 2) * 0.06; l.intensity = 0.7 + Math.sin(t * 4) * 0.2; };
+    // Détails propres à chaque élément
+    const detail = [];
+    if (type === "tourLave") for (let i = 0; i < 4; i++) { const d = mesh(new T.SphereGeometry(0.05, 5, 4), mat(0xff5a0a, { e: 0xff5a0a, ei: 1.5 }), false); g.add(d); detail.push(d); }
+    if (type === "tourGivre") for (let i = 0; i < 6; i++) { const s = mesh(new T.ConeGeometry(0.07, 0.4, 4), mat(0xcff4ff, { e: 0x7fd6ff, ei: 0.4 })); const a = (i / 6) * 6.28; s.position.set(Math.cos(a) * 0.78, 0.45, Math.sin(a) * 0.78); s.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4); g.add(s); }
+    if (type === "tourEau") for (let i = 0; i < 3; i++) { const j = mesh(new T.ConeGeometry(0.06, 0.5, 6), new T.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.7 }), false); const a = (i / 3) * 6.28; j.position.set(Math.cos(a) * 0.62, 2.9, Math.sin(a) * 0.62); g.add(j); detail.push(j); }
+    anims.push((t) => {
+      coeur.rotation.y = t * 1.5; coeur.position.y = 3.2 + Math.sin(t * 2) * 0.08; l.intensity = 0.9 + Math.sin(t * 4) * 0.3;
+      anneaux[0].rotation.set(t * 1.1, t * 0.4, 0); anneaux[1].rotation.set(-t * 0.7, 0, t * 0.9);
+      if (type === "tourLave") detail.forEach((d, i) => { const k = (t * 0.6 + i / 4) % 1; const a = i * 1.57; d.position.set(Math.cos(a) * 0.55, 2.6 - k * 2.2, Math.sin(a) * 0.55); });
+      if (type === "tourEau") detail.forEach((j, i) => { j.scale.y = 0.6 + Math.abs(Math.sin(t * 3 + i)) * 0.8; });
+    });
   }
-  // Petits fanions : un par niveau
-  for (let i = 1; i < niveau; i++) { const f = mesh(new T.ConeGeometry(0.07, 0.16, 3).rotateZ(-Math.PI / 2), mat(0xf2b544, { r: 0.6 }), false); f.position.set(-0.7 + i * 0.18, 0.08, 0.75); g.add(f); }
-  g.scale.setScalar(0.85 + niveau * 0.06);
+  // Fanions : un par niveau
+  for (let i = 1; i < niveau; i++) { const f = mesh(new T.ConeGeometry(0.07, 0.16, 3).rotateZ(-Math.PI / 2), mat(0xf2b544, { r: 0.6 }), false); f.position.set(-0.7 + i * 0.18, 0.08, 0.85); g.add(f); }
+  if (anims.length) g.userData.anim = (t) => { for (const a of anims) a(t); };
+  g.scale.setScalar(1.05 + niveau * 0.07);
   return g;
 }
 

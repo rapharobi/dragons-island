@@ -195,7 +195,7 @@ function ficheDragon() {
     const an = el("div", { class: "choix-ligne" });
     for (const a of ANIMATIONS) an.append(el("button", { class: vue.anim === a.id ? "actif" : "", onclick: () => {
       vue.anim = a.id;
-      if (a.id === "rugir") Son.crier(d.element, vue.stade / 4);
+      if (a.id === "rugir") Son.crier(d.element, vue.stade / 4, d.id);
       if (a.id === "attaque") Son.souffle(d.element);
       D.anim.jouer(a.boucle ? a.id : a.id);
       if (!a.boucle && D.anim.boucle !== "repos" && D.anim.boucle !== "vol" && D.anim.boucle !== "marche") D.anim.jouer("repos");

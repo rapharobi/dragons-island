@@ -4,7 +4,7 @@ import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite, versEcran } from "./scene.js";
 import { mat, mesh, bloc } from "./outils3d.js";
 import { E, changer, depenserEnergie, energie, gagnerXp, maintenant, noter, rationsPourSoigner, soignerEquipe, remplirCouvoir } from "./etat.js";
-import { DRAGONS, PAR_ID, ELEMENTS, TOURS, COUT, degats, tirerAlea, domine, postures, pvMax, stadeEffectif, stadeDuNiveau, xpCombat, ESPERANCE, nomStade, armuresDe } from "./regles.js";
+import { DRAGONS, PAR_ID, ELEMENTS, TOURS, COUT, degats, tirerAlea, domine, postures, pvMax, stadeEffectif, stadeDuNiveau, xpCombat, ESPERANCE, nomStade, armuresDe, habitatDe } from "./regles.js";
 import { preparer, ouvrirSalon, nouveauCode, codeValide, identifiant, modeReseau, lienInvitation, VERSION_RESEAU, aleaGraine } from "./reseau.js";
 import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement } from "./ui.js";
 import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } from "./tuto.js";
@@ -194,7 +194,7 @@ function construireArene() {
       if (D.secousse > 0) { D.secousse = Math.max(0, D.secousse - dt * 2); camera.position.x += (Math.random() - 0.5) * D.secousse * 0.3; camera.position.y += (Math.random() - 0.5) * D.secousse * 0.3; }
       D.braseros.forEach((f, i) => { const k = 1 + Math.sin(D.t * 11 + i) * 0.12; f.scale.set(1, k, 1); });
       D.flash.intensity = Math.max(0, D.flash.intensity - dt * 8);
-      for (const c of D.cotes) if (c) c.anim.update(dt);
+      for (const c of D.cotes) if (c) { c.anim.update(dt); majVol(c, dt); }
       majProjectiles(dt);
       majEffets(dt);
     },
@@ -219,9 +219,20 @@ function placerDragon(cote, membre, entree = true) {
   support.add(rig.racine);
   D.scene.add(support);
   const anim = new Animateur(rig);
+  const vol = rig.ailes && rig.ailes.length > 0 && membre.stade >= 1 && habitatDe(membre.id) !== "fond";
+  if (vol) anim.jouer("vol");
   if (entree) anim.jouer("entree");
   if (membre.pv <= 0) anim.jouer("ko");
-  D.cotes[cote] = { membre, rig, anim, support, ech };
+  if (vol && membre.pv > 0) support.position.y = 3;
+  D.cotes[cote] = { membre, rig, anim, support, ech, vol, plonge: null, ph: Math.random() * 6 };
+}
+// Hauteur de vol d'un dragon ailé (il retombe au sol s'il est K.O.)
+function majVol(c, dt) {
+  if (!c || !c.vol) return;
+  const ko = c.membre.pv <= 0;
+  const voulu = ko ? 0 : c.plonge != null ? c.plonge : 1.45 + Math.sin(D.t * 1.8 + c.ph) * 0.18;
+  c.support.position.y += (voulu - c.support.position.y) * Math.min(1, dt * (c.plonge != null ? 7 : 3));
+  if (!ko) c.support.rotation.z = Math.sin(D.t * 1.3 + c.ph) * 0.05;
 }
 
 // ---------- Effets de souffle ----------
@@ -1008,7 +1019,7 @@ function lancer() {
 const etroit = () => window.innerWidth / window.innerHeight < 0.8;
 function viserArene() { D.orbite.viser(new T.Vector3(0, 0.5, -0.5), etroit() ? 12.5 : 8.6, 0.5, 1.0); }
 // Pendant une attaque, la caméra se place derrière l'attaquant
-function viserPhase(k) { D.orbite.viser(new T.Vector3(0, 0.6, k === 0 ? -0.7 : 0.7), etroit() ? 11.5 : 8, k === 0 ? 0.6 : Math.PI - 0.6, 1.02); }
+function viserPhase(k) { const haut = D.cotes.some((c) => c && c.vol) ? 1.2 : 0.6; D.orbite.viser(new T.Vector3(0, haut, k === 0 ? -0.7 : 0.7), etroit() ? 12 : 8.4, k === 0 ? 0.6 : Math.PI - 0.6, 1.02); }
 let chronoInt = null;
 function debutTour() {
   if (!C || C.fini) return;
@@ -1319,15 +1330,19 @@ async function phase(k) {
     } });
   } else {
     // Corps à corps : morsure, griffes ou charge
+    const hauteurCible = cib.vol && cib.membre.pv > 0 ? 1.45 : 0.25;
+    if (att.vol) { att.plonge = 2.6; await pause(260); }
     if (sa === "charge") {
       await glisser(att.support, departZ - dir * 0.6, 0.3);
       att.anim.jouer("attaque", { style: "charge" });
       reagir();
+      if (att.vol) att.plonge = hauteurCible;
       await glisser(att.support, zContact, 0.32);
       eclatement(posMonde(cib.rig.tronc), elA, true);
       D.secousse = 1.3;
       impact();
     } else {
+      if (att.vol) att.plonge = hauteurCible;
       await glisser(att.support, zContact, 0.45);
       reagir();
       await new Promise((r) => att.anim.jouer("attaque", { style: sa, surImpact: () => {
@@ -1338,7 +1353,9 @@ async function phase(k) {
       } }));
     }
     await pause(350);
+    if (att.vol) att.plonge = 2.2;
     await glisser(att.support, departZ, 0.5);
+    if (att.vol) att.plonge = null;
   }
   await fini;
   clearTimeout(secours);
@@ -1360,7 +1377,7 @@ function attendreSuite(fiche) {
 function apresCoups(d1, d2) {
   for (const c of [0, 1]) {
     const m = C.choix[c].m;
-    if (m.pv <= 0) { m.pv = 0; D.cotes[c].anim.jouer("ko"); Son.crier(m.element, 0.8); toast(`${m.nom} est K.O. !`, c === 0 ? "mal" : "bon"); }
+    if (m.pv <= 0) { m.pv = 0; D.cotes[c].anim.jouer("ko"); Son.crier(m.element, 0.8, m.id, "douleur"); toast(`${m.nom} est K.O. !`, c === 0 ? "mal" : "bon"); }
   }
   // Rafraîchit le haut
   const h = ui.querySelector(".cb-haut"); if (h) h.replaceWith(rendreHaut());

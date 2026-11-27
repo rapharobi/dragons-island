@@ -99,6 +99,55 @@ function ech(k, t, o = {}) {
   return true;
 }
 
+// ---------- La voix de chaque dragon ----------
+// Un profil stable par espèce (tiré de son identifiant) : hauteur, timbre, vibrato, forme du cri, souffle.
+const PROFILS = {};
+function profil(id) {
+  if (PROFILS[id]) return PROFILS[id];
+  let h = 2166136261;
+  for (const c of String(id)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const r = (k) => (((h >>> (k * 4)) & 0xff) / 255);
+  const p = {
+    hauteur: 0.6 + r(0) * 1.1,              // grave ↔ aigu
+    onde: ["sawtooth", "square", "triangle", "sawtooth"][Math.floor(r(1) * 4) % 4],
+    vib: 4 + r(2) * 26, vibProf: 0.02 + r(3) * 0.09,
+    forme: Math.floor(r(4) * 5) % 5,         // 0 rugissement, 1 appel montant, 2 trille, 3 gargouillis, 4 grondement
+    formant: 500 + r(5) * 2200, souffle: 0.05 + r(6) * 0.2, duree: 0.8 + r(7) * 0.6,
+  };
+  PROFILS[id] = p;
+  return p;
+}
+function voix(id, element, grave, humeur) {
+  const p = profil(id), t = T0();
+  const taille = 1 - grave * 0.55; // les gros dragons parlent plus grave
+  const base = 300 * p.hauteur * taille;
+  const court = humeur === "joie" || humeur === "douleur" || humeur === "attaque";
+  const d = (court ? 0.35 : 0.65) * p.duree * (0.8 + grave * 0.5);
+  const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), fi = ctx.createBiquadFilter();
+  o.type = p.onde; o2.type = p.onde === "square" ? "sawtooth" : "square";
+  const f = o.frequency;
+  // La forme du cri, selon l'espèce et l'humeur
+  if (humeur === "joie") { f.setValueAtTime(base, t); f.exponentialRampToValueAtTime(base * 1.7, t + d * 0.6); f.exponentialRampToValueAtTime(base * 1.4, t + d); }
+  else if (humeur === "douleur") { f.setValueAtTime(base * 1.8, t); f.exponentialRampToValueAtTime(base * 0.6, t + d); }
+  else if (p.forme === 0) { f.setValueAtTime(base * 0.9, t); f.linearRampToValueAtTime(base * 1.3, t + d * 0.25); f.exponentialRampToValueAtTime(base * 0.5, t + d); }
+  else if (p.forme === 1) { f.setValueAtTime(base * 0.7, t); f.exponentialRampToValueAtTime(base * 1.6, t + d * 0.7); f.exponentialRampToValueAtTime(base * 1.2, t + d); }
+  else if (p.forme === 2) { for (let k = 0; k < 6; k++) f.setValueAtTime(base * (k % 2 ? 1.35 : 1), t + (k * d) / 6); }
+  else if (p.forme === 3) { f.setValueAtTime(base * 0.8, t); for (let k = 1; k < 5; k++) f.linearRampToValueAtTime(base * (k % 2 ? 1.25 : 0.75), t + (k * d) / 5); }
+  else { f.setValueAtTime(base * 0.55, t); f.linearRampToValueAtTime(base * 0.7, t + d * 0.4); f.exponentialRampToValueAtTime(base * 0.4, t + d); }
+  o2.frequency.setValueAtTime(base * 0.501, t); o2.frequency.exponentialRampToValueAtTime(base * 0.38, t + d);
+  const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = p.vib; lg.gain.value = base * p.vibProf; lfo.connect(lg); lg.connect(f);
+  fi.type = "bandpass"; fi.frequency.setValueAtTime(p.formant * taille + 200, t); fi.frequency.linearRampToValueAtTime(p.formant * 0.6 * taille + 200, t + d); fi.Q.value = 2 + p.hauteur;
+  env(g, t, humeur === "attaque" ? 0.01 : 0.04, d, humeur === "douleur" ? 0.38 : 0.45);
+  const g2 = ctx.createGain(); g2.gain.value = p.forme === 4 ? 0.9 : 0.5;
+  o.connect(fi); o2.connect(g2); g2.connect(fi); fi.connect(g); g.connect(busEffets);
+  const rv = ctx.createGain(); rv.gain.value = 0.3 + grave * 0.4; g.connect(rv); rv.connect(reverb);
+  [o, o2, lfo].forEach((x) => { x.start(t); x.stop(t + d + 0.12); });
+  // Le souffle de l'élément, plus ou moins présent selon l'espèce
+  bruit(t, d * 0.9, p.souffle + (p.forme === 4 ? 0.15 : 0), "bandpass", element === "glace" ? 3800 : element === "eau" ? 900 : 1700, element === "eau" ? 500 : 600, busEffets, { q: 1.4 });
+  if (element === "eau" && p.forme === 3) for (let k = 0; k < 3; k++) osc("sine", 300 + Math.random() * 300, t + k * 0.08, 0.08, 0.06, busEffets, { vers: 900 });
+  if (element === "glace") osc("sine", base * 4, t, d * 0.6, 0.03, busEffets, { rev: 0.6 });
+}
+
 export const Son = {
   clic() { const t = T0(); osc("triangle", 900, t, 0.05, 0.12, busEffets, { vers: 600 }); },
   ok() { const t = T0(); osc("triangle", 660, t, 0.08, 0.15); osc("triangle", 990, t + 0.07, 0.12, 0.13, busEffets, { rev: 0.2 }); },
@@ -151,9 +200,10 @@ export const Son = {
   },
   glisse() { const t = T0(); bruit(t, 0.12, 0.12, "bandpass", 1800, 900, busEffets, { q: 1.5 }); },
   pas(sol = "roche", grave = 0.5) { const t = T0(); if (!ech(sol, t, { vol: 0.28 + grave * 0.2, vitesse: 0.85 - grave * 0.3, filtre: 3000 - grave * 1500 })) bruit(t, 0.06, 0.25, "lowpass", 400); },
-  // Cri d'un dragon : grave = 0 (petit) à 1 (énorme)
-  crier(element = "feu", grave = 0.5) {
+  // Cri d'un dragon : grave = 0 (petit) à 1 (énorme). Avec son identifiant, chaque espèce a sa propre voix.
+  crier(element = "feu", grave = 0.5, id = null, humeur = "cri") {
     if (!ctx) return;
+    if (id) { voix(id, element, grave, humeur); return; }
     const t = T0(), base = 520 - grave * 380, d = 0.5 + grave * 0.6;
     const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), fi = ctx.createBiquadFilter();
     o.type = "sawtooth"; o2.type = "square";

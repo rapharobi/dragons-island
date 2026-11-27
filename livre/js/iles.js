@@ -425,7 +425,7 @@ function choisirEnvie(v) {
   let r = Math.random() * total, choix = "marche";
   for (const [n, w] of tirage) { r -= w; if (r <= 0) { choix = n; break; } }
   if (choix === "marche") { const c = pointAuHasard(v, v.habitat === "cheminee" || perche ? v.maison : p, perche ? 2 : v.habitat === "cheminee" ? 3 : 4.5); if (c) return allerVers(v, c, "marche", 0.7 + Math.random() * 0.6); choix = "action"; }
-  if (choix === "action") { v.etat = "action"; const a = ACTIONS_SEUL[Math.floor(Math.random() * ACTIONS_SEUL.length)]; v.anim.jouer(a); v.minuteur = 2.6; if (a === "rugir" && v.proche) Son.crier(v.element, Math.min(1, v.stade / 4)); return; }
+  if (choix === "action") { v.etat = "action"; const a = ACTIONS_SEUL[Math.floor(Math.random() * ACTIONS_SEUL.length)]; v.anim.jouer(a); v.minuteur = 2.6; if (a === "rugir" && v.proche) Son.crier(v.element, Math.min(1, v.stade / 4), v.d.id); return; }
   if (choix === "dort" || choix === "nid") return allerVers(v, v.maison.clone(), "nid", 0.8);
   if (choix === "vol") return decoller(v);
   if (choix === "ami") {
@@ -775,7 +775,7 @@ function majRituel(dt) {
   const prets = r.groupe.every((v) => v.etat === "rituelPret");
   if (!r.fini && (prets || r.t > 14)) {
     r.fini = true;
-    for (const v of r.groupe) { v.anim.jouer("rugir"); Son.crier(v.element, Math.min(1, v.stade / 4)); }
+    for (const v of r.groupe) { v.anim.jouer("rugir"); Son.crier(v.element, Math.min(1, v.stade / 4), v.d.id); }
     setTimeout(() => {
       Son.portail();
       changer((s) => { s.sources[r.elx].niveau += 1; s.sources[r.elx].maj = maintenant(); });
@@ -1403,8 +1403,8 @@ function interagir(d, type) {
   else {
     if (v.etat !== "vol") { v.etat = "action"; v.minuteur = type === "caresser" ? 3.2 : 2.6; }
     if (type === "caresser") { v.anim.jouer(car.caresse[0]); setTimeout(() => { if (v.etat === "action") v.anim.jouer(car.caresse[1]); }, 1250); coeurs(v); Son.ronron(v.element, Math.min(1, v.stade / 4)); }
-    else if (type === "jouer") { v.anim.jouer("jouer"); setTimeout(() => { if (v.etat === "action") v.anim.jouer("joie"); }, 1500); Son.joie(); }
-    else if (type === "rugir") { v.anim.jouer("rugir"); Son.crier(v.element, Math.min(1, v.stade / 4)); }
+    else if (type === "jouer") { v.anim.jouer("jouer"); setTimeout(() => { if (v.etat === "action") v.anim.jouer("joie"); }, 1500); Son.crier(v.element, Math.min(1, v.stade / 4), v.d.id, "joie"); }
+    else if (type === "rugir") { v.anim.jouer("rugir"); Son.crier(v.element, Math.min(1, v.stade / 4), v.d.id); }
     else if (type === "souffle") { v.anim.jouer("attaque"); setTimeout(() => souffler(v), 380); Son.souffle(v.element); }
   }
   toast(`${nom} ${car.rep[type]}.`, "bon");

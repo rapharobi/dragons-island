@@ -327,7 +327,7 @@ function poser(sel, pos) {
   // Un portail de lumière et un rugissement à l'arrivée
   particules(pos.clone().setY(0.3), COUL[u.element], 26, 2.2, 0.9, 0.09);
   particules(pos.clone().setY(0.3), 0xffffff, 10, 1.2, 0.6);
-  Son.crier(u.element, Math.min(1, u.taille / 3));
+  Son.crier(u.element, Math.min(1, u.taille / 3), u.id);
   const suivant = A.reserve.findIndex((r) => !r.pose);
   A.choisi = suivant;
   majPlateau();
@@ -341,6 +341,8 @@ function majAttaque(dt) {
   // Secousse de caméra après une destruction
   if (A.secousse > 0) { A.secousse = Math.max(0, A.secousse - dt * 2.5); A.camera.position.x += (Math.random() - 0.5) * A.secousse * 0.6; A.camera.position.y += (Math.random() - 0.5) * A.secousse * 0.6; }
   for (let i = A.parts.length - 1; i >= 0; i--) { const p = A.parts[i]; p.t += dt; p.v.y -= 4 * dt; p.m.position.addScaledVector(p.v, dt); p.m.material.opacity = 1 - p.t / p.vie; if (p.t > p.vie) { A.scene.remove(p.m); A.parts.splice(i, 1); } }
+  // Les bâtiments encore debout travaillent (scie, grue, wagonnet…)
+  for (const b of A.bats) if (b.pv > 0 && b.g.userData.anim) b.g.userData.anim(A.t);
   for (const b of A.bats) if (b.pv <= 0 && b.chute < 1) { b.chute = Math.min(1, b.chute + dt * 1.6); b.g.scale.y = Math.max(0.25, 1 - b.chute * 0.75); b.g.rotation.z = Math.sin(b.chute * 9) * 0.06 * (1 - b.chute); }
   if (A.couvoir.pv <= 0 && A.fort.scale.y > 0.35) A.fort.scale.y = Math.max(0.35, A.fort.scale.y - dt * 0.8);
   majEtiquettes();
@@ -481,7 +483,7 @@ function majTirs(dt) {
       // Un dragon touché
       if (s.type === "tourGivre") c.lent = 2;
       if (s.type === "tourEau" && !c.vol) { const p = c.m.position; const dx = p.x - s.dep.x, dz = p.z - s.dep.z, d = Math.hypot(dx, dz) || 1; p.x += (dx / d) * 0.9; p.z += (dz / d) * 0.9; }
-      if (c.pv <= 0) { c.anim.jouer("ko"); Son.crier(c.element, 0.6); particules(c.m.position.clone().setY(0.5), 0xffffff, 12, 1.6); if (c.camp === "eux") toast(`${c.nom} est vaincu !`, "bon"); }
+      if (c.pv <= 0) { c.anim.jouer("ko"); Son.crier(c.element, 0.6, c.id, "douleur"); particules(c.m.position.clone().setY(0.5), 0xffffff, 12, 1.6); if (c.camp === "eux") toast(`${c.nom} est vaincu !`, "bon"); }
       else if (Math.random() < 0.3) c.anim.jouer("coup");
     } else {
       if (Math.random() < 0.4) Son.impact(s.source ? s.source.element : "feu", false);
