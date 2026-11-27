@@ -42,14 +42,14 @@ export function journal() {
   const e = E();
   if (!e) return null;
   const j = jour();
-  if (!e.journal || e.journal.jour !== j) {
+  if (!e.quetesJour || e.quetesJour.jour !== j) {
     let h = 0; for (const c of j) h = (h * 31 + c.charCodeAt(0)) >>> 0;
     const dispo = QUETES.filter((q) => q[5](e));
     const choix = [];
     while (choix.length < Math.min(3, dispo.length)) { h = (h * 1103515245 + 12345) >>> 0; const q = dispo[h % dispo.length]; if (!choix.includes(q[0])) choix.push(q[0]); }
-    e.journal = { jour: j, quetes: choix.map((id) => ({ id, n: 0, pris: false })), bonus: false };
+    e.quetesJour = { jour: j, quetes: choix.map((id) => ({ id, n: 0, pris: false })), bonus: false };
   }
-  return e.journal;
+  return e.quetesJour;
 }
 const def = (id) => QUETES.find((q) => q[0] === id);
 export function nonPris() { const j = journal(); return j ? j.quetes.filter((q) => !q.pris && q.n >= def(q.id)[3]).length + (j.quetes.every((q) => q.pris) && !j.bonus ? 1 : 0) : 0; }
@@ -83,7 +83,7 @@ export function ouvrirJournal() {
     }
     const tout = j.quetes.every((q) => q.pris);
     rendu.append(el("div", { class: "jr-bonus" }, `🎁 Coffre du jour (les 3 quêtes) : ${BONUS[0]} `,
-      j.bonus ? el("b", {}, "· pris ✓") : el("button", { class: "btn petit" + (tout ? " principal" : ""), disabled: !tout, onclick: () => { changer((s) => { BONUS[1](s.ressources, s); s.journal.bonus = true; }); Son.evolution(); toast("Coffre du jour ouvert !", "bon"); remplir(); majBoutons && majBoutons(); } }, "Ouvrir")));
+      j.bonus ? el("b", {}, "· pris ✓") : el("button", { class: "btn petit" + (tout ? " principal" : ""), disabled: !tout, onclick: () => { changer((s) => { BONUS[1](s.ressources, s); s.quetesJour.bonus = true; }); Son.evolution(); toast("Coffre du jour ouvert !", "bon"); remplir(); majBoutons && majBoutons(); } }, "Ouvrir")));
   };
   remplir();
   modale({ titre: "📜 Journal d'aventure", contenu: rendu, boutons: [{ texte: "Fermer" }] });

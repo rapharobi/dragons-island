@@ -94,6 +94,8 @@ export function lieuSauvegarde() { return stockage ? stockage.nom : "navigateur"
 function migrer(o) {
   // Anciennes parties : toutes les îles sont déjà là
   if (!("ilesVisibles" in o)) o.ilesVisibles = null;
+  // Réparation : le journal des événements doit rester une liste (les quêtes du jour vivent dans « quetesJour »)
+  if (o.journal && !Array.isArray(o.journal)) { if (!o.quetesJour && o.journal.quetes) o.quetesJour = o.journal; o.journal = []; }
   // La propreté (crottes, aspirateurs, engrais) a été retirée du jeu
   delete o.crottes; delete o.fertilite; delete o.proprete; delete o.aspirateurs; delete o.nettoyeurs; if (o.ressources) for (const k of ["engrais_feu", "engrais_glace", "engrais_eau"]) delete o.ressources[k];
   const base = nouvellePartie();
@@ -156,6 +158,7 @@ export function reinitialiser() {
 }
 
 export function noter(texte) {
+  if (!Array.isArray(etat.journal)) etat.journal = [];
   etat.journal.unshift({ t: maintenant(), texte });
   etat.journal = etat.journal.slice(0, 40);
 }

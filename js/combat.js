@@ -1540,8 +1540,18 @@ function blocSoins() {
   return b;
 }
 
+// Filet de sécurité : quoi qu'il arrive, on peut toujours sortir de l'arène à la fin
 function finCombat(raison) {
   if (C.fini) return;
+  try { finCombatInterne(raison); }
+  catch (err) {
+    console.error(err);
+    C.fini = true; clearInterval(chronoInt);
+    modale({ titre: "Fin du combat", contenu: `Dégâts infligés : ${Math.round(C.totaux[0])} contre ${Math.round(C.totaux[1])}.`, fermable: false,
+      boutons: [{ texte: "Retour", classe: "principal", action: () => { ctxJeu.cacherInterface(false); ctxJeu.aller("combat"); } }] });
+  }
+}
+function finCombatInterne(raison) {
   C.fini = true;
   clearInterval(chronoInt);
   const enLigne = C.mode === "ligne";
