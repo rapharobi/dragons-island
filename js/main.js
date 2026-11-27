@@ -16,6 +16,7 @@ import "./village.js";
 import "./couvoir3d.js";
 import { verifierRecits } from "./recit.js";
 import { verifierExpedition } from "./expeditions.js";
+import { verifierRaids, lancerAttaque } from "./attaque.js";
 import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto, accueillir, signaler } from "./tuto.js";
 
 enregistrerElements(DRAGONS);
@@ -48,6 +49,13 @@ const ctx = {
   majHud,
 };
 window.__jeu = ctx;
+// Revanche : attaquer le village du mage qui t'a attaqué
+window.__revanche = (r) => {
+  const eq = E().dragons.filter((d) => d.pv > 0 && !d.chantier && !d.expedition).sort((a, b) => b.niveau - a.niveau);
+  if (!eq.length) { toast("Aucun dragon en forme : soigne-les d'abord.", "mal"); return; }
+  ctx.aller("combat", { mode: "village" });
+  setTimeout(() => lancerAttaque(ctx, eq, { nom: r.nom, niveau: r.niveau, revanche: true, apres: () => ctx.aller("combat") }), 60);
+};
 
 function majNav() {
   const nav = document.getElementById("nav");
@@ -180,6 +188,18 @@ async function demarrer() {
   // L'histoire reprend de temps en temps, et le chantier du couvoir prévient quand il est fini
   setInterval(() => {
     verifierRecits(ctx);
+    // Une attaque de mage a eu lieu pendant ton absence : on te raconte, avec la revanche
+    if (ctx.ecran === "iles" && document.getElementById("modale").hidden && !document.querySelector(".histoire") && !document.body.classList.contains("en-bataille")) {
+      const r = verifierRaids();
+      if (r) {
+        Son.crier("feu", 0.9);
+        modale({ titre: r.etoiles ? `${r.nom} a attaqué ton village !` : `Tu as repoussé ${r.nom} !`,
+          contenu: el("div", { style: { display: "grid", gap: "8px" } }, el("div", { style: { fontSize: "30px", textAlign: "center", color: "var(--ambre)", letterSpacing: "5px" } }, "★".repeat(r.etoiles) + "☆".repeat(3 - r.etoiles)),
+            el("p", { style: { margin: 0 } }, r.etoiles ? `Pendant ton absence, ses dragons ont percé tes défenses (${r.etoiles} étoile${r.etoiles > 1 ? "s" : ""}). Construis et améliore des tours, et place-les mieux !` : "Tes tours et tes dragons ont tenu bon pendant ton absence."),
+            el("p", { class: "doux", style: { margin: 0 } }, [...r.pertes, `${r.trophees >= 0 ? "+" : ""}${r.trophees} trophées`, "bouclier 8 h"].join(" · "))),
+          boutons: [{ texte: "Fermer" }, { texte: "Revanche !", classe: "principal", action: () => window.__revanche({ nom: `Village de ${r.nom}`, niveau: r.niveau }) }] });
+      }
+    }
     // Fin de la réparation du couvoir : la cinématique se joue sur les îles
     if (E().cineReparation && ctx.ecran === "iles" && document.getElementById("modale").hidden) { E().cineReparation = false; Iles.cinematiqueReparation(() => signaler("reparation_finie")); }
     verifierExpedition();

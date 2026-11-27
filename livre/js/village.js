@@ -233,16 +233,16 @@ const V = { cle: null, objets: new Map(), marqueurs: [], libres: [], bataille: n
 function synchro() {
   const D = moteurIles();
   if (!D || !E()) return;
-  const cle = vil().batiments.map((b) => `${b.uid}:${b.niveau}:${b.place}`).join("|");
+  const cle = vil().batiments.map((b) => `${b.uid}:${b.niveau}:${b.place}:${b.pos ? b.pos.x.toFixed(2) + "," + b.pos.z.toFixed(2) : ""}`).join("|");
   if (cle === V.cle) return;
   V.cle = cle;
   const vus = new Set();
   for (const b of vil().batiments) {
     vus.add(b.uid);
     const ancien = V.objets.get(b.uid);
-    if (ancien && ancien.niveau === b.niveau) continue;
+    if (ancien && ancien.niveau === b.niveau && ancien.pos === (b.pos ? b.pos.x + "," + b.pos.z : "")) continue;
     if (ancien) ancien.g.parent && ancien.g.parent.remove(ancien.g);
-    const p = places(b.ile).find((x) => x.id === b.place);
+    const p = b.pos ? { x: b.pos.x, y: solIle(b.ile, b.pos.x, b.pos.z), z: b.pos.z } : places(b.ile).find((x) => x.id === b.place);
     if (!p) continue;
     const g = modele(b.type, b.niveau, b.ile);
     g.position.set(p.x, p.y, p.z);
@@ -256,15 +256,17 @@ function synchro() {
       bulle.position.y = 1.7; bulle.visible = false; g.add(bulle); g.userData.bulle = bulle;
     }
     moteurIles().iles[b.ile].groupe.add(g);
-    V.objets.set(b.uid, { g, niveau: b.niveau, b });
+    V.objets.set(b.uid, { g, niveau: b.niveau, b, pos: b.pos ? b.pos.x + "," + b.pos.z : "" });
   }
   for (const [uid, o] of V.objets) if (!vus.has(uid)) { o.g.parent && o.g.parent.remove(o.g); V.objets.delete(uid); }
   // Cercles dorés sur les emplacements libres : on les touche pour construire
   for (const m of V.libres) m.parent && m.parent.remove(m);
   V.libres = [];
   const prises = new Set(vil().batiments.map((b) => b.place));
+  const posees = vil().batiments.filter((b) => b.pos);
   for (const elx of ["feu", "glace", "eau"]) for (const p of places(elx)) {
     if (prises.has(p.id)) continue;
+    if (posees.some((b) => b.ile === elx && Math.hypot(b.pos.x - p.x, b.pos.z - p.z) < 1.8)) continue;
     const m = new T.Group();
     const anneau = new T.Mesh(new T.RingGeometry(0.55, 0.68, 20), new T.MeshBasicMaterial({ color: 0xf2b544, transparent: true, opacity: 0.32, side: T.DoubleSide, depthWrite: false }));
     anneau.rotation.x = -Math.PI / 2; m.add(anneau);
@@ -362,9 +364,82 @@ export function ouvrirVillage(elx) {
       bloque ? null : plein ? el("small", {}, "Améliore le couvoir pour en construire plus.") : el("span", { class: "cout" }, `Coût : ${texteCout(c)}`),
       !bloque && !plein ? el("button", { class: "btn petit" + (assez(c) ? " principal" : ""), style: { gridColumn: "1 / -1", justifySelf: "start" }, disabled: !assez(c), onclick: () => placer(type) }, `Construire sur l'${NOM_ILE[elx]}`) : null));
   }
+  contenu.push(el("button", { class: "btn petit", onclick: () => { fermerPanneau(); amenager(true); } }, "🛠️ Aménager : déplacer mes bâtiments et mes tours"));
   panneau(`Village · ${NOM_ILE[elx]}`, `${sur.length} bâtiment${sur.length > 1 ? "s" : ""} sur cette île`, ...contenu, el("div", { class: "etiquette" }, "Construire"), liste);
 }
 const duree = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` : `${m} min`; };
+
+// ---------- Aménager : glisser ses bâtiments sur l'île pour organiser sa défense ----------
+let drag = null;
+function amenager(on) {
+  V.amenager = on;
+  document.getElementById("vl-amenager")?.remove();
+  if (!on) return;
+  document.getElementById("ecran").append(el("div", { id: "vl-amenager", class: "bandeau-placement panneau" },
+    el("span", {}, "🛠️ Glisse un bâtiment pour le déplacer sur son île."), el("button", { class: "btn principal petit", onclick: () => { Son.ok(); amenager(false); } }, "Terminé")));
+  toast("Mode aménagement : glisse tes bâtiments.", "bon");
+}
+function sourisVersIle(e, elx) {
+  const D = moteurIles(), ray = new T.Raycaster();
+  ray.setFromCamera(new T.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), D.camera);
+  const h = ray.intersectObject(D.iles[elx].groupe, true).find((x) => !x.object.userData.action || x.object === D.iles[elx].groupe);
+  const h2 = h || ray.intersectObject(D.iles[elx].groupe, true)[0];
+  return h2 ? D.iles[elx].groupe.worldToLocal(h2.point.clone()) : null;
+}
+function emplacementValide(b, x, z) {
+  const elx = b.ile, y = solIle(elx, x, z);
+  if (Math.hypot(x, z) > rayonBord(elx, Math.atan2(z, x)) * 0.86) return false;
+  if (elx === "eau" ? y < 0.1 || dansLEau(elx, x, z) : elx === "glace" ? y > 2.4 : false) return false;
+  if (emplacements(elx).some((n) => Math.hypot(n.x - x, n.z - z) < 1.7)) return false;
+  for (const o of vil().batiments) {
+    if (o.uid === b.uid || o.ile !== elx) continue;
+    const p = o.pos || places(elx).find((q) => q.id === o.place);
+    if (p && Math.hypot(p.x - x, p.z - z) < 1.9) return false;
+  }
+  return true;
+}
+function installerAmenagement() {
+  const canvas = document.getElementById("scene3d");
+  canvas.addEventListener("pointerdown", (e) => {
+    const D = moteurIles();
+    if (!V.amenager || !D || !window.__jeu || window.__jeu.ecran !== "iles" || window.__jeu.moteur.decor !== D) return;
+    const ray = new T.Raycaster();
+    ray.setFromCamera(new T.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), D.camera);
+    const objets = [...V.objets.values()];
+    const h = ray.intersectObjects(objets.map((o) => o.g), true)[0];
+    if (!h) return;
+    let g = h.object; while (g && !(g.userData.action && g.userData.action.type === "batiment")) g = g.parent;
+    const o = g && objets.find((x) => x.g === g);
+    if (!o) return;
+    D.orbite.actif = false;
+    drag = { o, depart: g.position.clone(), ok: true };
+    g.position.y += 0.4; Son.clic();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const p = sourisVersIle(e, drag.o.b.ile);
+    if (!p) return;
+    drag.ok = emplacementValide(drag.o.b, p.x, p.z);
+    drag.o.g.position.set(p.x, solIle(drag.o.b.ile, p.x, p.z) + 0.4, p.z);
+    drag.o.g.traverse((m) => { if (m.isMesh && m.material && m.material.emissive && !m.userData.emi0) m.userData.emi0 = m.material.emissive.getHex(); });
+    drag.o.g.scale.setScalar(drag.ok ? 1.05 : 0.95);
+  });
+  const lacher = () => {
+    if (!drag) return;
+    const D = moteurIles(); if (D) D.orbite.actif = true;
+    const { o, depart, ok } = drag; drag = null;
+    const g = o.g;
+    if (ok && g.position.distanceTo(depart) > 0.3) {
+      const x = g.position.x, z = g.position.z;
+      changer(() => { const b = vil().batiments.find((q) => q.uid === o.b.uid); if (b) b.pos = { x, z }; });
+      Son.recolte("pierre"); g.position.y = solIle(o.b.ile, x, z); g.scale.setScalar(1);
+      o.pos = x + "," + z; V.cle = null;
+    } else { if (!ok) toast("Impossible ici : trop près d'un nid ou d'un autre bâtiment.", "mal"); g.position.copy(depart); g.scale.setScalar(1); }
+  };
+  canvas.addEventListener("pointerup", lacher); canvas.addEventListener("pointercancel", lacher);
+}
+installerAmenagement();
+export { amenager };
 
 // ---------- Placement ----------
 function arreterPlacement() {
@@ -497,7 +572,7 @@ function verifierVague() {
     const iles = [...new Set(v.batiments.map((b) => b.ile))];
     const cible = iles[Math.floor(Math.random() * iles.length)] || "feu";
     changer((s) => { s.village.vague.enAttente = cible; });
-    toast(`Des pillards approchent de l'${NOM_ILE[cible]} ! Touche « Village » pour défendre.`, "mal");
+    toast(`Des pillards approchent de l'${NOM_ILE[cible]} ! Touche « Défendre » ou l'hôtel de ville du couvoir.`, "mal");
     Son.crier("feu", 0.9);
   }
 }
@@ -788,7 +863,7 @@ function finBataille(victoire) {
 
 // ---------- Branchement sur les îles ----------
 extensions.update.push(update);
-extensions.action.batiment = (a) => { if (V.bataille) return; Son.clic(); ficheBatiment(a.uid); };
+extensions.action.batiment = (a) => { if (V.bataille || V.amenager) return; Son.clic(); ficheBatiment(a.uid); };
 extensions.action.vplace = (a) => construireIci(a);
 extensions.cibleLibre = () => { const D = moteurIles(); const m = V.libres.find((x) => x.visible); return m ? m.getWorldPosition(new T.Vector3()).add(new T.Vector3(0, 0.8, 0)) : null; };
 extensions.action.vlibre = (a) => { if (V.bataille) return; Son.clic(); construireSur(a.ile, a.place); };
@@ -803,7 +878,10 @@ extensions.sol = (elx, p) => {
   return true;
 };
 extensions.action.ennemi = (a) => toucherEnnemi(a);
-extensions.boutons.push(() => ouvert() && el("button", { class: "btn petit", style: { borderColor: "rgba(111,214,138,.55)", color: "#b8f0c8" }, onclick: () => { Son.clic(); ouvrirVillage(); } }, "Village"));
+// Le village s'ouvre depuis l'atelier « Hôtel de ville » de la cour du couvoir (couvoir3d.js)
+export const villageOuvert = () => ouvert();
+// Quand des pillards attendent, un bouton « Défendre » apparaît en haut
+extensions.boutons.push(() => ouvert() && vil().vague.enAttente && !V.bataille && el("button", { class: "btn petit", style: { borderColor: "rgba(255,120,90,.7)", color: "#ffb8a8" }, onclick: () => { Son.clic(); ouvrirVillage(vil().vague.enAttente); } }, "⚔️ Défendre"));
 export function lancerVagueGuide() { V.vagueGuide = true; lancerBataille(null, false); }
 export function lancerVagueTest(elx) { const v = vil(); const iles = [...new Set(v.batiments.map((b) => b.ile))]; lancerBataille(elx && iles.includes(elx) ? elx : iles[0], false); }
 

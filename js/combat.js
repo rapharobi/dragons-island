@@ -11,7 +11,7 @@ import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } f
 import { Son, Musique } from "./son.js";
 import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang, difficulte } from "./ligues.js";
 import { ouvrirArchipel, cibleArchipel, ILES_COMBAT } from "./archipel.js";
-import { lancerAttaque, niveauVillage } from "./attaque.js";
+import { lancerAttaque, niveauVillage, codeVillage, lireCodeVillage, boucliers } from "./attaque.js";
 import { boss, blocBoss, infliger, nomBoss } from "./boss.js";
 import { contenuHall, historiser, verifierSaison } from "./hall.js";
 import { blocExpedition } from "./expeditions.js";
@@ -511,7 +511,13 @@ function contenuLieu(id, refaire, partir) {
     if (!classeOuvert()) b.append(el("p", { class: "doux" }, `Le classé s'ouvre avec 7 dragons, dont au moins un au niveau 5 (tu en as ${E().dragons.length}).`));
   } else if (id === "tour") b.append(bouton("Entrer dans la tour", "21 étages · roguelite", () => partir("tour", "tour")));
   else if (id === "sauvage") b.append(bouton("Chasser les dragons sauvages", "Coûte 2 d'énergie", () => partir("sauvage", "sauvage")));
-  else if (id === "villages") b.append(bouton("Préparer l'attaque", `Village niveau ${niveauVillage()} · toute ta couvée`, () => partir("villages", "village")));
+  else if (id === "villages") {
+    b.append(bouton("Attaquer un village", `Village niveau ${niveauVillage()} · toute ta couvée, gratuit (les blessures restent)`, () => partir("villages", "village")));
+    b.append(bouton("Attaquer le village d'un ami", "Colle le code de son village", () => attaquerAmi(), false));
+    b.append(bouton("Partager mon village", "Un code que ton ami pourra attaquer", () => partagerVillage(), false));
+    const bc = boucliers();
+    b.append(el("p", { class: "doux" }, bc ? `🛡️ Ton village est sous bouclier encore ${fmtDuree(bc)} : personne ne peut l'attaquer.` : "Des mages peuvent attaquer ton village pendant ton absence (1 à 2 fois par jour). Après chaque attaque, un bouclier de 8 h le protège."));
+  }
   else if (id === "amis") {
     b.append(bouton("Sur le même téléphone", "Chacun choisit à son tour, sans regarder.", () => partir("amis", "ami")));
     b.append(bouton("En ligne, avec un code", "Chacun sur son téléphone, reliés par un code.", () => partir("amis", "ligne"), false));
@@ -520,12 +526,31 @@ function contenuLieu(id, refaire, partir) {
   else if (id === "boss") b.append(blocBoss(() => partir("boss", "boss")));
   return b;
 }
+function dragonsEnForme() { return E().dragons.filter((d) => d.pv > 0 && !d.chantier && !d.expedition).sort((a, b) => b.niveau - a.niveau); }
+function attaquerAmi() {
+  const champ = el("input", { type: "text", placeholder: "VG-…", autocomplete: "off", spellcheck: "false", class: "bq-code-champ", style: { width: "100%" } });
+  const msg = el("small", { class: "doux" });
+  modale({ titre: "Le village d'un ami", contenu: el("div", { style: { display: "grid", gap: "8px" } }, el("p", { style: { margin: 0 } }, "Demande à ton ami son code (Combat › Villages volants › Partager mon village) et colle-le ici."), champ, msg),
+    boutons: [{ texte: "Annuler" }, { texte: "Attaquer !", classe: "principal", action: () => {
+      const o = lireCodeVillage(champ.value);
+      if (!o) { msg.textContent = "Ce code n'est pas valide."; msg.style.color = "#ff9a9a"; return false; }
+      const eq = dragonsEnForme();
+      if (!eq.length) { toast("Aucun dragon en forme.", "mal"); return; }
+      lancerAttaque(ctxJeu, eq, { compo: o, nom: `Village de ${o.n}`, apres: () => ctxJeu.aller("combat") });
+    } }] });
+}
+function partagerVillage() {
+  const code = codeVillage();
+  const champ = el("textarea", { readonly: true, rows: 3, style: { width: "100%", font: "11px var(--mono)", padding: "8px", borderRadius: "10px", background: "rgba(255,255,255,.05)", color: "inherit", border: "1px solid var(--trait)" } }, code);
+  modale({ titre: "Ton village en code", contenu: el("div", { style: { display: "grid", gap: "8px" } }, el("p", { style: { margin: 0 } }, "Envoie ce code à ton ami : il pourra attaquer une copie de ton village (tes bâtiments et tes meilleurs dragons). Rien n'est perdu chez toi."), champ),
+    boutons: [{ texte: "Fermer" }, { texte: "Copier", classe: "principal", action: () => { try { navigator.clipboard.writeText(code); toast("Code copié !", "bon"); } catch (err) { champ.select(); } return false; } }] });
+}
 function statutLieu(id) {
   const e = E();
   if (id === "arene") return classeOuvert() ? [`🏆 ${(e.ligue && e.ligue.trophees) || 0} trophées`] : ["7 dragons dont un niv. 5", true];
   if (id === "tour") { const tn = e.tourNid || {}; return [tn.run ? `Étage ${tn.run.etage}/21 en cours` : `Record : étage ${tn.record || 0}/21`]; }
   if (id === "sauvage") return ["Dragons faciles"];
-  if (id === "villages") return [`Village niveau ${niveauVillage()}`];
+  if (id === "villages") return [boucliers() ? `🛡️ Village niv. ${niveauVillage()}` : `Village niveau ${niveauVillage()}`];
   if (id === "amis") return ["Même téléphone · en ligne"];
   if (id === "port") { const ex = e.expedition; if (!ex) return ["Prêt à partir"]; const r = ex.fin - maintenant(); return r > 0 ? [`En route · ${fmtDuree(r)}`] : ["De retour !", false, true]; }
   if (id === "hall") return [nomRang((e.ligue && e.ligue.trophees) || 0)];
@@ -943,7 +968,7 @@ function essayerReveler() {
 function coutMode(mode) {
   const et = etapeTuto();
   if (et !== "fini") return 0;
-  return mode === "bot" || mode === "boss" ? COUT.combat : mode === "sauvage" ? 2 : mode === "village" ? 3 : 0; // la tour se paie à l'entrée
+  return mode === "bot" || mode === "boss" ? COUT.combat : mode === "sauvage" ? 2 : 0; // la tour se paie à l'entrée
 }
 
 function membreJoueur(d) {
@@ -987,8 +1012,9 @@ function lancer() {
   }
   // Attaque d'un village : une autre scène, avec l'équipe choisie
   if (prep.mode === "village") {
-    const eq = dragonsPrets();
-    if (!eq.length) { toast("Choisis au moins un dragon en forme.", "mal"); return; }
+    // Toute la couvée en forme est disponible pendant l'attaque
+    const eq = e.dragons.filter((d) => d.pv > 0 && !d.chantier && !d.expedition).sort((a, b) => b.niveau - a.niveau);
+    if (!eq.length) { toast("Aucun dragon en forme : soigne-les avec des rations.", "mal"); return; }
     lancerAttaque(ctxJeu, eq, { oeufGaranti: et === "attaque", apres: (v) => { ctxJeu.aller("combat"); signaler("attaque_finie", { victoire: v }); } });
     return;
   }
