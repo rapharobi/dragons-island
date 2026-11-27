@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0e13"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.DRAGONS_SITE = true;</script></head><body><title>Dragon World</title>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0e13"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.DRAGONS_SITE = true;</script><link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icone-192.png"><link rel="apple-touch-icon" href="icone-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Dragon World"><script>if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));addEventListener("beforeinstallprompt",(e)=>{e.preventDefault();window.__installer=e;});</script></head><body><title>Dragon World</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -86,6 +86,8 @@ body.ecran-iles:not(.hud-ligne) .puce .jauge { width: 26px; }
 #ecran { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
 #ecran > * { pointer-events: auto; }
 #ecran > .ar-etiqs, #ecran > .cv-etiqs, #ecran > .at-iles, #ecran > .ar-titre, #ecran > .titre-intro, #ecran > .cv-fete { pointer-events: none; }
+.bientot { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; border: 1px dashed rgba(190,150,255,.5); background: rgba(150,110,255,.08); font-size: 12px; color: #d8ccf0; line-height: 1.4; }
+.bientot b { flex: none; font: 700 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #1a1028; background: #c8a8ff; border-radius: 6px; padding: 2px 6px; }
 .panneau { background: var(--panneau); border: 1px solid var(--trait); border-radius: 16px; backdrop-filter: blur(12px); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,0.06); font-weight: 600; font-size: 13px; transition: background .15s, transform .1s; }
 .btn:hover { background: rgba(255,255,255,0.12); }

@@ -391,6 +391,7 @@ function majPlateau() {
     : "Tous tes dragons sont posés. Touche un bâtiment pour qu'ils le visent."));
   const l = el("div", { class: "at-cartes" });
   A.reserve.forEach((r, i) => {
+    if (r.pose) return; // déjà sur le champ de bataille : sa place laisse voir les suivants
     const src = PAR_ID[r.d.id];
     l.append(el("button", { class: `at-carte ${i === A.choisi && !r.pose ? "choisi" : ""} ${r.pose ? "pose" : ""}`, style: { "--el": ELEMENTS[src.element].couleur }, disabled: r.pose, onclick: () => { A.choisi = i; Son.clic(); majPlateau(); } },
       stadeEffectif(r.d) >= 1 && habitatDe(r.d.id) !== "fond" ? el("span", { class: "vol" }, "🪽") : null,

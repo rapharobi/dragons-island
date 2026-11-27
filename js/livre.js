@@ -11,6 +11,9 @@ import { Son, Musique } from "./son.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null;
+// Dans le jeu, le Livre ne révèle que les dragons déjà découverts (le wiki à part montre tout)
+const enJeu = () => !E().stub;
+const connu = (id) => !enJeu() || E().livre.vus.includes(id) || E().dragons.some((d) => d.id === id);
 const vue = { onglet: "dragons", filtre: "tous", id: "braisil", stade: 3, armure: null, ul: false, niveau: 10, sous: "fiche", anim: "repos", auto: true };
 
 styles("livre", `
@@ -85,11 +88,12 @@ function construireStudio() {
 }
 
 function montrerModele(force = false) {
-  const cle = `${vue.id}|${vue.stade}|${vue.armure}|${vue.ul}`;
+  const cle = `${vue.id}|${vue.stade}|${vue.armure}|${vue.ul}|${connu(vue.id)}`;
   if (!force && cle === D.cle) return;
   D.cle = cle;
   while (D.support.children.length) D.support.remove(D.support.children[0]);
-  const rig = construireDragon(vue.id, vue.stade, { armure: vue.armure, ul: vue.ul });
+  const rig = construireDragon(vue.id, connu(vue.id) ? vue.stade : 1, { armure: vue.armure, ul: vue.ul });
+  if (!connu(vue.id)) { const noir = new T.MeshBasicMaterial({ color: 0x0c0a14 }); rig.racine.traverse((o) => { if (o.isMesh) o.material = noir; }); }
   D.support.add(rig.racine);
   D.rig = rig;
   D.anim = new Animateur(rig);
@@ -105,6 +109,8 @@ export function ouvrir(ctx, params = {}) {
   ctxJeu = ctx;
   if (!D) construireStudio();
   if (params.id) { vue.id = params.id; vue.onglet = "dragons"; if (params.stade !== undefined) vue.stade = params.stade; }
+  if (enJeu() && !connu(vue.id)) { const p = DRAGONS.find((d) => connu(d.id)); if (p) vue.id = p.id; }
+  if (enJeu() && vue.onglet === "equilibrage") vue.onglet = "dragons";
   ui = document.getElementById("ecran");
   Musique.jouer("livre");
   rendre();
@@ -124,7 +130,8 @@ function rendre() {
   ctxJeu.moteur.montrer(D, zone());
   const g = el("aside", { class: "lv-gauche panneau" });
   const ong = el("div", { class: "lv-onglets" });
-  for (const [id, nom] of [["dragons", "Dragons"], ["elements", "Éléments"], ["regles", "Règles"], ["equilibrage", "Équilibrage"]]) {
+  if (enJeu()) g.append(el("button", { class: "btn petit", style: { justifySelf: "start" }, onclick: () => { Son.clic(); ctxJeu.aller("iles", { couvoir: true }); } }, "← Retour au couvoir"));
+  for (const [id, nom] of (enJeu() ? [["dragons", "Dragons"], ["elements", "Éléments"], ["regles", "Règles"]] : [["dragons", "Dragons"], ["elements", "Éléments"], ["regles", "Règles"], ["equilibrage", "Équilibrage"]])) {
     ong.append(el("button", { class: vue.onglet === id ? "actif" : "", onclick: () => { Son.clic(); vue.onglet = id; rendre(); } }, nom));
   }
   g.append(ong);
@@ -135,8 +142,9 @@ function rendre() {
     const liste = el("div", { class: "lv-liste" });
     for (const d of DRAGONS) {
       if (vue.filtre !== "tous" && d.element !== vue.filtre) continue;
-      liste.append(el("button", { class: `lv-item ${d.element} ${vue.id === d.id ? "actif" : ""}`, onclick: () => { Son.clic(); vue.id = d.id; vue.ul = false; vue.armure = null; rendre(); } },
-        el("i"), el("span", {}, el("b", {}, d.nom), el("br"), el("small", {}, DONNEES.archetypes[d.archetype].nom)), possede(d.id) ? el("span", { class: "possede" }, "✓") : el("span")));
+      const ok = connu(d.id);
+      liste.append(el("button", { class: `lv-item ${d.element} ${vue.id === d.id ? "actif" : ""}`, style: ok ? null : { opacity: 0.55 }, onclick: () => { Son.clic(); vue.id = d.id; vue.ul = false; vue.armure = null; rendre(); } },
+        el("i"), el("span", {}, el("b", {}, ok ? d.nom : "???"), el("br"), el("small", {}, ok ? DONNEES.archetypes[d.archetype].nom : "Inconnu")), possede(d.id) ? el("span", { class: "possede" }, "✓") : el("span")));
     }
     g.append(liste);
     const e = E();
@@ -153,6 +161,11 @@ function rendre() {
 // ---------- Fiche d'un dragon ----------
 function ficheDragon() {
   const d = PAR_ID[vue.id];
+  if (!connu(d.id)) {
+    return el("section", { class: "lv-droite panneau" }, el("span", { class: "pil " + d.element }, ELEMENTS[d.element].nom), el("h2", {}, "Dragon inconnu"),
+      el("p", {}, `Tu ne l'as pas encore découvert. Fais éclore des œufs ${d.element === "eau" ? "d'Eau" : d.element === "feu" ? "de Feu" : "de Glace"} : peut-être qu'il en sortira…`),
+      el("p", { class: "doux" }, "Sa page se remplira dès qu'il rejoindra ta couvée."));
+  }
   const arch = DONNEES.archetypes[d.archetype];
   const p = el("section", { class: "lv-droite panneau" });
   const moi = E().dragons.filter((x) => x.id === d.id);
@@ -313,6 +326,12 @@ function pageElements() {
   p.append(el("section", {}, el("div", { class: "etiquette" }, "Le cœur du jeu"), el("h2", {}, "Pierre, feuille, ciseaux"),
     el("p", {}, "Chaque flèche va de l'élément qui gagne vers celui qui perd. Quand ton dragon frappe l'élément qu'il bat, il ajoute le bonus de sa posture, et l'adversaire subit en plus sa faiblesse. À l'inverse, frapper l'élément qui te bat est peu efficace (dégâts × 0,7). Entre deux dragons du même élément, le coup est normal."),
     roue(ELEMENTS, 260)));
+  if (enJeu()) {
+    p.append(el("section", {}, el("div", { class: "etiquette" }, "Une page arrachée"), el("h3", { style: { fontSize: "20px" } }, "Le quatrième élément"),
+      el("p", {}, "Il manque une page au Livre. Il n'en reste qu'un coin, où l'on devine un quatrième symbole, ni feu, ni glace, ni eau… Les anciens mages disaient qu'il dormait au-delà du continent."),
+      el("p", { class: "doux" }, E().oeufNoir ? "Ton œuf noir lui appartient peut-être." : "Peut-être qu'un jour, un œuf venu de là-bas croisera ta route.")));
+    return p;
+  }
   p.append(el("section", {}, el("div", { class: "etiquette" }, "Prévu pour une mise à jour"), el("h3", { style: { fontSize: "20px" } }, "Six éléments"),
     el("p", {}, "Trois nouveaux éléments arriveront plus tard. Chacun bat un ancien élément et un nouveau, et il est battu par un ancien et un nouveau. Chaque élément bat donc 2 éléments, perd contre 2, et reste neutre contre 1. Les noms Foudre, Terre et Vent sont une proposition."),
     roue(ELEMENTS_FUTURS, 340),
@@ -337,7 +356,7 @@ function pageRegles() {
   p.append(el("section", {}, el("div", { class: "etiquette" }, "Combat"), el("h2", {}, "Neuf tours, le plus de dégâts gagne"),
     el("p", {}, `Équipe de 7 dragons au plus. À chaque tour, les deux joueurs choisissent en secret un dragon puis une posture (${E().reglages.chrono || "sans limite de"} s pour choisir). Les deux dragons frappent en même temps. Après ${TOURS} tours, celui qui a infligé le plus de dégâts gagne. Un dragon à 0 PV est K.O. : il ne peut plus être choisi, et il reste K.O. après le combat tant qu'il n'a pas mangé.`),
     el("div", { class: "formule" }, `dégâts = ATK × ${R.force} × ${R.amorti} / (${R.amorti} + DEF adverse) × (1 + bonus + faiblesse adverse si on bat son élément, ou × ${R.malus_domine ?? 0.7} si on frappe l'élément qui nous bat) × hasard (${R.alea[0]} à ${R.alea[1]}, et 1 coup sur ${Math.round(1 / R.chance)} fait ×${R.mult_chance})`),
-    el("p", {}, "Matchmaking : un adversaire de ton niveau. S'il n'y en a pas, un bot du même niveau. Contre un ami, l'écart de niveau est permis."),
+    el("p", {}, "Matchmaking : un mage de ton niveau et de ta ligue. Contre un ami, l'écart de niveau est permis."),
   ));
   // Progression
   const xp = el("table", { class: "tbl", style: { maxWidth: "520px" } }, el("tr", {}, el("th", { class: "num" }, "Niveau"), el("th", { class: "num" }, "XP pour monter"), el("th", { class: "num" }, "Total")));

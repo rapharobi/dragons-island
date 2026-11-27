@@ -25,6 +25,14 @@ const CHAPITRES = [
     ],
   },
   {
+    id: "quatrieme",
+    quand: (e) => e.tuto.etape === "fini" && e.oeufs.couvoir.niveau >= 2,
+    pages: [
+      ["La légende oubliée", "Les anciens mages gravaient trois symboles sur les portes du couvoir : le feu, la glace et l'eau. Mais sous la poussière, il y en a un quatrième, effacé…"],
+      [`${MENTOR}`, "On raconte qu'il existait un quatrième élément, et une quatrième île, perdue au-delà du continent. Personne ne l'a revue depuis des siècles. Si un jour tu trouves un œuf qui ne ressemble à aucun autre… garde-le précieusement."],
+    ],
+  },
+  {
     id: "tour",
     quand: (e) => e.tuto.etape === "fini" && e.dragons.length >= 6 && e.oeufs.couvoir.niveau >= 1,
     pages: [

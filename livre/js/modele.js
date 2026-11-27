@@ -247,7 +247,7 @@ function construireTete(gn, ech, m, coul, r, rig) {
 // ---------- Ailes ----------
 function construireAile(gn, ech, m, cote, r, decal = 0) {
   const st = gn.ailes.style;
-  const W = gn.ailes.taille * ech * (decal ? 0.75 : 1);
+  const W = gn.ailes.taille * ech * (decal ? 0.75 : 1) * 1.55;
   const racine = new T.Group();
   const interieur = new T.Group(); interieur.scale.x = cote; racine.add(interieur);
   const coude = new T.Group();

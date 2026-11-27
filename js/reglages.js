@@ -1,6 +1,7 @@
 // Réglages : son, chrono des combats, sauvegarde.
 import { E, changer, lieuSauvegarde, reinitialiser } from "./etat.js";
 import { COUVOIR } from "./regles.js";
+import { bientot } from "./ui.js";
 import { el, styles, toast, modale } from "./ui.js";
 import { Son, Musique, reglerSon, reglerVolumes, initAudio } from "./son.js";
 import { pleinEcranPossible, basculerPleinEcran } from "./portail.js";
@@ -53,6 +54,21 @@ function rendre() {
   p.append(el("div", { class: "opt" }, el("h3", {}, "Son"),
     seg([[true, "Bruitages activés"], [false, "Bruitages coupés"]], r.son, (v) => { changer((s) => { s.reglages.son = v; }); initAudio(); reglerSon(v, E().reglages.musique); }),
     seg([[true, "Musique activée"], [false, "Musique coupée"]], r.musique, (v) => { changer((s) => { s.reglages.musique = v; }); initAudio(); reglerSon(E().reglages.son, v); })));
+  // L'appli sur l'écran d'accueil
+  const appli = el("div", { class: "opt" }, el("h3", {}, "Installer l'appli"));
+  const dejaAppli = window.matchMedia && (matchMedia("(display-mode: fullscreen)").matches || matchMedia("(display-mode: standalone)").matches);
+  if (dejaAppli) appli.append(el("p", {}, "Tu joues déjà dans l'appli Dragon World. 🐉"));
+  else if (!window.DRAGONS_SITE) appli.append(el("p", {}, "Pour installer le jeu comme une appli, ouvre-le sur son site : rapharobi.github.io/dragons-island, puis reviens ici."),
+    el("div", { class: "seg" }, el("a", { class: "btn principal", href: "https://rapharobi.github.io/dragons-island/", target: "_blank", rel: "noopener" }, "Ouvrir le site")));
+  else {
+    appli.append(el("p", {}, "Ajoute Dragon World sur ton écran d'accueil : il s'ouvre en plein écran, comme une vraie appli, avec son icône."));
+    appli.append(el("div", { class: "seg" }, el("button", { class: "btn principal", onclick: async () => {
+      if (window.__installer) { window.__installer.prompt(); try { await window.__installer.userChoice; } catch (err) { /* */ } window.__installer = null; }
+      else modale({ titre: "Installer l'appli", contenu: "Ouvre le menu de ton navigateur (les trois points ⋮ en haut à droite sur Android, ou le bouton Partager sur iPhone), puis touche « Installer l'application » ou « Ajouter à l'écran d'accueil ».", boutons: [{ texte: "Compris", classe: "principal" }] });
+    } }, "📲 Installer Dragon World")));
+  }
+  p.append(appli);
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Compte"), bientot("Connexion avec ton compte Google, sauvegarde en ligne sur tous tes appareils et récupération de ta partie.")));
   p.append(el("div", { class: "opt" }, el("h3", {}, "Graphismes"),
     el("p", {}, "Si le jeu rame sur ton téléphone, baisse la qualité : moins d'ombres et une image plus légère."),
     seg([["basse", "Basse"], ["moyenne", "Moyenne"], ["haute", "Haute"]], r.qualite || "haute", (v) => { changer((s) => { s.reglages.qualite = v; }); window.__jeu.moteur.regler(v); })));
@@ -76,6 +92,6 @@ function rendre() {
     if (++tapes < 7) return;
     try { localStorage.setItem("dw-pilote", "1"); } catch (e) { /* stockage refusé */ }
     toast("Pilotage débloqué.", "bon"); rendre();
-  } }, "Dragon World, bêta 0.12 : jeu complet, avec des bots à la place des vrais adversaires et le défi en ligne entre amis. Le GPS et les nids NFC arriveront avec l'appli mobile.")));
+  } }, "Dragon World, bêta 0.19. Les comptes, les classements mondiaux et les attaques entre joueurs du monde entier arrivent bientôt.")));
   ui.append(p);
 }

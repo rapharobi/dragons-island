@@ -252,8 +252,16 @@ function synchro() {
     const zone = new T.Mesh(new T.CylinderGeometry(1, 1, 2, 8), new T.MeshBasicMaterial({ visible: false })); zone.position.y = 1; g.add(zone);
     // Icône flottante quand une ferme a de quoi récolter
     if (BATIMENTS[b.type].produit) {
-      const bulle = new T.Mesh(new T.IcosahedronGeometry(0.16, 1), mat({ rations: 0xe8a070, brindilles: 0xc89a5a, pierres: 0xb8b8c0 }[BATIMENTS[b.type].produit], { e: 0xffd880, ei: 0.5 }));
-      bulle.position.y = 1.7; bulle.visible = false; g.add(bulle); g.userData.bulle = bulle;
+      // Une grosse icône flottante (pastille dorée + la ressource) : la toucher vide toutes les fermes d'un coup
+      const bulle = new T.Group(); bulle.position.y = 2.6; bulle.visible = false;
+      const disque = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.08, 20).rotateX(Math.PI / 2), mat(0xf2b544, { e: 0xa86a10, ei: 0.6, m: 0.4, r: 0.35 }), false); bulle.add(disque);
+      const anneau = new T.Mesh(new T.TorusGeometry(0.42, 0.05, 6, 24), mat(0xfff0c0, { e: 0xffd27a, ei: 0.8 }), false); bulle.add(anneau);
+      const res = new T.Mesh(BATIMENTS[b.type].produit === "pierres" ? new T.DodecahedronGeometry(0.2, 0) : BATIMENTS[b.type].produit === "brindilles" ? new T.CylinderGeometry(0.06, 0.06, 0.42, 6).rotateZ(0.8) : new T.SphereGeometry(0.19, 10, 8),
+        mat({ rations: 0xd8462a, brindilles: 0x9a6a3a, pierres: 0xb8b8c0 }[BATIMENTS[b.type].produit], { r: 0.6 }), false);
+      res.position.z = 0.12; bulle.add(res);
+      const zoneB = new T.Mesh(new T.SphereGeometry(0.7, 8, 6), new T.MeshBasicMaterial({ visible: false })); bulle.add(zoneB);
+      bulle.userData.action = { type: "recolteTout" };
+      g.add(bulle); g.userData.bulle = bulle;
     }
     moteurIles().iles[b.ile].groupe.add(g);
     V.objets.set(b.uid, { g, niveau: b.niveau, b, pos: b.pos ? b.pos.x + "," + b.pos.z : "" });
@@ -287,7 +295,7 @@ function update(dt) {
   synchro();
   for (const [, o] of V.objets) {
     if (o.g.userData.anim) o.g.userData.anim(V.t);
-    if (o.g.userData.bulle) { o.g.userData.bulle.position.y = 1.7 + Math.sin(V.t * 2.5) * 0.1; o.g.userData.bulle.rotation.y += dt * 2; }
+    if (o.g.userData.bulle) { const bl = o.g.userData.bulle; bl.position.y = 2.6 + Math.sin(V.t * 2.5) * 0.12; const cam = moteurIles() && moteurIles().camera; if (cam) bl.quaternion.copy(o.g.getWorldQuaternion(new T.Quaternion()).invert().multiply(cam.quaternion)); }
   }
   // Les bulles de récolte (vérifiées une fois par seconde)
   if (V.t - dernierProd > 1) {
@@ -543,6 +551,17 @@ function ficheBatiment(uid) {
   contenu.push(el("button", { class: "btn petit", onclick: () => ouvrirVillage(b.ile) }, "Tout le village"));
   panneau(d.nom, `${NOM_ILE[b.ile]} · niveau ${b.niveau}`, ...contenu);
 }
+// Vider toutes les fermes d'un coup (en touchant l'icône au-dessus de n'importe laquelle)
+function recolterTout() {
+  const total = {};
+  changer((s) => { for (const b of s.village.batiments) { const d = BATIMENTS[b.type]; if (!d.produit) continue; majProduction(b); const n = Math.floor(b.stock); if (n < 1) continue; s.ressources[d.produit] = (s.ressources[d.produit] || 0) + n; b.stock -= n; total[d.produit] = (total[d.produit] || 0) + n; } });
+  const l = Object.entries(total);
+  if (!l.length) return;
+  Son.recolte("bois"); setTimeout(() => Son.recolte("pierre"), 120);
+  for (const [, o] of V.objets) if (o.g.userData.bulle && o.g.userData.bulle.visible) { particule(o.g.parent, o.g.position.clone().add(new T.Vector3(0, 2.6, 0)), 0xf2b544, new T.Vector3(0, 2, 0), { vie: 0.8, taille: 1.4, e: true }); o.g.userData.bulle.visible = false; }
+  toast(l.map(([k, n]) => `+${n} ${MATERIAUX[k].nom.toLowerCase()}`).join(" · "), "bon");
+}
+extensions.action.recolteTout = () => { if (V.bataille || V.amenager) return; recolterTout(); };
 function recolter(uid) {
   let n = 0, quoi = "";
   changer((s) => { const b = s.village.batiments.find((x) => x.uid === uid); majProduction(b); n = Math.floor(b.stock); quoi = BATIMENTS[b.type].produit; s.ressources[quoi] = (s.ressources[quoi] || 0) + n; b.stock -= n; });
@@ -572,7 +591,7 @@ function verifierVague() {
     const iles = [...new Set(v.batiments.map((b) => b.ile))];
     const cible = iles[Math.floor(Math.random() * iles.length)] || "feu";
     changer((s) => { s.village.vague.enAttente = cible; });
-    toast(`Des pillards approchent de l'${NOM_ILE[cible]} ! Touche « Défendre » ou l'hôtel de ville du couvoir.`, "mal");
+    toast(`Des pillards approchent de l'${NOM_ILE[cible]} ! Touche « Défendre » ou l'île Mère dans la cour du couvoir.`, "mal");
     Son.crier("feu", 0.9);
   }
 }

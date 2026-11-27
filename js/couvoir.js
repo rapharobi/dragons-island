@@ -408,7 +408,7 @@ export function blocHub(quoi, refaireFiche) {
     const b = el("div", { class: "carte" },
       el("div", { class: "ligne" }, el("span", {}, "Prochain œuf"), el("b", { class: "num", id: "couv-minuteur" }, mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "dès ton 3e dragon")),
       el("div", { class: "doux", style: { fontSize: "12px" } }, "Les attentes suivantes :"), chaine,
-      el("div", { class: "doux", style: { fontSize: "12px" } }, `Œufs reçus : ${mi.compte}. Il y a aussi une petite chance chaque jour d'un œuf gratuit.`));
+      el("div", { class: "doux", style: { fontSize: "12px" } }, e.dragons.length >= 10 ? "Le sablier s'est endormi : à partir de 10 dragons, les œufs viennent des expéditions, des attaques de village, du dragon-roi et de la boutique." : `Œufs reçus : ${mi.compte}. Le sablier s'arrête à 10 dragons.`));
     if (e.oeufs.reserve.length) {
       const r = el("div", { class: "chaine" });
       for (const o of e.oeufs.reserve) r.append(el("span", { style: { color: ELEMENTS[o.element].couleur } }, ELEMENTS[o.element].nom));
@@ -419,7 +419,7 @@ export function blocHub(quoi, refaireFiche) {
   if (quoi === "livre") {
     const vus = e.livre.vus.length;
     const coll = el("div", { class: "carte" }, el("div", { class: "ligne" }, el("span", {}, "Dragons découverts"), el("b", { class: "num" }, `${vus}/21`)), barre(vus, 21, ""),
-      el("a", { class: "btn petit", href: window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM", target: "_blank", rel: "noopener" }, "Ouvrir le Livre des dragons"));
+      el("button", { class: "btn petit", onclick: () => ctxJeu.aller("livre") }, "Ouvrir le Livre des dragons"));
     if (livreComplet() && !e.livre.ulChoisi) coll.append(boutonUL());
     return coll;
   }
@@ -439,7 +439,7 @@ function blocChantier() {
   const niv = e.oeufs.couvoir.niveau;
   const def = COUVOIR[niv];
   const b = el("div", { class: "carte", style: { display: "grid", gap: "8px" } },
-    el("div", { class: "ligne" }, el("b", {}, `Niveau ${niv + 1}/5 · hôtel du village`)),
+    el("div", { class: "ligne" }, el("b", {}, `Niveau ${niv + 1}/5 · île Mère`)),
     el("div", { class: "doux", style: { fontSize: "12px" } }, `Tes dragons peuvent monter jusqu'au niveau ${def.nivMax}, et les bâtiments du village jusqu'au niveau ${niv + 1}. ${def.places} œuf${def.places > 1 ? "s" : ""} à la fois.`));
   const ch = e.oeufs.couvoir.chantier;
   if (ch) {
@@ -527,7 +527,7 @@ function rendre() {
   // Collection et récompense UL
   const vus = e.livre.vus.length;
   const coll = el("div", { class: "carte" }, el("div", { class: "ligne" }, el("span", {}, "Collection"), el("b", { class: "num" }, `${vus}/21`)), barre(vus, 21, ""),
-    el("a", { class: "doux", style: { fontSize: "12px" }, href: window.DRAGONS_SITE ? "livre/" : "https://claude.ai/artifact/LvMeuxAvSM8wsMbph4SgZM", target: "_blank", rel: "noopener" }, "Ouvrir le Livre des dragons"));
+    el("button", { class: "btn petit", onclick: () => ctxJeu.aller("livre") }, "Ouvrir le Livre des dragons"));
   if (livreComplet() && !e.livre.ulChoisi) coll.append(el("button", { class: "btn principal petit", onclick: () => {
     const liste = el("div", { style: { display: "grid", gap: "6px" } });
     for (const d of e.dragons) liste.append(el("button", { class: "btn", onclick: () => { changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = true; x.ulPossede = true; s.livre.ulDebloque = true; s.livre.ulChoisi = d.id; }); Son.evolution(); toast(`${PAR_ID[d.id].nom} devient UL !`, "bon"); modale({ titre: "Version UL", contenu: "Sa nouvelle robe t'attend sur son île." }); rendre(); return false; } }, `${PAR_ID[d.id].nom} · Nv ${d.niveau}`));

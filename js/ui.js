@@ -20,6 +20,8 @@ export function el(tag, attrs = {}, ...enfants) {
 export const $ = (s, r = document) => r.querySelector(s);
 
 const deja = new Set();
+// « Bientôt » : une fonction qui arrivera avec les comptes en ligne
+export function bientot(texte) { return el("div", { class: "bientot" }, el("b", {}, "Bientôt"), el("span", {}, texte)); }
 export function styles(cle, css) {
   if (deja.has(cle)) return;
   deja.add(cle);

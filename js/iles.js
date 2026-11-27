@@ -1199,7 +1199,7 @@ export function revelerIle(elx, apres) {
       oeuf.position.lerpVectors(dep, arr, k); oeuf.position.y += Math.sin(k * Math.PI) * 9; oeuf.rotation.y += 0.25;
       particule(D.scene, oeuf.position, 0xfff0c0, new T.Vector3((Math.random() - 0.5) * 0.4, -0.3, (Math.random() - 0.5) * 0.4), { e: true, vie: 0.8, grossit: 1, taille: 2 });
     } else {
-      if (oeuf.parent) { D.scene.remove(oeuf); g.visible = true; Son.portail(); D.secousse = 0.6; }
+      if (oeuf.parent) { D.scene.remove(oeuf); g.visible = true; Son.portail(); D.secousse = 0.6; import("./tuto.js").then((m) => m.parler(`Regarde ! L'île ${elx === "eau" ? "d'Eau" : elx === "feu" ? "de Feu" : "de Glace"} sort des nuages et se rattache à l'île Mère.`)); }
       const k = lisse(Math.min(1, (t - 1.8) / 2.2));
       g.position.y = yFin - 30 * (1 - k); g.scale.setScalar(0.5 + 0.5 * k);
       if (Math.random() < 0.7) particule(D.scene, POS_ILES[elx].clone().add(new T.Vector3((Math.random() - 0.5) * 22, yFin - 2 + Math.random() * 3, (Math.random() - 0.5) * 22)), 0xe8e0ff, new T.Vector3(0, 2 + Math.random() * 3, 0), { vie: 1.4, grossit: 2, taille: 4, o: 0.45 });

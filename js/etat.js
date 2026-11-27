@@ -194,7 +194,9 @@ export function mettreAJour() {
   // Minuteur des œufs
   const mi = etat.oeufs.minuteur;
   // Dès que l'on a ses trois premiers dragons, le minuteur des œufs tourne (même pendant le guide)
-  if (!mi.prochain && etat.dragons.length >= 3) mi.prochain = t + attenteOeuf(2) * H;
+  // Le sablier ne donne plus d'œufs à partir de 10 dragons (ils viennent alors des expéditions, des attaques, du boss…)
+  if (etat.dragons.length >= 10) mi.prochain = null;
+  if (!mi.prochain && etat.dragons.length >= 3 && etat.dragons.length < 10) mi.prochain = t + attenteOeuf(2) * H;
   while (mi.prochain && t >= mi.prochain) {
     etat.oeufs.choix += 1;
     mi.compte += 1;

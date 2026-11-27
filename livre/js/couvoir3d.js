@@ -12,6 +12,7 @@ import { extensions, moteurIles, focaliser, particule, fermerFiche, nouvelleFich
 import { blocHub, majHub, initHub } from "./couvoir.js";
 import { etape as etapeTuto } from "./tuto.js";
 import { ouvrirVillage, villageOuvert } from "./village.js";
+import { portOuvert } from "./expeditions.js";
 
 const T = window.THREE;
 const deg = (d) => (d * Math.PI) / 180;
@@ -59,10 +60,11 @@ const ATELIERS = [
   { quoi: "sablier", nom: "Sablier", ic: "⏳", angle: deg(-50), r: 3.3 },
   { quoi: "chantier", nom: "Architecte", ic: "🏗️", angle: deg(-14), r: 3.3 },
   { quoi: "quai", nom: "Dirigeable", ic: "🎈", angle: deg(190), r: 3.35 },
-  { quoi: "village", nom: "Hôtel de ville", ic: "🏛️", angle: deg(234), r: 3.2 },
+  { quoi: "village", nom: "Île Mère", ic: "🏛️", angle: deg(234), r: 3.2 },
+  { quoi: "noir", nom: "Œuf noir", ic: "🖤", angle: deg(160), r: 2.1, cache: true },
 ];
-const NOMS = { village: "Hôtel de ville", oeufs: "Couveuse", autel: "Autel des œufs", livre: "Livre des dragons", sablier: "Sablier", chantier: "Architecte", quai: "Dirigeable des expéditions" };
-const ICONES = { village: "🏛️", oeufs: "🪺", autel: "🥚", livre: "📖", sablier: "⏳", chantier: "🏗️", quai: "🎈" };
+const NOMS = { noir: "Œuf noir", village: "Île Mère", oeufs: "Couveuse", autel: "Autel des œufs", livre: "Livre des dragons", sablier: "Sablier", chantier: "Architecte", quai: "Dirigeable des expéditions" };
+const ICONES = { noir: "🖤", village: "🏛️", oeufs: "🪺", autel: "🥚", livre: "📖", sablier: "⏳", chantier: "🏗️", quai: "🎈" };
 
 let G = null; // { groupe, ateliers: {quoi: {g, haut, anim}}, echafaudage, lumiere }
 let calque = null, ficheQuoi = null, dernierNiv = null, fete = null, rafraichi = 0;
@@ -81,7 +83,18 @@ function modeleAutel() {
   const anneau = mesh(new T.TorusGeometry(0.55, 0.035, 6, 28), mat(0xffd27a, { e: 0xffb030, ei: 1.2 }), false); anneau.rotation.x = Math.PI / 2; anneau.position.y = 1.6; g.add(anneau);
   const oeuf = construireOeuf("inconnu", 0.52); oeuf.position.y = 1.1; g.add(oeuf);
   const lum = new T.PointLight(0xffc060, 0, 4, 2); lum.position.y = 1.7; g.add(lum);
+  // Les œufs qui attendent : posés en cercle autour de l'autel (inconnus), et ceux en réserve avec leur couleur
+  const attente = new T.Group(); g.add(attente);
+  let cleAttente = "";
   return { g, haut: 2.3, anim: (t, s) => {
+    const e = E(), cle = `${e.oeufs.choix}|${e.oeufs.reserve.map((o) => o.element).join(",")}`;
+    if (cle !== cleAttente) {
+      cleAttente = cle;
+      while (attente.children.length) attente.remove(attente.children[0]);
+      const liste = [...Array(Math.min(10, e.oeufs.choix)).fill("inconnu"), ...e.oeufs.reserve.slice(0, 8).map((o) => o.element)];
+      liste.forEach((elx, i) => { const o = construireOeuf(elx, 0.28); const a = (i / Math.max(6, liste.length)) * Math.PI * 2; o.position.set(Math.cos(a) * 0.95, 0.22, Math.sin(a) * 0.95); o.rotation.z = 0.15; attente.add(o); });
+    }
+    attente.rotation.y = t * 0.15;
     const actif = (E().oeufs.choix || 0) > 0;
     oeuf.position.y = 1.15 + (actif ? 0.25 + Math.sin(t * 2.2) * 0.12 : 0.05);
     oeuf.rotation.y = t * (actif ? 1.6 : 0.3);
@@ -195,7 +208,23 @@ function modeleVillage() {
     cloche.rotation.z = alerte ? Math.sin(t * 9) * 0.5 : Math.sin(t * 0.8) * 0.05;
   } };
 }
-const FABRIQUES = { village: modeleVillage, autel: modeleAutel, livre: modeleLivre, sablier: modeleSablier, chantier: modeleChantier, quai: modeleQuai };
+function modeleNoir() {
+  const g = new T.Group();
+  const socleN = mesh(new T.CylinderGeometry(0.35, 0.45, 0.3, 7).translate(0, 0.15, 0), mat(0x1a1420, { r: 0.6 })); g.add(socleN);
+  const oeuf = construireOeuf("inconnu", 0.55);
+  oeuf.userData.coque.material.color.setHex(0x0a0810); oeuf.userData.coque.material.emissive.setHex(0x3a0a5a); oeuf.userData.coque.material.vertexColors = false; oeuf.userData.coque.material.needsUpdate = true;
+  oeuf.position.y = 0.3; g.add(oeuf);
+  const aura = new T.Mesh(new T.SphereGeometry(0.55, 14, 10), new T.MeshBasicMaterial({ color: 0x5a1a8a, transparent: true, opacity: 0.15, blending: T.AdditiveBlending, depthWrite: false }));
+  aura.position.y = 0.85; aura.scale.y = 1.3; g.add(aura);
+  return { g, haut: 1.7, anim: (t, s) => {
+    g.visible = !!E().oeufNoir;
+    const k = (Math.sin(t * 0.9) + 1) / 2;
+    oeuf.userData.coque.material.emissiveIntensity = 0.2 + k * 0.5; aura.material.opacity = 0.08 + k * 0.14; aura.scale.setScalar(1 + k * 0.15);
+    oeuf.rotation.y = Math.sin(t * 0.3) * 0.4;
+    if (E().oeufNoir && Math.random() < 0.04) particule(s, new T.Vector3((Math.random() - 0.5) * 0.4, 0.6, (Math.random() - 0.5) * 0.4), 0x2a0a3a, new T.Vector3(0, 0.5, 0), { vie: 1.4, taille: 0.6, e: true });
+  } };
+}
+const FABRIQUES = { noir: modeleNoir, village: modeleVillage, autel: modeleAutel, livre: modeleLivre, sablier: modeleSablier, chantier: modeleChantier, quai: modeleQuai };
 
 // Échafaudage et grue géante pendant le chantier du couvoir
 function modeleEchafaudage() {
@@ -254,19 +283,21 @@ function etat(quoi) {
     const min = Math.min(...c.slots.map((s) => Math.max(0, (1 - avancement(s)))));
     return [`${c.slots.length}/${COUVOIR[c.niveau].places} · ${Math.round((1 - min) * 100)} %`, false];
   }
-  if (quoi === "sablier") { const mi = e.oeufs.minuteur; return [mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "dès 3 dragons", false]; }
+  if (quoi === "sablier") { const mi = e.oeufs.minuteur; return [e.dragons.length >= 10 ? "Endormi (10 dragons)" : mi.prochain ? fmtDuree(mi.prochain - maintenant()) : "dès 3 dragons", false]; }
   if (quoi === "chantier") {
     if (c.chantier) { const r = c.chantier.fin - maintenant(); return [r > 0 ? `Travaux · ${fmtDuree(r)}` : "Terminé !", r <= 0]; }
     if (!CHANTIER_COUVOIR[c.niveau + 1]) return [`Niveau ${c.niveau + 1}/5 · max`, false];
     return [`Niveau ${c.niveau + 1}/5`, !manqueChantier()];
   }
   if (quoi === "livre") return [`${e.livre.vus.length}/21`, false];
+  if (quoi === "noir") return ["???", true];
   if (quoi === "village") {
     if (!villageOuvert()) return ["Couvoir niveau 2", false];
     const v = e.village; if (v && v.vague && v.vague.enAttente) return ["Pillards en vue !", true];
     return [`${(v && v.batiments.length) || 0} bâtiments`, false];
   }
   if (quoi === "quai") {
+    if (!portOuvert()) return ["Couvoir niveau 2", false];
     const ex = e.expedition;
     if (!ex) return ["Prêt à partir", false];
     const r = ex.fin - maintenant();
@@ -294,6 +325,7 @@ function majEtiquettes() {
   const basMax = fiche ? fiche.getBoundingClientRect().top - 4 : window.innerHeight - 90;
   const hautMin = (document.querySelector(".tuto-bulle:not([hidden])")?.getBoundingClientRect().bottom || 0) + 30;
   for (const quoi of ["oeufs", ...ATELIERS.map((a) => a.quoi)]) {
+    if (quoi === "noir" && !E().oeufNoir) { const x = etiqs.get(quoi); if (x) x.hidden = true; continue; }
     let e = etiqs.get(quoi);
     if (!e) {
       e = el("button", { class: "cv-etiq", onclick: () => ouvrirFiche(quoi) }, el("b", {}, `${ICONES[quoi]} ${NOMS[quoi].replace(" des expéditions", "")}`), el("small"));
@@ -318,7 +350,7 @@ function ficheResume() {
   const f = nouvelleFiche();
   f.append(enTete(COUVOIR[E().oeufs.couvoir.niveau].nom, sousTitre()));
   const t = el("div", { class: "cv-tuiles" });
-  for (const quoi of ["autel", "oeufs", "sablier", "chantier", "village", "livre", "quai"]) {
+  for (const quoi of ["autel", "oeufs", "sablier", "chantier", "village", "livre", "quai", ...(E().oeufNoir ? ["noir"] : [])]) {
     const [txt, chaud] = etat(quoi);
     t.append(el("button", { class: "cv-tuile" + (chaud ? " chaud" : ""), "data-quoi": quoi, onclick: () => ouvrirFiche(quoi) }, el("span", { class: "ic" }, ICONES[quoi]), el("b", {}, NOMS[quoi].replace(" des expéditions", "").replace("Livre des dragons", "Livre")), el("small", {}, txt)));
   }
@@ -329,6 +361,7 @@ export function ouvrirFiche(quoi) {
   if (!ctx) return;
   initHub(ctx);
   if (quoi === "resume") { ficheResume(); return; }
+  if (quoi === "livre") { Son.clic(); fermerFiche(); ctx.aller("livre"); return; }
   if (quoi === "autel" && E().oeufs.choix > 0) { Son.ok(); fermerFiche(); ctx.aller("couvoir", { choisir: true }); return; }
   if (quoi === "village") {
     if (villageOuvert()) { Son.clic(); fermerFiche(); const v = E().village; ouvrirVillage((v && v.vague && v.vague.enAttente) || null); return; }
@@ -341,8 +374,12 @@ export function ouvrirFiche(quoi) {
   if (D.focus !== "centre") focaliser("centre");
   const f = nouvelleFiche();
   f.append(enTete(NOMS[quoi], sousTitre(), el("button", { class: "cv-retour", onclick: () => ouvrirFiche("resume") }, "← Couvoir")));
-  if (quoi === "village") {
-    f.append(el("div", { class: "bloc" }, el("div", { class: "info" }, "Le couvoir devient l'hôtel de ville d'un village quand il passe au niveau 2. Tu pourras alors construire des fermes, des entrepôts et des tours sur tes îles, et les aménager comme tu veux.")));
+  if (quoi === "noir") {
+    f.append(el("div", { class: "bloc" }, el("div", { class: "info" }, "Un œuf noir, froid comme la nuit. Il ne ressemble à aucun élément connu : ni feu, ni glace, ni eau. Quand on l'approche de la couveuse, elle s'éteint."),
+      el("p", { class: "doux", style: { fontSize: "12px", fontStyle: "italic" } }, "Lia : « Les anciens parlaient d'un quatrième élément, oublié de tous… Cet œuf vient peut-être de là-bas. Ici, il ne pourra jamais éclore. »"),
+      el("button", { class: "btn petit", onclick: () => { Son.erreur(); toast("La couveuse refuse l'œuf noir : il ne peut pas éclore ici.", "mal"); const a = G && G.ateliers.noir; if (a) { let k = 0; const sec = setInterval(() => { a.g.rotation.z = Math.sin(k * 1.8) * 0.12 * (1 - k / 20); if (++k > 20) { clearInterval(sec); a.g.rotation.z = 0; } }, 30); } } }, "Essayer de le couver")));
+  } else if (quoi === "village") {
+    f.append(el("div", { class: "bloc" }, el("div", { class: "info" }, "Au niveau 2, le couvoir réveille l'île Mère : c'est elle qui gouverne ton village. Tu pourras alors construire des fermes, des entrepôts et des tours sur tes îles, et les aménager comme tu veux.")));
   } else if (quoi === "autel") {
     f.append(el("div", { class: "bloc" }, el("div", { class: "info" }, "Aucun œuf à choisir pour l'instant. Ils arrivent avec le sablier, les expéditions, les attaques de village et la boutique. Quand un œuf t'attend, l'autel s'illumine.")));
   } else {

@@ -8,6 +8,7 @@ import { el, icone, toast, modale } from "./ui.js";
 import { ecranAccueil } from "./portail.js";
 import * as Iles from "./iles.js";
 import * as Couvoir from "./couvoir.js";
+import * as Livre from "./livre.js";
 import * as Combat from "./combat.js";
 import * as Boutique from "./boutique.js";
 import * as Reglages from "./reglages.js";
@@ -22,7 +23,7 @@ import { initTuto, histoire, afficher as afficherTuto, etape as etapeTuto, accue
 
 enregistrerElements(DRAGONS);
 
-const ECRANS = { iles: Iles, couvoir: Couvoir, combat: Combat, boutique: Boutique, reglages: Reglages, pilotage: Pilotage };
+const ECRANS = { iles: Iles, couvoir: Couvoir, combat: Combat, boutique: Boutique, reglages: Reglages, pilotage: Pilotage, livre: Livre };
 const NAV = [["iles", "Îles"], ["combat", "Combat"], ["boutique", "Boutique"], ["reglages", "Réglages"]];
 
 const ctx = {

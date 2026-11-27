@@ -11,30 +11,42 @@ export const MENTOR = "Lia";
 const NB_ETAPES = 12;
 
 styles("tuto", `
-.tuto-bulle { position: fixed; z-index: 30; top: calc(var(--hud) + 6px); left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); padding: 14px 16px; display: grid; grid-template-columns: 46px 1fr; gap: 12px; background: rgba(20, 16, 30, .94); border: 1px solid rgba(190, 150, 255, .45); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); animation: entre .3s; }
+.tuto-bulle { position: fixed; z-index: 30; top: calc(var(--hud) + 6px); left: 50%; transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); padding: 9px 12px; display: grid; grid-template-columns: 34px 1fr; gap: 10px; background: rgba(20, 16, 30, .94); border: 1px solid rgba(190, 150, 255, .45); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); animation: entre .3s; }
 .tuto-bulle.haut { bottom: auto; top: calc(var(--hud) + 46px); left: 50%; transform: translateX(-50%); }
 .tuto-bulle.reduite { grid-template-columns: 30px auto; padding: 4px 12px 4px 4px; width: auto; bottom: auto; top: calc(var(--hud) + 6px); left: auto; right: var(--bord-d); transform: none; cursor: pointer; align-items: center; gap: 8px; }
 .tuto-bulle.reduite .portrait { width: 30px; height: 30px; }
 .tuto-bulle.reduite .portrait svg { width: 20px; height: 20px; }
 .tuto-bulle .reduire { position: absolute; top: 6px; right: 8px; background: none; border: 0; color: var(--doux); font-size: 18px; line-height: 1; padding: 2px 6px; }
-.tuto-bulle .portrait { width: 46px; height: 46px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #c8a8ff, #4a2a8a 70%); display: grid; place-items: center; box-shadow: 0 0 18px rgba(170, 120, 255, .5); }
-.tuto-bulle .portrait svg { width: 30px; height: 30px; }
+.tuto-bulle .portrait { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #c8a8ff, #4a2a8a 70%); display: grid; place-items: center; box-shadow: 0 0 18px rgba(170, 120, 255, .5); }
+.tuto-bulle .portrait svg { width: 22px; height: 22px; }
+.tuto-bulle .portrait.parle, .lia-st .logo.parle { animation: lia-parle .32s ease-in-out infinite alternate; }
+@keyframes lia-parle { from { transform: scale(1); box-shadow: 0 0 10px rgba(170,120,255,.4); } to { transform: scale(1.14); box-shadow: 0 0 26px rgba(200,160,255,.95); } }
 .tuto-bulle b { font-family: var(--titre); color: #cdb4ff; font-size: 14px; }
-.tuto-bulle p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; }
+.tuto-bulle p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.tuto-bulle.ouvert p { -webkit-line-clamp: unset; display: block; }
 .tuto-bulle .bas { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 8px; flex-wrap: wrap; }
 .tuto-bulle .passer { background: none; border: 0; color: var(--doux); font-size: 11px; text-decoration: underline; padding: 0; }
 .tuto-bulle .etape { font-size: 10px; color: var(--doux); font-family: var(--mono); }
+.lia-st { position: fixed; z-index: 44; left: 50%; transform: translateX(-50%); bottom: calc(var(--bas) + 78px); width: min(520px, calc(100vw - 24px)); display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 14px; background: rgba(10, 8, 18, .82); border: 1px solid rgba(190,150,255,.35); pointer-events: none; animation: entre .25s; }
+.lia-st .logo { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 50% 35%, #c8a8ff, #4a2a8a 70%); }
+.lia-st .logo svg { width: 18px; height: 18px; }
+.lia-st p { margin: 0; font-size: 13px; line-height: 1.45; color: #9a8fb8; }
+.lia-st p span.dit { color: #f2ecff; }
+body:has(.histoire) .lia-st { display: none; }
 #nav a.tuto-cible { animation: pulse 1.2s infinite; color: #cdb4ff; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(190,150,255,.0); } 50% { box-shadow: 0 0 0 4px rgba(190,150,255,.55); } }
-.histoire { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, rgba(40, 20, 80, .97), rgba(8, 6, 14, .99) 70%); padding: 24px var(--bord-d) 24px var(--bord-g); text-align: center; }
-.histoire .carte { max-width: 560px; display: grid; gap: 18px; justify-items: center; }
-.histoire .fenetre { width: 140px; height: 200px; border-radius: 18px; border: 6px solid #2a2238; outline: 2px solid #b896ff; box-shadow: 0 0 60px rgba(170, 120, 255, .6), inset 0 0 50px rgba(170, 120, 255, .45); background: radial-gradient(circle at 50% 45%, #ffd6a0 0, #b05aff 18%, #3a1a7a 45%, #120c26 75%); position: relative; overflow: hidden; }
+.histoire { position: fixed; z-index: 45; left: 50%; transform: translateX(-50%); bottom: calc(var(--bas) + 80px); width: min(520px, calc(100vw - 24px)); padding: 12px 14px; border-radius: 16px; background: rgba(20, 14, 34, .95); border: 1px solid rgba(190,150,255,.5); box-shadow: 0 10px 40px rgba(0,0,0,.55); text-align: left; animation: entre .3s; }
+.histoire .carte { display: grid; grid-template-columns: 58px 1fr; gap: 6px 12px; align-items: start; }
+.histoire .carte > .etiquette, .histoire .carte > h2, .histoire .carte > p, .histoire .carte > div:last-child { grid-column: 2; }
+.histoire .carte > .fenetre { grid-row: 1 / span 4; }
+.histoire .fenetre { width: 58px; height: 80px; border-radius: 12px; border: 3px solid #2a2238; outline: 2px solid #b896ff; box-shadow: 0 0 60px rgba(170, 120, 255, .6), inset 0 0 50px rgba(170, 120, 255, .45); background: radial-gradient(circle at 50% 45%, #ffd6a0 0, #b05aff 18%, #3a1a7a 45%, #120c26 75%); position: relative; overflow: hidden; }
 .histoire .fenetre::before { content: ""; position: absolute; inset: -40%; background: conic-gradient(from 0deg, transparent, rgba(255,255,255,.35), transparent 30%, rgba(170,120,255,.5), transparent 60%); animation: tourne 6s linear infinite; }
 @keyframes tourne { to { transform: rotate(360deg); } }
 .histoire .fenetre i { position: absolute; border-radius: 50%; background: #fff; opacity: .8; width: 2px; height: 2px; }
-.histoire .fenetre .ile { position: absolute; left: 30px; right: 30px; bottom: 40px; height: 22px; border-radius: 50% 50% 40% 40%; background: #2a3a2a; }
-.histoire h2 { font-size: clamp(24px, 5vw, 34px); }
-.histoire p { margin: 0; font-size: 16px; line-height: 1.6; color: #e0d8f0; }
+.histoire .fenetre .ile { position: absolute; left: 12px; right: 12px; bottom: 16px; height: 9px; border-radius: 50% 50% 40% 40%; background: #2a3a2a; }
+.histoire h2 { font-size: 18px; margin: 0; }
+.histoire p { margin: 0; font-size: 13.5px; line-height: 1.5; color: #e0d8f0; }
+.histoire .btn { padding: 7px 14px; }
 .choix-4 { display: grid; gap: 10px; }
 .choix-4 .col { display: grid; gap: 5px; }
 .choix-4 button { text-align: left; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); border-left: 3px solid var(--el); display: grid; gap: 2px; }
@@ -66,6 +78,12 @@ const nomDernier = () => { const d = dernier(); return d ? PAR_ID[d.id].nom : "t
 const ileDe = () => { const d = dernier(); return d ? PAR_ID[d.id].element : "feu"; };
 const nomIle = (elx) => (elx === "eau" ? "d'Eau" : elx === "feu" ? "de Feu" : "de Glace");
 const nomJoueur = () => (E().joueur && E().joueur.nom) || "mage";
+// Ce que Lia dit de chaque dragon de départ
+const PRESENTATIONS = {
+  braisil: "Il a le sang chaud et ne recule jamais : sa flamme grandira avec lui.",
+  givrelin: "Calme et patient, il gèle ce qu'il touche. Un vrai bouclier.",
+  ondin: "Joueur et rapide, il glisse dans l'eau comme une ombre.",
+};
 function combattre(conf) { import("./combat.js").then((m) => m.combatGuide(ctx, conf)); }
 function recompenseIle(e) { e.ressources.brindilles += 25; e.ressources.pierres += 20; e.ressources.rations += 10; }
 function etapesIle(k) {
@@ -79,7 +97,7 @@ function etapesIle(k) {
     },
     [`mini${k}`]: {
       cible: "iles", triangle: k === 1,
-      texte: () => `Un dragon sauvage rôde sur l'île ${nomIle(ileDe())} ! ${nomDernier()} va lui montrer qui commande : un petit combat de 3 tours, contre un élément que tu bats.`,
+      texte: () => { const d = dernier(), src = d && PAR_ID[d.id]; const pres = src ? `Voici ${src.nom}, ${src.titre.charAt(0).toLowerCase() + src.titre.slice(1)}. ${PRESENTATIONS[d.id] || ""} ` : ""; return `${pres}Un dragon sauvage rôde sur l'île ${nomIle(ileDe())} ! ${nomDernier()} va lui montrer qui commande : un petit combat de 3 tours, contre un élément que tu bats.`; },
       bouton: { texte: "Combattre !", action: () => combattre({ tours: 3, eux: 1, faible: true, uids: [dernier().uid], nom: "Dragon sauvage", titre: "Mini-combat · 3 tours", texte: "Choisis ton dragon, puis une posture. ATK frappe fort, DEF protège." }) },
       quand: (n, d) => n === "combat_fini" && d && d.mode === "guide", suite: `nid${k}`,
     },
@@ -102,7 +120,7 @@ const ETAPES = {
     cible: "iles", vise: () => "couvoir",
     texte: () => (E().oeufs.couvoir.reparation
       ? "Les pierres se remettent en place… Deux minutes de travaux. Tu peux aussi tout finir maintenant avec tes gemmes : je t'en ai offert 60. Touche le couvoir."
-      : `Bienvenue, ${nomJoueur()} ! Voici tout ce qu'il reste du couvoir des dragons… Touche les ruines pour le réparer : tu as juste assez de pierres et de brindilles.`),
+      : `Bienvenue sur l'île Mère, ${nomJoueur()} ! Autrefois, trois îles flottaient autour d'elle. Il ne reste que les ruines du couvoir des dragons… Touche-les pour le réparer : tu as juste assez de pierres et de brindilles.`),
     quand: (n) => n === "reparation_finie", suite: "oeuf1",
   },
   ...etapesIle(1), ...etapesIle(2), ...etapesIle(3),
@@ -195,16 +213,42 @@ function voixFr() {
   const l = (window.speechSynthesis ? speechSynthesis.getVoices() : []).filter((v) => /^fr/i.test(v.lang));
   return l.find((v) => /amélie|amelie|audrey|julie|denise|hortense|marie|léa|celine|céline|female|femme/i.test(v.name)) || l.find((v) => /google/i.test(v.name)) || l[0] || null;
 }
+// Sous-titres : chaque fois que Lia parle, le texte s'affiche en bas avec son logo qui s'anime
+let st = null, stFin = null, stMinuteur = null;
+function sousTitres(texte) {
+  if (st) st.remove();
+  clearInterval(stMinuteur); clearTimeout(stFin);
+  const mots = String(texte).split(/(\s+)/);
+  const p = el("p", {}, mots.map((m) => el("span", {}, m)));
+  const logo = el("div", { class: "logo parle", html: RUNE });
+  st = el("div", { class: "lia-st", "aria-live": "polite" }, logo, p);
+  document.body.append(st);
+  const spans = [...p.children];
+  let k = 0;
+  const allumer = (jusqua) => { for (; k < spans.length && k <= jusqua; k++) spans[k].classList.add("dit"); };
+  const finir = () => { allumer(spans.length); logo.classList.remove("parle"); document.querySelector(".tuto-bulle .portrait")?.classList.remove("parle"); clearInterval(stMinuteur); stFin = setTimeout(() => { if (st) { st.remove(); st = null; } }, 2600); };
+  document.querySelector(".tuto-bulle .portrait")?.classList.add("parle");
+  return { spans, allumer, finir, texte };
+}
 export function parler(texte) {
-  if (!voixActive() || !window.speechSynthesis || !texte) return;
+  if (!texte) return;
+  const s = sousTitres(texte);
+  const sansVoix = () => { let i = 0; stMinuteur = setInterval(() => { i += 2; s.allumer(i); if (i >= s.spans.length) s.finir(); }, 160); };
+  if (!voixActive() || !window.speechSynthesis) { sansVoix(); return; }
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(texte.replace(/[«»]/g, ""));
     const v = voixFr(); if (v) u.voice = v;
     u.lang = "fr-FR"; u.rate = 1.04; u.pitch = 1.15;
     u.volume = Math.max(0, Math.min(1, E().reglages.volVoix ?? 1));
+    // Les mots s'allument au rythme de la voix
+    let pos = 0;
+    u.onboundary = (ev) => { if (ev.name && ev.name !== "word") return; let c = 0, idx = 0; for (; idx < s.spans.length; idx++) { c += s.spans[idx].textContent.length; if (c > ev.charIndex) break; } pos = idx; s.allumer(idx); };
+    u.onend = () => s.finir(); u.onerror = () => s.finir();
     speechSynthesis.speak(u);
-  } catch (e) { /* pas de voix sur ce navigateur */ }
+    // Si le navigateur ne donne pas le rythme des mots, on avance à vitesse de lecture
+    setTimeout(() => { if (pos === 0 && st) sansVoix(); }, 1200);
+  } catch (e) { sansVoix(); }
 }
 
 // ---------- La flèche de Lia : montre où toucher ----------
@@ -302,7 +346,7 @@ export function afficher() {
     el("div", {},
       el("b", {}, MENTOR),
       el("button", { class: "voix", "aria-label": voixActive() ? "Couper la voix de Lia" : "Activer la voix de Lia", title: "Voix de Lia", onclick: () => { basculerVoix(); afficher(); } }, voixActive() ? "🔊" : "🔇"),
-      el("p", {}, et.texte()),
+      el("p", { onclick: (ev) => ev.currentTarget.closest(".tuto-bulle").classList.toggle("ouvert") }, et.texte()),
       el("div", { class: "bas" },
         el("button", { class: "passer", onclick: () => modale({ titre: "Passer l'apprentissage ?", contenu: "Tu pourras retrouver toutes les règles dans le Livre.", boutons: [{ texte: "Continuer l'apprentissage" }, { texte: "Passer", classe: "danger", action: () => terminer(true) }] }) }, "Passer l'apprentissage"),
         et.triangle ? el("button", { class: "btn petit", onclick: () => montrerTriangle() }, "Le triangle des éléments") : null,

@@ -26,6 +26,7 @@ styles("archipel", `
   box-shadow: 0 6px 18px rgba(0,0,0,.45), 0 0 14px color-mix(in srgb, var(--c) 25%, transparent); transition: transform .15s; }
 .ar-etiq:hover, .ar-etiq.choisi { transform: translate(-50%, -100%) scale(1.07); border-color: var(--c); }
 .ar-etiq b { font-family: var(--titre); font-size: 13px; color: var(--c); }
+@media (max-width: 420px) { .ar-etiq { padding: 4px 8px 5px; } .ar-etiq b { font-size: 12px; } .ar-etiq small { font-size: 10px; } }
 .ar-etiq small { color: var(--doux); font-size: 10.5px; }
 .ar-etiq.ferme { filter: grayscale(.7); opacity: .85; }
 .ar-etiq.chaud { animation: ar-pulse 1.4s infinite; }
@@ -348,7 +349,7 @@ function construire() {
     lieux[def.id] = { ...m, def };
   }
   A = {
-    scene, camera, lieux, t: 0, vue: { cible: new T.Vector3(0, 0, 0), zoom: 1 }, voulu: { cible: new T.Vector3(0, 0, 0), zoom: 1 },
+    scene, camera, lieux, t: 0, vue: { cible: new T.Vector3(0, 0, 0), zoom: 1, az: 0 }, voulu: { cible: new T.Vector3(0, 0, 0), zoom: 1, az: 0 }, libre: { x: 0, z: 0, zoom: 1, az: 0 },
     update(dt) {
       A.t += dt;
       const t = A.t;
@@ -360,7 +361,8 @@ function construire() {
       for (const o of oiseaux) { o.a += o.v * dt; o.o.position.set(Math.cos(o.a) * o.r, o.y, Math.sin(o.a) * o.r * 1.4); o.o.rotation.y = -o.a; o.o.children.forEach((w, i) => { w.rotation.z = (i ? 1 : -1) * Math.sin(t * 8 + o.a) * 0.5; }); }
       // Caméra : glisse doucement vers la vue voulue
       const k = 1 - Math.exp(-5 * dt);
-      A.vue.cible.lerp(A.voulu.cible, k); A.vue.zoom += (A.voulu.zoom - A.vue.zoom) * k;
+      const vc = A.voulu.cible.clone().add(new T.Vector3(A.libre.x, 0, A.libre.z));
+      A.vue.cible.lerp(vc, k); A.vue.zoom += (A.voulu.zoom * A.libre.zoom - A.vue.zoom) * k; A.vue.az += (A.libre.az - A.vue.az) * k;
       cadrer();
       majEtiquettes();
     },
@@ -374,15 +376,16 @@ function cadrer() {
   const besoinL = LARG * 1.12, besoinH = PROF * 0.88;
   const demiH = Math.max(besoinH, besoinL / asp) / A.vue.zoom;
   cam.left = -demiH * asp; cam.right = demiH * asp; cam.top = demiH; cam.bottom = -demiH;
-  const az = 0.3, elv = 1.0, d = 120;
+  const az = 0.3 + A.vue.az, elv = 1.0, d = 120;
   const c = A.vue.cible;
   cam.position.set(c.x + Math.sin(az) * Math.cos(elv) * d, c.y + Math.sin(elv) * d, c.z + Math.cos(az) * Math.cos(elv) * d);
   cam.lookAt(c);
   cam.updateProjectionMatrix();
 }
-function vueEnsemble() { A.voulu.cible.set(0, 0.5, etroit() ? -1.8 : 0); A.voulu.zoom = 1; if (ctxJeu) ctxJeu.moteur.definirZone(null); }
+function vueEnsemble() { A.voulu.cible.set(0, 0.5, etroit() ? -1.8 : 0); A.voulu.zoom = 1; A.libre.x = 0; A.libre.z = 0; A.libre.zoom = 1; if (ctxJeu) ctxJeu.moteur.definirZone(null); }
 function viserLieu(id) {
   const l = A.lieux[id];
+  A.libre.x = 0; A.libre.z = 0; A.libre.zoom = 1;
   A.voulu.cible.copy(l.g.position).add(new T.Vector3(0, l.haut * 0.4, 0));
   A.voulu.zoom = etroit() ? 2.6 : 2.2;
 }
@@ -390,6 +393,35 @@ function viserLieu(id) {
 function installerToucher() {
   const canvas = document.getElementById("scene3d"), ray = new T.Raycaster();
   let d0 = null;
+  // Glisser (un doigt) déplace un peu la vue ; pincer zoome ; deux doigts qui tournent (ou clic droit) pivotent légèrement
+  const doigts = new Map();
+  let geste = null;
+  const actif = () => ctxJeu && ctxJeu.moteur.decor === A;
+  const borne = () => { const L = A.libre; L.x = Math.max(-5, Math.min(5, L.x)); L.z = Math.max(-6, Math.min(6, L.z)); L.zoom = Math.max(0.85, Math.min(1.8, L.zoom)); L.az = Math.max(-0.45, Math.min(0.45, L.az)); };
+  canvas.addEventListener("pointerdown", (e) => { if (!actif()) return; doigts.set(e.pointerId, { x: e.clientX, y: e.clientY }); geste = null; });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!actif() || !doigts.has(e.pointerId)) return;
+    const p = doigts.get(e.pointerId), dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (doigts.size === 1) {
+      const echelle = (PROF * 1.6) / (window.innerHeight * A.vue.zoom);
+      if (e.buttons === 2 || e.shiftKey) A.libre.az += dx * 0.004;
+      else { const c = Math.cos(0.3 + A.vue.az), s = Math.sin(0.3 + A.vue.az); A.libre.x -= (dx * c + dy * s * 0.6) * echelle; A.libre.z -= (dy * c * 1.4 - dx * s) * echelle; }
+    } else if (doigts.size === 2) {
+      const [a, b] = [...doigts.values()];
+      const ancien = { d: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x) };
+      p.x = e.clientX; p.y = e.clientY;
+      const [a2, b2] = [...doigts.values()];
+      const d2 = Math.hypot(a2.x - b2.x, a2.y - b2.y), ang2 = Math.atan2(b2.y - a2.y, b2.x - a2.x);
+      if (ancien.d > 0) A.libre.zoom *= d2 / ancien.d;
+      A.libre.az -= (ang2 - ancien.ang);
+      borne(); return;
+    }
+    p.x = e.clientX; p.y = e.clientY; borne();
+  });
+  const lever = (e) => { doigts.delete(e.pointerId); };
+  canvas.addEventListener("pointerup", lever); canvas.addEventListener("pointercancel", lever);
+  canvas.addEventListener("contextmenu", (e) => { if (actif()) e.preventDefault(); });
+  canvas.addEventListener("wheel", (e) => { if (!actif()) return; A.libre.zoom *= e.deltaY > 0 ? 0.92 : 1.08; borne(); }, { passive: true });
   canvas.addEventListener("pointerdown", (e) => { d0 = { x: e.clientX, y: e.clientY }; });
   canvas.addEventListener("pointerup", (e) => {
     if (!d0 || !ctxJeu || ctxJeu.moteur.decor !== A || Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > 10) return;
@@ -413,10 +445,11 @@ function majEtiquettes() {
     if (!e) { e = el("button", { class: "ar-etiq", style: { "--c": def.c }, onclick: () => choisir(def.id) }, el("b", {}, def.nom), el("small")); calque.append(e); etiqs.set(def.id, e); }
     const l = A.lieux[def.id];
     const p = versEcran(l.g.position.clone().add(new T.Vector3(0, l.haut + 0.2, 0)), A.camera);
-    const ok = p.devant && p.y < basMax && p.y > hautMin && p.x > 24 && p.x < window.innerWidth - 24 && (!choisie || choisie === def.id);
+    const ok = p.devant && p.y < basMax && p.y > hautMin && p.x > -40 && p.x < window.innerWidth + 40 && (!choisie || choisie === def.id);
     e.hidden = !ok;
     if (!ok) continue;
-    e.style.left = Math.round(p.x) + "px"; e.style.top = Math.round(p.y) + "px";
+    const demi = (e.offsetWidth || 120) / 2 + 6;
+    e.style.left = Math.round(Math.max(demi, Math.min(window.innerWidth - demi, p.x))) + "px"; e.style.top = Math.round(p.y) + "px";
     const [txt, ferme, chaud] = statutFn(def.id);
     const s = e.querySelector("small"); if (s.textContent !== txt) s.textContent = txt;
     e.classList.toggle("ferme", !!ferme); e.classList.toggle("chaud", !!chaud); e.classList.toggle("choisi", choisie === def.id);

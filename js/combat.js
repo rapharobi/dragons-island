@@ -6,7 +6,7 @@ import { mat, mesh, bloc } from "./outils3d.js";
 import { E, changer, depenserEnergie, energie, gagnerXp, maintenant, noter, rationsPourSoigner, soignerEquipe, remplirCouvoir } from "./etat.js";
 import { DRAGONS, PAR_ID, ELEMENTS, TOURS, COUT, degats, tirerAlea, domine, postures, pvMax, stadeEffectif, stadeDuNiveau, xpCombat, ESPERANCE, nomStade, armuresDe, habitatDe, fmtDuree } from "./regles.js";
 import { preparer, ouvrirSalon, nouveauCode, codeValide, identifiant, modeReseau, lienInvitation, VERSION_RESEAU, aleaGraine } from "./reseau.js";
-import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement } from "./ui.js";
+import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement, bientot } from "./ui.js";
 import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } from "./tuto.js";
 import { Son, Musique } from "./son.js";
 import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang, difficulte } from "./ligues.js";
@@ -67,6 +67,28 @@ styles("combat", `
 .points-eq i { width: 22px; height: 6px; border-radius: 3px; background: var(--el); opacity: .9; position: relative; overflow: hidden; }
 .points-eq i.ko { opacity: .2; }
 .cb-bas { position: fixed; z-index: 15; left: var(--bord-g); right: var(--bord-d); bottom: calc(var(--bas) + 10px); padding: 12px; display: grid; gap: 10px; max-width: 980px; margin: 0 auto; }
+.cb-modes { display: flex; gap: 4px; justify-content: center; }
+.cb-modes button { flex: 1; max-width: 130px; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,.04); color: var(--doux); font-size: 12px; font-weight: 600; }
+.cb-modes button.actif { background: var(--ambre); color: #1a1208; border-color: var(--ambre); }
+.cb-auto { justify-items: center; }
+.points-auto { display: flex; gap: 6px; } .points-auto i { width: 8px; height: 8px; border-radius: 50%; background: var(--ambre); animation: pulse-auto 1s infinite; } .points-auto i:nth-child(2) { animation-delay: .2s; } .points-auto i:nth-child(3) { animation-delay: .4s; }
+@keyframes pulse-auto { 50% { opacity: .2; transform: scale(.6); } }
+.cb-tri { display: flex; gap: 6px; align-items: center; justify-content: center; font-size: 12px; }
+.cb-tri button { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--trait-fort); background: none; color: var(--doux); font-size: 12px; }
+.cb-tri button.actif { border-color: var(--ambre); color: var(--ambre); }
+.cb-tableau { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; max-height: 40vh; overflow-y: auto; }
+.cb-tete { position: sticky; top: 0; z-index: 1; text-align: center; font: 700 13px var(--titre); padding: 4px; border-radius: 8px; background: rgba(20,16,30,.95); }
+.cb-tete.feu { color: var(--feu); } .cb-tete.glace { color: var(--glace); } .cb-tete.eau { color: var(--eau); }
+.cb-tete small { font: 400 10px var(--police, sans-serif); color: var(--doux); }
+.cb-case { display: grid; gap: 2px; text-align: left; padding: 6px 7px; border-radius: 10px; border: 1px solid var(--trait); background: rgba(255,255,255,.04); color: var(--texte); min-width: 0; }
+.cb-case.vide { border: none; background: none; }
+.cb-case.feu { border-left: 3px solid var(--feu); } .cb-case.glace { border-left: 3px solid var(--glace); } .cb-case.eau { border-left: 3px solid var(--eau); }
+.cb-case.choisi { border-color: var(--ambre); background: rgba(242,181,68,.16); box-shadow: 0 0 0 1px var(--ambre) inset; }
+.cb-case b { font-size: 12px; line-height: 1.15; overflow-wrap: anywhere; }
+.cb-case .qui { font-size: 10.5px; color: var(--doux); }
+.cb-case .stats { display: flex; gap: 8px; font: 700 12px var(--mono); }
+.cb-case small { font-size: 9.5px; color: var(--doux); line-height: 1.25; }
+.cb-case .st { color: #c8b8ff; }
 .cb-bas .rangee { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
 .cb-bas .rangee > * { flex: 0 0 auto; }
 .cb-bas .carte-dr { width: 138px; cursor: pointer; }
@@ -158,7 +180,7 @@ styles("combat", `
 function construireArene() {
   const scene = new T.Scene();
   scene.fog = new T.Fog(0x1a1626, 18, 60);
-  scene.add(ciel(0x120e24, 0x4a2a3a, 0x0c0a12));
+  const leCiel = ciel(0x120e24, 0x4a2a3a, 0x0c0a12); scene.add(leCiel);
   eclairage(scene, { ciel: 0xc8b8ff, sol: 0x3a2020, hemi: 0.7, soleil: 0xfff0d8, force: 1.4, zoneOmbre: 7, x: 4, y: 10, z: 6 });
   const piste = new T.Group(); scene.add(piste);
   const sol = mesh(new T.CylinderGeometry(6, 6.6, 0.6, 18).translate(0, -0.3, 0), mat(0x4a423c, { r: 1 })); piste.add(sol);
@@ -187,7 +209,7 @@ function construireArene() {
   orbite.viser(new T.Vector3(0, 0.7, 0), 8, 0.55, 1.1);
   const flash = new T.PointLight(0xffffff, 0, 8, 2); scene.add(flash);
   D = {
-    scene, camera, orbite, braseros, flash, t: 0, cotes: [null, null], projectiles: [], eclats: [], secousse: 0,
+    scene, camera, orbite, braseros, flash, ciel: leCiel, piste, sol, cercle, decors: {}, t: 0, cotes: [null, null], projectiles: [], eclats: [], secousse: 0,
     vitesse: E().reglages.vitesseCombat || 1, tweens: [], ondes: [], marques: [], boucliers: [],
     update(dtReel) {
       // Les effets du combat suivent la vitesse choisie (× 1 ou × 2)
@@ -200,9 +222,52 @@ function construireArene() {
       for (const c of D.cotes) if (c) { c.anim.update(dt); majVol(c, dt); }
       majProjectiles(dt);
       majSignatures(dt);
+      const dg = D.decors[D.decorActuel]; if (dg && dg.userData.anim) dg.userData.anim(D.t);
       majEffets(dt);
     },
   };
+}
+
+// ---------- Le décor change selon le combat : arène, forêt sauvage (selon le biome), tour du nid, volcan ----------
+const DECOR_SOL = { arene: 0x4a423c, feu: 0x3a2a24, glace: 0xdde8f0, eau: 0x5a9a4a, tour: 0x3a3448, boss: 0x2a1a18 };
+const DECOR_CIEL = { arene: [0x120e24, 0x4a2a3a, 0x0c0a12], feu: [0x2a0a08, 0x8a3a1a, 0x1a0804], glace: [0x2a4a7a, 0xa8c8e8, 0x1a2a3a], eau: [0x1a4a7a, 0x6ab8d8, 0x0a2a3a], tour: [0x0a0820, 0x3a2a6a, 0x08060f], boss: [0x1a0404, 0x6a1a0a, 0x0a0202] };
+function construireDecor(nom) {
+  const g = new T.Group(), r = Math.random;
+  if (nom === "feu" || nom === "glace" || nom === "eau") {
+    // La forêt sauvage, version de l'île de l'élément
+    for (let k = 0; k < 18; k++) {
+      const a = (k / 18) * Math.PI * 2 + r() * 0.2, d = 6.5 + r() * 3;
+      let o;
+      if (nom === "feu") { o = mesh(new T.ConeGeometry(0.12, 1.6, 5).translate(0, 0.8, 0), mat(0x1a1210)); if (k % 3 === 0) { const l = mesh(new T.CircleGeometry(0.7, 8), mat(0xff5a0a, { e: 0xff3a00, ei: 1.2 }), false); l.rotation.x = -Math.PI / 2; l.position.set(Math.cos(a + 0.2) * (d - 1), 0.02, Math.sin(a + 0.2) * (d - 1)); g.add(l); } }
+      else if (nom === "glace") { o = new T.Group(); for (let i = 0; i < 3; i++) { const c = mesh(new T.ConeGeometry(0.7 - i * 0.18, 0.9, 7).translate(0, 0.6 + i * 0.5, 0), mat(0x1f4a3a)); o.add(c); const n = mesh(new T.ConeGeometry(0.4 - i * 0.1, 0.35, 7).translate(0, 1.0 + i * 0.5, 0), mat(0xf4f8fc)); o.add(n); } }
+      else { o = new T.Group(); o.add(mesh(new T.CylinderGeometry(0.08, 0.12, 1.8, 5).translate(0, 0.9, 0), mat(0x8a6a44))); for (let i = 0; i < 5; i++) { const f = mesh(new T.BoxGeometry(1, 0.04, 0.25).translate(0.5, 0, 0), mat(0x3aa04a, { d: true })); f.position.y = 1.8; f.rotation.set(0, i * 1.25, -0.4); o.add(f); } }
+      o.position.set(Math.cos(a) * d, 0, Math.sin(a) * d); o.scale.setScalar(1 + r() * 0.6); g.add(o);
+    }
+  } else if (nom === "tour") {
+    // Au sommet de la tour du nid : créneaux de pierre et grand cristal violet
+    for (let k = 0; k < 24; k++) { const a = (k / 24) * Math.PI * 2; const c = mesh(new T.BoxGeometry(0.8, k % 2 ? 1.2 : 0.7, 0.6).translate(0, k % 2 ? 0.6 : 0.35, 0), mat(0x5a5470)); c.position.set(Math.cos(a) * 6.2, 0, Math.sin(a) * 6.2); c.rotation.y = -a; g.add(c); }
+    const cr = mesh(new T.OctahedronGeometry(0.9, 0).scale(1, 1.8, 1), mat(0xc8a8ff, { e: 0x8a5aff, ei: 1.2 })); cr.position.set(0, 7, -6); g.add(cr);
+    const l = new T.PointLight(0xa07aff, 2, 20); l.position.copy(cr.position); g.add(l);
+    g.userData.anim = (t) => { cr.rotation.y = t * 0.6; };
+  } else if (nom === "boss") {
+    // Le cratère du volcan : anneau de lave et roches noires
+    const lave = mesh(new T.RingGeometry(6.6, 9, 32), mat(0xff4a0a, { e: 0xff3a00, ei: 1.4, d: true }), false); lave.rotation.x = -Math.PI / 2; lave.position.y = -0.1; g.add(lave);
+    for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2; const p2 = mesh(new T.ConeGeometry(0.8 + r() * 0.6, 2 + r() * 2.5, 5).translate(0, 1, 0), mat(0x1a1210)); p2.position.set(Math.cos(a) * 10, 0, Math.sin(a) * 10); g.add(p2); }
+    const l = new T.PointLight(0xff5a1a, 2.5, 25); l.position.set(0, 2, 0); g.add(l);
+    g.userData.anim = (t) => { l.intensity = 2.2 + Math.sin(t * 3) * 0.5; };
+  }
+  return g;
+}
+function choisirDecor(mode, element) {
+  if (!D) return;
+  const nom = mode === "sauvage" || mode === "guide" ? (element || "eau") : mode === "tour" ? "tour" : mode === "boss" ? "boss" : "arene";
+  for (const [k, g] of Object.entries(D.decors)) g.visible = k === nom;
+  if (nom !== "arene" && !D.decors[nom]) { D.decors[nom] = construireDecor(nom); D.scene.add(D.decors[nom]); }
+  D.sol.material = mat(DECOR_SOL[nom], { r: 1 });
+  D.cercle.visible = nom === "arene" || nom === "tour";
+  for (const b of D.braseros) b.parent.visible = nom === "arene";
+  D.ciel.setColors(...DECOR_CIEL[nom]);
+  D.decorActuel = nom;
 }
 
 function placerDragon(cote, membre, entree = true) {
@@ -517,14 +582,16 @@ function contenuLieu(id, refaire, partir) {
     b.append(bouton("Attaquer le village d'un ami", "Colle le code de son village", () => attaquerAmi(), false));
     b.append(bouton("Partager mon village", "Un code que ton ami pourra attaquer", () => partagerVillage(), false));
     const bc = boucliers();
+    b.append(bientot("Défendre et attaquer en direct avec tes amis connectés, et voir qui t'a attaqué depuis son propre village."));
     b.append(el("p", { class: "doux" }, bc ? `🛡️ Ton village est sous bouclier encore ${fmtDuree(bc)} : personne ne peut l'attaquer.` : "Des mages peuvent attaquer ton village pendant ton absence (1 à 2 fois par jour). Après chaque attaque, un bouclier de 8 h le protège."));
   }
   else if (id === "amis") {
     b.append(bouton("Sur le même téléphone", "Chacun choisit à son tour, sans regarder.", () => partir("amis", "ami")));
     b.append(bouton("En ligne, avec un code", "Chacun sur son téléphone, reliés par un code.", () => partir("amis", "ligne"), false));
-  } else if (id === "port") b.append(blocExpedition(refaire, E().tuto && E().tuto.etape === "expedition"));
-  else if (id === "hall") b.append(contenuHall(refaire));
-  else if (id === "boss") b.append(blocBoss(() => partir("boss", "boss")));
+    b.append(bientot("Guildes, liste d'amis connectés et discussion à l'auberge."));
+  } else if (id === "port") { b.append(blocExpedition(refaire, E().tuto && E().tuto.etape === "expedition")); b.append(bientot("Expéditions en équipe avec les dragons de tes amis.")); }
+  else if (id === "hall") { b.append(contenuHall(refaire)); b.append(bientot("Ton compte, le classement mondial et la saison entre amis.")); }
+  else if (id === "boss") { b.append(blocBoss(() => partir("boss", "boss"))); b.append(bientot("Affronter le dragon-roi à plusieurs, avec ta guilde, et partager le butin.")); }
   return b;
 }
 function dragonsEnForme() { return E().dragons.filter((d) => d.pv > 0 && !d.chantier && !d.expedition).sort((a, b) => b.niveau - a.niveau); }
@@ -558,7 +625,7 @@ function statutLieu(id) {
   if (id === "boss") { const B = boss(); return B.pv > 0 ? [`${Math.round((1 - B.pv / B.max) * 100)} % abattu`, false, B.combats === 0] : ["Abattu !"]; }
   return [""];
 }
-function montrerArene() { ctxJeu.moteur.montrer(D); D.orbite.viser(new T.Vector3(0, 0.9, 0), 11, 0.6, 1.1); D.orbite.auto = 0.08; }
+function montrerArene() { choisirDecor("arene"); ctxJeu.moteur.montrer(D); D.orbite.viser(new T.Vector3(0, 0.9, 0), 11, 0.6, 1.1); D.orbite.auto = 0.08; }
 export function ouvrir(ctx, params = {}) {
   ctxJeu = ctx;
   if (!D) construireArene();
@@ -628,10 +695,10 @@ function rendrePrep() {
   );
   const et = etapeTuto();
   let modes = [
-    ["bot", "Duel de mage (classé)", et === "mage" ? "Un mage rival a ouvert un portail et te défie. Gratuit pendant l'apprentissage." : `Un autre mage de ton niveau. Si aucun n'est en ligne, un mage-bot du même niveau te défie. Coûte ${COUT.combat} d'énergie.`],
+    ["bot", "Duel de mage (classé)", et === "mage" ? "Un mage rival a ouvert un portail et te défie. Gratuit pendant l'apprentissage." : `Un mage de ta ligue, de ton niveau, te défie. Coûte ${COUT.combat} d'énergie.`],
     ["ligne", "Défi en ligne (code ami)", "Chacun sur son téléphone : crée une partie et envoie le code à ton ami, ou entre le sien. Combat amical : gratuit, sans expérience, et tes dragons ne perdent pas de PV."],
     ["village", "Attaquer un village", `Tes dragons partent à l'assaut d'un village ennemi : ses tours tirent, toi tu choisis les cibles. Détruis son couvoir pour gagner du butin (et parfois un œuf). Village niveau ${niveauVillage()}. Coûte 3 d'énergie.`],
-    ["tour", "La tour du nid", `Mode roguelite : tu entres sans dragon, tu choisis 3 œufs, et tu grimpes ${ETAGES} étages contre une IA de plus en plus forte. Au sommet : un œuf et un œuf mystère UL. Coûte ${COUT_TOUR} d'énergie par ascension.`],
+    ["tour", "La tour du nid", `Mode roguelite : tu entres sans dragon, tu choisis 3 œufs, et tu grimpes ${ETAGES} étages contre des mages gardiens de plus en plus forte. Au sommet : un œuf et un œuf mystère UL. Coûte ${COUT_TOUR} d'énergie par ascension.`],
     ["sauvage", "Dragons sauvages", "Des dragons sauvages plus faibles que les tiens (2 niveaux de moins) : de l'expérience et des rations sans trop de risques. Coûte 2 d'énergie."],
     ["boss", "Le dragon-roi", "Le dragon géant de la semaine. Chaque combat lui retire des PV pour de bon. Coûte 4 d'énergie."],
     ["ami", "Défi entre amis", "Sur le même appareil : chacun choisit à son tour, sans regarder. L'écart de niveau est permis. Gratuit."],
@@ -1000,6 +1067,8 @@ function lancer() {
       // Le chef a ton niveau moyen moins un, ses compagnons un peu moins : gagnable, sans être donné
       luiG.push(membreBot(l[Math.floor(Math.random() * l.length)].id, g.faible ? 1 : Math.max(1, niv - (i === 0 ? 1 : 2)), g.faible ? 0 : 1));
     }
+    // Le combat du guide se passe sur l'île de ton dragon
+    choisirDecor("guide", moiG[0] && moiG[0].element);
     C = { mode: "guide", tour: 1, tours: g.tours, totaux: [0, 0], equipes: [moiG, luiG], noms: ["Toi", g.nom || "Dragons sauvages"], choix: [null, null], fini: false, sel: [null, null], historique: [], etage: 0, adv: null };
     ctxJeu.cacherInterface(true);
     D.orbite.auto = 0; viserArene();
@@ -1058,6 +1127,7 @@ function lancer() {
     if (!lui.length || !moi.length) return;
   } else { lui = equipeBot(new Array(Math.max(3, moi.length)).fill(prep.niveauAmi), 4); nomAdv = "Joueur 2"; }
   C = { mode: prep.mode, tour: 1, totaux: [0, 0], equipes: [moi, lui], noms: ["Toi", nomAdv], choix: [null, null], fini: false, sel: [null, null], historique: [], etage: run ? run.etage : 0, adv: advLigue };
+  choisirDecor(prep.mode, lui[0] && lui[0].element);
   if (prep.mode === "ligne") {
     C.hote = L.hote;
     C.graine = L.hote ? L.graine : (L.autre.g | 0);
@@ -1119,8 +1189,84 @@ function rendreHaut() {
   return h;
 }
 
+// Trois façons de jouer : manuel (élément → dragon → posture), semi-auto (toutes les postures en un tableau
+// de trois colonnes, une par élément) et auto (l'ordinateur choisit pour toi, avec stratégie).
+const MODES_CHOIX = [["manuel", "Manuel"], ["semi", "Semi-auto"], ["auto", "Auto"]];
+function modeChoix() { if (C.mode === "ami") return "manuel"; return E().reglages.modeCombat || "manuel"; }
+function barreModes(joueur) {
+  return el("div", { class: "cb-modes" }, MODES_CHOIX.map(([k, n]) => el("button", { class: modeChoix() === k ? "actif" : "", onclick: () => { Son.clic(); changer((s) => { s.reglages.modeCombat = k; }); rendreChoix(joueur); } }, n)));
+}
+// Auto : l'ordinateur choisit le meilleur coup pour toi
+function choixAuto(joueur) {
+  ui.innerHTML = "";
+  ui.append(rendreHaut());
+  cacherBulle(true);
+  ui.append(el("section", { class: "cb-bas panneau cb-auto" }, barreModes(joueur),
+    el("p", { class: "doux", style: { margin: 0, fontSize: "13px", textAlign: "center" } }, "Combat automatique : tes dragons choisissent eux-mêmes leur coup."), el("div", { class: "points-auto" }, el("i"), el("i"), el("i"))));
+  setTimeout(() => {
+    if (!C || C.fini || C.choix[joueur] || modeChoix() !== "auto") return;
+    const adv = C.equipes[1 - joueur];
+    const r = choixOrdinateur(C.equipes[joueur], adv, 0.04);
+    C.sel[joueur] = { el: r.m.element, i: r.i, j: r.j };
+    montrerChoix(joueur, r.m);
+    valider(joueur);
+  }, 700 / (D ? D.vitesse : 1));
+}
+// Semi-auto : un tableau à trois colonnes (Feu, Glace, Eau), une ligne par posture, triées comme tu veux
+let triSemi = "equilibre";
+function choixSemi(joueur) {
+  const defil = memoriserDefilement(".cb-tableau");
+  ui.innerHTML = "";
+  ui.append(rendreHaut());
+  cacherBulle(true);
+  const equipe = C.equipes[joueur];
+  const sel = C.sel[joueur];
+  const bas = el("section", { class: "cb-bas panneau cb-semi" }, barreModes(joueur));
+  bas.append(el("div", { class: "cb-tri" }, el("span", { class: "doux" }, "Trier :"), [["attaque", "Attaque"], ["defense", "Défense"], ["equilibre", "Équilibré"]].map(([k, n]) =>
+    el("button", { class: triSemi === k ? "actif" : "", onclick: () => { Son.clic(); triSemi = k; choixSemi(joueur); } }, n))));
+  const cle = (p) => (triSemi === "attaque" ? p.atk * 10 + p.def : triSemi === "defense" ? p.def * 10 + p.atk : p.atk + p.def);
+  const cols = { feu: [], glace: [], eau: [] };
+  equipe.forEach((m, i) => { if (m.pv > 0) m.postures.forEach((p, j) => cols[m.element].push({ m, i, j, p })); });
+  for (const k of Object.keys(cols)) cols[k].sort((a, b) => cle(b.p) - cle(a.p));
+  const lignes = Math.max(1, ...Object.values(cols).map((l) => l.length));
+  const tab = el("div", { class: "cb-tableau" });
+  for (const elx of ["feu", "glace", "eau"]) tab.append(el("div", { class: `cb-tete ${elx}` }, ELEMENTS[elx].nom, el("small", {}, ` bat ${ELEMENTS[ELEMENTS[elx].bat[0]].nom}`)));
+  for (let r = 0; r < lignes; r++) for (const elx of ["feu", "glace", "eau"]) {
+    const o = cols[elx][r];
+    if (!o) { tab.append(el("div", { class: "cb-case vide" })); continue; }
+    const choisi = sel && sel.i === o.i && sel.j === o.j;
+    const battu = Object.keys(ELEMENTS).find((x) => domine(x, o.m.element));
+    tab.append(el("button", { class: `cb-case ${elx} ${choisi ? "choisi" : ""}`, onclick: () => {
+      Son.clic();
+      if (choisi) { valider(joueur); return; }
+      C.sel[joueur] = { el: o.m.element, i: o.i, j: o.j };
+      montrerChoix(joueur, o.m);
+      choixSemi(joueur);
+    } },
+      el("b", {}, o.p.nom), el("span", { class: "qui" }, `${o.m.nom} · Nv ${o.m.niveau}`),
+      el("div", { class: "stats" }, el("span", {}, "⚔ ", o.p.atk), el("span", {}, "🛡 ", o.p.def)),
+      el("small", {}, `Bonus +${Math.round(o.p.bonus * 100)} % contre ${ELEMENTS[ELEMENTS[o.m.element].bat[0]].nom}`), el("small", {}, `Faiblesse : +${Math.round(o.p.faib * 100)} % pris du ${ELEMENTS[battu].nom}`),
+      el("small", { class: "st" }, `${NOMS_STYLE[styleAttaque(o.p)]} · ${NOMS_DEFENSE[styleDefense(o.p)]}`)));
+  }
+  bas.append(tab);
+  const m = sel && equipe[sel.i];
+  bas.append(el("div", { class: "valider" },
+    el("button", { class: "btn danger petit", onclick: () => modale({ titre: "Abandonner ?", contenu: "Le combat compte comme une défaite. Les PV déjà perdus restent perdus.", boutons: [{ texte: "Continuer le combat" }, { texte: "Abandonner", classe: "danger", action: () => abandonner() }] }) }, "Abandonner"),
+    el("span", { class: "doux", style: { fontSize: "12px" } }, m ? `${m.nom} · ${m.postures[sel.j].nom} (touche encore pour valider)` : "Touche une case"),
+    el("button", { class: "btn principal", disabled: !m, onclick: () => valider(joueur) }, "Valider")));
+  ui.append(bas);
+  restaurerDefilement(".cb-tableau", defil);
+  demarrerChrono(joueur);
+}
+
 // Choix secret, en trois temps : l'élément, puis le dragon de cet élément, puis sa posture.
 function rendreChoix(joueur) {
+  if (C.mode !== "ami" && joueur === 0 && modeChoix() === "auto") { choixAuto(joueur); return; }
+  if (C.mode !== "ami" && joueur === 0 && modeChoix() === "semi") {
+    const eq = C.equipes[joueur];
+    if (!C.sel[joueur] || !eq[C.sel[joueur].i] || eq[C.sel[joueur].i].pv <= 0) { const i = eq.findIndex((x) => x.pv > 0); C.sel[joueur] = { el: eq[i].element, i, j: meilleurePosture(eq[i]) }; }
+    choixSemi(joueur); return;
+  }
   const defil = C.dernierChoix === joueur ? memoriserDefilement(".cb-bas .rangee") : null;
   C.dernierChoix = joueur;
   ui.innerHTML = "";
@@ -1134,6 +1280,7 @@ function rendreChoix(joueur) {
   }
   if (!sel.el) sel.el = equipe[sel.i].element;
   const bas = el("section", { class: "cb-bas panneau" });
+  if (C.mode !== "ami") bas.append(barreModes(joueur));
   bas.append(el("div", { class: "valider" },
     el("b", { style: { fontFamily: "var(--titre)" } }, C.mode === "ami" ? `Joueur ${joueur + 1} : choisis en secret` : "Ton coup secret"),
     el("span", { class: "doux", style: { fontSize: "12px" } }, "1. un élément · 2. un dragon · 3. une posture")));
@@ -1480,7 +1627,7 @@ async function phase(k) {
 }
 // Après chaque attaque, le récapitulatif reste à l'écran jusqu'à « Continuer » (sauf si « Enchaîner » est coché)
 function attendreSuite(fiche) {
-  if (!C || C.fini || C.mode === "ligne" || E().reglages.combatAuto) return Promise.resolve();
+  if (!C || C.fini || C.mode === "ligne" || E().reglages.combatAuto || (C.mode !== "ami" && E().reglages.modeCombat === "auto")) return Promise.resolve();
   return new Promise((r) => {
     const barreS = el("div", { class: "fc-suite" }, el("button", { class: "btn principal", onclick: () => { Son.clic(); fin(); } }, "Continuer ›"));
     const fin = () => { fiche._suite = null; barreS.remove(); r(); };
@@ -1572,7 +1719,7 @@ function finCombatInterne(raison) {
       if (victoire) {
         for (const x of run.dragons) x.niveau = Math.min(20, x.niveau + 1);
         e.tourNid.record = Math.max(e.tourNid.record, run.etage);
-        if (run.etage >= ETAGES) { gains.push(...recompensesTour(e, ETAGES, true)); e.tourNid.sommets++; e.tourNid.run = null; C.finTour = "sommet"; }
+        if (run.etage >= ETAGES) { gains.push(...recompensesTour(e, ETAGES, true)); e.tourNid.sommets++; e.tourNid.run = null; C.finTour = "sommet"; if (!e.oeufNoir) { e.oeufNoir = { t: maintenant(), ou: "tour" }; gains.push("… et un étrange œuf noir"); } }
         else { gains.push(`Étage ${run.etage} conquis`, "+1 niveau pour toute l'équipe", "un nouvel œuf à choisir"); run.etage++; run.attente = "oeuf"; C.finTour = "suite"; }
       } else { gains.push(...recompensesTour(e, run.etage - 1, false)); e.tourNid.run = null; C.finTour = "chute"; }
       noter(`Tour du nid, étage ${C.etage} : ${resultat}.`);
