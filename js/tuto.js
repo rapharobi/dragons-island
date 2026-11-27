@@ -252,7 +252,10 @@ export function etape() { const t = E() && E().tuto; return t ? t.etape : "fini"
 export function tutoActif() { const et = etape(); return !!ETAPES[et]; }
 export function enApprentissage() { return etape() !== "fini"; }
 
+// D'autres modules (le journal d'aventure) écoutent aussi les événements du jeu
+export const ecouteurs = [];
 export function signaler(nom, donnee) {
+  for (const f of ecouteurs) { try { f(nom, donnee); } catch (err) { console.error(err); } }
   if (!tutoActif()) return;
   const id = etape();
   const et = ETAPES[id];

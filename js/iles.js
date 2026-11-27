@@ -79,6 +79,17 @@ body.ecran-iles .iles-choix .btn { padding: 6px 10px; font-size: 12px; }
 .ld-droite { display: grid; gap: 4px; justify-items: end; font-size: 12px; } .ld-droite .barre { width: 70px; height: 5px; }
 .ld-alerte { color: var(--ambre); font-size: 10px; }
 .iles-choix .mes-dragons { border-color: var(--ambre); color: var(--ambre); }
+.mini-carte { position: relative; width: 112px; height: 112px; flex: none; }
+.mini-carte-svg { width: 112px; height: 112px; display: block; filter: drop-shadow(0 6px 16px rgba(0,0,0,.5)); }
+.mc-fond { fill: rgba(14,12,24,.78); stroke: rgba(242,181,68,.35); stroke-width: 1.5; }
+.mc-pont { stroke: rgba(200,170,120,.6); stroke-width: 2; stroke-dasharray: 3 2; }
+.mc-ile { cursor: pointer; }
+.mc-ile circle:first-child { stroke: rgba(0,0,0,.35); stroke-width: 1.5; opacity: .85; transition: opacity .15s; }
+.mc-ile:hover circle:first-child, .mc-ile.actif circle:first-child { opacity: 1; stroke: #fff; stroke-width: 2.5; }
+.mc-ile text { font: 700 9px var(--titre, sans-serif); fill: #120d08; pointer-events: none; }
+.mc-n { font: 700 8px sans-serif !important; fill: #fff !important; }
+.mc-tout { position: absolute; right: -4px; bottom: -4px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--trait-fort); background: rgba(14,12,24,.9); color: var(--texte); font-size: 15px; display: grid; place-items: center; }
+.mc-tout.actif { border-color: var(--ambre); color: var(--ambre); }
 .ld-vignette { border-radius: 10px; background: radial-gradient(circle at 50% 60%, rgba(255,255,255,.1), rgba(255,255,255,.02) 70%); display: block; }
 .ld-ligne.feu .ld-vignette { background: radial-gradient(circle at 50% 65%, rgba(255,106,61,.28), rgba(255,255,255,.02) 70%); }
 .ld-ligne.glace .ld-vignette { background: radial-gradient(circle at 50% 65%, rgba(127,214,255,.28), rgba(255,255,255,.02) 70%); }
@@ -329,7 +340,7 @@ function repousser(v, dt) {
   v.bloque = pousse ? (v.bloque || 0) + dt : 0;
   // Bloqué contre un obstacle : on fait le tour par le côté le plus court
   if (pousse && v.bloque > 0.4 && v.cible && ["marche", "nid", "rejoindre", "versRecolte", "rituel"].includes(v.etat)) contourner(v, pousse);
-  if (v.bloque > 2.5 && (v.etat === "marche" || v.etat === "rejoindre")) { v.etat = "pause"; v.minuteur = 0.5; v.bloque = 0; v.anim.jouer("repos"); }
+  if (v.bloque > 2.5 && (v.etat === "marche" || v.etat === "rejoindre" || v.etat === "chasse")) { v.etat = "pause"; v.minuteur = 0.5; v.bloque = 0; v.anim.jouer("repos"); }
 }
 function contourner(v, o) {
   const p = v.mobile.position;
@@ -403,7 +414,7 @@ function allerVers(v, cible, etat, vitesse = 1) { v.cible = cible; v.etat = etat
 // ---------- La vie des dragons ----------
 const ACTIONS_SEUL = ["renifler", "regarder", "secouer", "etirer", "bailler", "joie", "jouer", "rugir"];
 const ACTIONS_EAU = ["regarder", "joie", "secouer", "rugir"];
-const HUMEURS = { marche: "se promène", pause: "observe", dort: "fait la sieste", vol: "vole", rejoindre: "va voir un ami", attendre: "attend un ami", jeu: "joue", action: "s'amuse", nid: "rentre au nid", ko: "K.O.", versRecolte: "part récolter", recolte: "récolte", rituel: "rejoint la source", rituelPret: "attend", repas: "mange", nage: "nage", plonge: "nage au fond", chantier: "construit le couvoir", expedition: "en expédition", bataille: "défend le village" };
+const HUMEURS = { chasse: "chasse", marche: "se promène", pause: "observe", dort: "fait la sieste", vol: "vole", rejoindre: "va voir un ami", attendre: "attend un ami", jeu: "joue", action: "s'amuse", nid: "rentre au nid", ko: "K.O.", versRecolte: "part récolter", recolte: "récolte", rituel: "rejoint la source", rituelPret: "attend", repas: "mange", nage: "nage", plonge: "nage au fond", chantier: "construit le couvoir", expedition: "en expédition", bataille: "défend le village" };
 
 function choisirEnvie(v) {
   const p = v.mobile.position;
@@ -417,9 +428,13 @@ function choisirEnvie(v) {
   const voisins = [...D.dragons.values()].filter((o) => o !== v && o.element === v.element && !o.ko && !nage(o) && (o.etat === "pause" || o.etat === "marche"));
   const ailes = v.rig.ailes.length > 0 && v.stade >= 1;
   const perche = v.habitat === "perchoir";
+  // Chaque caractère a ses habitudes : le paresseux dort, le joueur cherche ses amis, le gourmand chasse…
+  const car = caractere(v.d).nom;
+  const poids = { Joueur: { ami: 2.2, action: 1.3, chasse: 1 }, Fier: { vol: 1.6, action: 1.2 }, Timide: { nid: 2.5, ami: 0.5 }, Gourmand: { chasse: 3, marche: 1.2 }, Paresseux: { dort: 3.5, marche: 0.5, vol: 0.4 }, Curieux: { marche: 1.6, chasse: 1.2 } }[car] || {};
+  const w = (n, x) => x * (poids[n] || 1);
   const tirage = [
-    ["marche", perche ? 12 : 30], ["action", 24], ["dort", v.fatigue > 40 ? 16 : 4], ["vol", ailes ? (perche ? 38 : 8) : 0],
-    ["ami", voisins.length && !perche ? 16 : 0], ["nid", perche ? 14 : 6],
+    ["marche", w("marche", perche ? 12 : 30)], ["action", w("action", 24)], ["dort", w("dort", v.fatigue > 40 ? 16 : 4)], ["vol", w("vol", ailes ? (perche ? 38 : 8) : 0)],
+    ["ami", w("ami", voisins.length && !perche ? 16 : 0)], ["nid", w("nid", perche ? 14 : 6)], ["chasse", w("chasse", perche ? 0 : 7)],
   ];
   const total = tirage.reduce((s, x) => s + x[1], 0);
   let r = Math.random() * total, choix = "marche";
@@ -427,7 +442,19 @@ function choisirEnvie(v) {
   if (choix === "marche") { const c = pointAuHasard(v, v.habitat === "cheminee" || perche ? v.maison : p, perche ? 2 : v.habitat === "cheminee" ? 3 : 4.5); if (c) return allerVers(v, c, "marche", 0.7 + Math.random() * 0.6); choix = "action"; }
   if (choix === "action") { v.etat = "action"; const a = ACTIONS_SEUL[Math.floor(Math.random() * ACTIONS_SEUL.length)]; v.anim.jouer(a); v.minuteur = 2.6; if (a === "rugir" && v.proche) Son.crier(v.element, Math.min(1, v.stade / 4), v.d.id); return; }
   if (choix === "dort" || choix === "nid") return allerVers(v, v.maison.clone(), "nid", 0.8);
-  if (choix === "vol") return decoller(v);
+  if (choix === "vol") {
+    decoller(v);
+    // Parfois, les autres dragons ailés de l'île décollent avec lui et volent en escadrille
+    const ailes2 = [...D.dragons.values()].filter((o) => o !== v && o.element === v.element && !o.ko && !nage(o) && o.rig.ailes.length > 0 && o.stade >= 1 && (o.etat === "pause" || o.etat === "marche" || o.etat === "action"));
+    if (ailes2.length && Math.random() < 0.45) ailes2.slice(0, 3).forEach((o, i) => { decoller(o, v.volDuree); o.volCentre = v.volCentre.clone(); o.volR = v.volR + 0.6 * (i + 1); o.volA = v.volA - 0.5 * (i + 1); });
+    return;
+  }
+  if (choix === "chasse") {
+    // Il repère une proie, s'aplatit, puis bondit dessus
+    const c = pointAuHasard(v, p, 5);
+    if (c) { v.anim.jouer("renifler"); return allerVers(v, c, "chasse", 1.9); }
+    choix = "action";
+  }
   if (choix === "ami") {
     const ami = voisins[Math.floor(Math.random() * voisins.length)];
     const milieu = p.clone().lerp(ami.mobile.position, 0.5);
@@ -487,7 +514,7 @@ function vivre(v, dt) {
   v.fatigue += dt * (v.etat === "dort" ? -6 : 0.4);
   let hauteurVol = 0;
   switch (v.etat) {
-    case "marche": case "nid": case "rejoindre": case "versRecolte": case "nage": case "rituel": {
+    case "marche": case "nid": case "rejoindre": case "versRecolte": case "nage": case "rituel": case "chasse": {
       const dx = v.cible.x - p.x, dz = v.cible.z - p.z, dist = Math.hypot(dx, dz);
       if (dist < 0.25) {
         v.anim.jouer(enEau(v) ? "nage" : "repos");
@@ -499,6 +526,13 @@ function vivre(v, dt) {
           if (!nage(v) && (v.fatigue > 30 || Math.random() < 0.4)) { v.etat = "dort"; v.anim.jouer("dormir"); v.minuteur = 14 + Math.random() * 14; }
           else { v.etat = "pause"; v.minuteur = 1 + Math.random() * 2; }
         } else if (v.etat === "rejoindre") { v.etat = "attendre"; v.minuteur = 4; }
+        else if (v.etat === "chasse") {
+          // Le bond sur la proie : attaque, poussière, petit festin
+          v.etat = "action"; v.minuteur = 2.2; v.anim.jouer("attaque");
+          if (v.proche) Son.croquer("rations");
+          particule(D.iles[v.element].groupe, p.clone().add(new T.Vector3(0, 0.2, 0)), 0xb8a890, new T.Vector3(0, 1, 0), { vie: 0.8, grossit: 1.5, taille: 1.5, o: 0.5 });
+          setTimeout(() => { if (v.etat === "action") v.anim.jouer("joie"); }, 900);
+        }
         else { v.etat = "pause"; v.minuteur = 0.8 + Math.random() * 2.5; }
         break;
       }
@@ -881,7 +915,13 @@ function synchroniser() {
     };
     if (ko) anim.jouer("ko");
     else if (nage(v)) anim.jouer("nage");
-    if (evolue) { anim.jouer("evolution"); Son.evolution(); v.minuteur = 3; v.etat = "action"; }
+    if (evolue) {
+      anim.jouer("evolution"); Son.evolution(); v.minuteur = 3.5; v.etat = "action";
+      const col = new T.Mesh(new T.CylinderGeometry(0.6, 1.2, 12, 16, 1, true), new T.MeshBasicMaterial({ color: ELEMENTS[elx].couleur, transparent: true, opacity: 0.5, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+      col.position.copy(mobile.position).add(new T.Vector3(0, 6, 0)); D.iles[elx].groupe.add(col);
+      let t0 = 0; const fondre = () => { t0 += 0.05; col.material.opacity = 0.5 * Math.max(0, 1 - t0 / 2.5); col.rotation.y += 0.2; col.scale.set(1 + t0 * 0.3, 1, 1 + t0 * 0.3); if (t0 < 2.5) setTimeout(fondre, 50); else D.iles[elx].groupe.remove(col); }; fondre();
+      for (let k = 0; k < 30; k++) { const a = k * 0.6; setTimeout(() => particule(D.iles[elx].groupe, mobile.position.clone().add(new T.Vector3(Math.cos(a) * 0.9, 0.2 + k * 0.08, Math.sin(a) * 0.9)), new T.Color(ELEMENTS[elx].couleur).getHex(), new T.Vector3(0, 1.4, 0), { vie: 1.2, taille: 0.8, e: true }), k * 40); }
+    }
     if (D.suivi && ancien && D.suivi === ancien) D.suivi = v;
     D.dragons.set(d.uid, v);
   }
@@ -1246,11 +1286,41 @@ function majBoutons() {
   c.innerHTML = "";
   if (E().dragons.length) c.append(el("button", { class: "btn petit mes-dragons", onclick: () => { Son.clic(); ouvrirListe(); } }, `Mes dragons (${E().dragons.length})`));
   for (const b of extensions.boutons) { const x = b(); if (x) c.append(x); }
-  for (const [id, nom] of [["tout", "Vue d'ensemble"], ["feu", "Île de Feu"], ["glace", "Île de Glace"], ["eau", "Île d'Eau"], ["centre", "Couvoir"]].filter(([k]) => k === "tout" || k === "centre" || ileVisible(k))) {
+  c.prepend(miniCarte());
+  for (const [id, nom] of []) {
     const cls = id === "feu" || id === "glace" || id === "eau" ? id : "";
     const nOeufs = id === "centre" ? E().oeufs.choix + E().oeufs.couvoir.slots.filter((s) => avancement(s) >= 1).length : 0;
     c.append(el("button", { class: `btn petit ${D.focus === id && !D.suivi ? "actif" : ""} ${cls}`, "data-id": id, style: cls ? { color: `var(--${cls})` } : null, onclick: () => { Son.clic(); fermerFiche(); if (id === "centre" && extensions.couvoir && !E().oeufs.couvoir.ruine) { extensions.couvoir(); return; } focaliser(id); } }, nom, nOeufs ? el("span", { class: "pastille" }, nOeufs) : null));
   }
+}
+
+// ---------- Mini-carte : les trois îles et le couvoir, on touche pour y aller ----------
+const NS = "http://www.w3.org/2000/svg";
+function miniCarte() {
+  const taille = 112, r = taille / 2, k = (r - 16) / 20;
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${taille} ${taille}`); svg.setAttribute("class", "mini-carte-svg");
+  const ajouter = (tag, attrs, parent = svg) => { const n = document.createElementNS(NS, tag); for (const [a, v] of Object.entries(attrs)) n.setAttribute(a, v); parent.append(n); return n; };
+  ajouter("circle", { cx: r, cy: r, r: r - 2, class: "mc-fond" });
+  const aller = (id) => { Son.clic(); fermerFiche(); if (id === "centre" && extensions.couvoir && !E().oeufs.couvoir.ruine) { extensions.couvoir(); return; } focaliser(id); };
+  // Ponts
+  for (const elx of ["feu", "glace", "eau"]) { if (!ileVisible(elx)) continue; const p = POS_ILES[elx]; ajouter("line", { x1: r, y1: r, x2: r + p.x * k, y2: r + p.z * k, class: "mc-pont" }); }
+  for (const elx of ["feu", "glace", "eau"]) {
+    if (!ileVisible(elx)) continue;
+    const p = POS_ILES[elx];
+    const g = ajouter("g", { class: `mc-ile ${D.focus === elx && !D.suivi ? "actif" : ""}`, role: "button", tabindex: 0 });
+    ajouter("circle", { cx: r + p.x * k, cy: r + p.z * k, r: 15, fill: `var(--${elx})` }, g);
+    const t = ajouter("text", { x: r + p.x * k, y: r + p.z * k + 4, "text-anchor": "middle" }, g); t.textContent = elx === "feu" ? "Feu" : elx === "glace" ? "Glace" : "Eau";
+    g.addEventListener("click", () => aller(elx));
+  }
+  const gc = ajouter("g", { class: `mc-ile mc-centre ${D.focus === "centre" ? "actif" : ""}`, role: "button", tabindex: 0 });
+  ajouter("circle", { cx: r, cy: r, r: 9, fill: "#f2b544" }, gc);
+  const n = E().oeufs.choix + E().oeufs.couvoir.slots.filter((s) => avancement(s) >= 1).length;
+  if (n) { ajouter("circle", { cx: r + 8, cy: r - 8, r: 6, fill: "#e5484d" }, gc); const tn = ajouter("text", { x: r + 8, y: r - 5.5, "text-anchor": "middle", class: "mc-n" }, gc); tn.textContent = n; }
+  gc.addEventListener("click", () => aller("centre"));
+  const boite = el("div", { class: "mini-carte" }, svg,
+    el("button", { class: `mc-tout ${D.focus === "tout" ? "actif" : ""}`, title: "Vue d'ensemble", "aria-label": "Vue d'ensemble", onclick: () => aller("tout") }, "⤢"));
+  return boite;
 }
 
 function retirerFiche() { if (!ficheUI) return; if (ficheUI._ro) ficheUI._ro.disconnect(); for (const f of ficheUI._fleches || []) f.remove(); ficheUI.remove(); ficheUI = null; }

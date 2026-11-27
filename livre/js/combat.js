@@ -199,6 +199,7 @@ function construireArene() {
       D.flash.intensity = Math.max(0, D.flash.intensity - dt * 8);
       for (const c of D.cotes) if (c) { c.anim.update(dt); majVol(c, dt); }
       majProjectiles(dt);
+      majSignatures(dt);
       majEffets(dt);
     },
   };
@@ -1247,6 +1248,47 @@ function valider(joueur) {
 // Pause qui suit la vitesse du combat
 const pause = (ms) => new Promise((r) => setTimeout(r, ms / D.vitesse));
 
+// ---------- Les gros coups : ralenti, caméra qui plonge, et l'effet signature de l'élément ----------
+function ralenti(cible, element) {
+  if (!D || !cible) return;
+  const v0 = D.vitesse;
+  D.vitesse = Math.min(v0, 0.3);
+  const t = posMonde(cible.rig.tronc);
+  D.flash.position.copy(t).add(new T.Vector3(0, 1, 0)); D.flash.color.set(ELEMENTS[element].couleur); D.flash.intensity = 5;
+  D.secousse = 1.2;
+  D.orbite.viser(t.clone().add(new T.Vector3(0, 0.3, 0)), etroit() ? 7.5 : 5.6, D.orbite.thetaV + 0.25, 1.05);
+  signature(element, t.clone().setY(0));
+  setTimeout(() => { if (D) D.vitesse = v0; }, 700);
+}
+const SIG = [];
+function signature(element, pos) {
+  const c = new T.Color(ELEMENTS[element].couleur).getHex();
+  const g = new T.Group(); g.position.copy(pos); D.scene.add(g);
+  const parts = [];
+  if (element === "feu") {
+    // Une couronne de piliers de flammes jaillit autour de la cible
+    for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2; const m = new T.Mesh(new T.ConeGeometry(0.18, 1.6, 6).translate(0, 0.8, 0), new T.MeshBasicMaterial({ color: k % 2 ? 0xffd23a : 0xff5a0a, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false })); m.position.set(Math.cos(a) * 1.3, 0, Math.sin(a) * 1.3); m.scale.y = 0.01; g.add(m); parts.push(m); }
+  } else if (element === "glace") {
+    // Des pics de glace sortent du sol sous la cible
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + 0.3; const m = new T.Mesh(new T.ConeGeometry(0.16, 1.3, 5).translate(0, 0.65, 0), new T.MeshStandardMaterial({ color: 0xcff4ff, emissive: 0x7fd6ff, emissiveIntensity: 0.6, transparent: true, opacity: 0.9, flatShading: true })); m.position.set(Math.cos(a) * 0.9, 0, Math.sin(a) * 0.9); m.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4); m.scale.y = 0.01; g.add(m); parts.push(m); }
+  } else {
+    // Un raz-de-marée en anneau qui s'élargit
+    for (let k = 0; k < 2; k++) { const m = new T.Mesh(new T.TorusGeometry(0.5 + k * 0.3, 0.16, 6, 32), new T.MeshBasicMaterial({ color: k ? 0xbff4ff : c, transparent: true, opacity: 0.85, depthWrite: false })); m.rotation.x = Math.PI / 2; m.position.y = 0.2; g.add(m); parts.push(m); }
+  }
+  SIG.push({ g, parts, element, t: 0 });
+}
+function majSignatures(dt) {
+  for (let i = SIG.length - 1; i >= 0; i--) {
+    const s = SIG[i]; s.t += dt;
+    const k = s.t / 1.1;
+    for (const [j, m] of s.parts.entries()) {
+      if (s.element === "eau") { m.scale.setScalar(1 + k * 4 + j); m.position.y = 0.2 + Math.sin(k * Math.PI) * 0.6; m.material.opacity = 0.85 * (1 - k); }
+      else { m.scale.y = Math.min(1, k * 4) * (1 - Math.max(0, k - 0.6) * 2.5) + 0.01; if (m.material.opacity !== undefined) m.material.opacity = 0.9 * (1 - Math.max(0, k - 0.5) * 2); }
+    }
+    if (k >= 1) { D.scene.remove(s.g); SIG.splice(i, 1); }
+  }
+}
+
 // Calcule un coup, en gardant chaque étape pour l'afficher
 function calculerCoup(att, def, rnd) {
   const r = tirerAlea(rnd);
@@ -1348,6 +1390,7 @@ async function phase(k) {
     if (sd === "esquive") cib.anim.flash = 1; else cib.anim.jouer("coup");
     if (bouclier) bouclier.eclat = 1;
     chiffreDegat(1 - k, cp.d, { domine: cp.dom, faible: cp.faible, chance: cp.chance });
+    if (fort) ralenti(cib, elA);
     chD.m.pv -= cp.d; C.totaux[k] += cp.d;
     fiche.montrerTotal();
     const h = ui.querySelector(".cb-haut"); if (h) h.replaceWith(rendreHaut());

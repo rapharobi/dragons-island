@@ -70,7 +70,10 @@ const T0 = () => (ctx ? ctx.currentTime + 0.01 : 0);
 
 // ---------- Sons enregistrés (Kenney « Impact Sounds » et « RPG Audio », licence CC0) ----------
 // nom : nombre de variantes (sons/nom1.ogg, sons/nom2.ogg…). On en tire une au hasard, avec une petite variation de hauteur.
-const BANQUE = { bois: 5, planche: 5, pierre: 5, verre: 10, coup: 5, doux: 5, neige: 5, roche: 5, herbe: 5, cloche: 3, pieces: 2, tissu: 4, cuir: 1, hache: 1 };
+const BANQUE = { bois: 5, planche: 5, pierre: 5, verre: 10, coup: 5, doux: 5, neige: 5, roche: 5, herbe: 5, cloche: 3, pieces: 2, tissu: 4, cuir: 1, hache: 1,
+  // Voix de créatures (OpenGameArt, CC0) : rugissements, cris, attaques, douleur, grognements
+  rugir: 5, cri: 13, attaque: 6, mort: 4, grogner: 6, souffle: 1, ronfle: 1, lourd: 1, geant: 1 };
+const EXT = { geant: "wav" };
 const tampons = {};
 let chargement = null;
 function chargerSons() {
@@ -78,7 +81,7 @@ function chargerSons() {
   const base = new URL("../sons/", import.meta.url).href;
   const decoder = (b) => new Promise((ok, ko) => { const p = ctx.decodeAudioData(b, ok, ko); if (p && p.catch) p.catch(ko); });
   chargement = Promise.all(Object.entries(BANQUE).flatMap(([k, n]) => Array.from({ length: n }, (_, i) =>
-    fetch(`${base}${k}${i + 1}.ogg`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then(decoder)
+    fetch(`${base}${k}${i + 1}.${EXT[k] || "ogg"}`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then(decoder)
       .then((buf) => { (tampons[k] = tampons[k] || []).push(buf); }).catch(() => { /* format non lu : on garde le son fabriqué */ }))));
   return chargement;
 }
@@ -117,8 +120,31 @@ function profil(id) {
   PROFILS[id] = p;
   return p;
 }
+// Joue une variante précise (la voix d'une espèce reste toujours la même)
+function jouerTampon(buf, t, o = {}) {
+  const s = ctx.createBufferSource(); s.buffer = buf; s.playbackRate.value = o.vitesse || 1;
+  const g = ctx.createGain(); g.gain.value = o.vol ?? 0.6;
+  let sortie = s;
+  if (o.filtre) { const f = ctx.createBiquadFilter(); f.type = o.type || "lowpass"; f.frequency.value = o.filtre; s.connect(f); sortie = f; }
+  sortie.connect(g); g.connect(busEffets);
+  if (o.rev) { const r = ctx.createGain(); r.gain.value = o.rev; g.connect(r); r.connect(reverb); }
+  s.start(t);
+}
 function voix(id, element, grave, humeur) {
   const p = profil(id), t = T0();
+  // Un vrai cri enregistré, choisi et accordé pour l'espèce, puis une couche de souffle élémentaire
+  const banque = humeur === "douleur" ? "mort" : humeur === "attaque" ? "attaque" : humeur === "joie" ? "cri"
+    : grave > 0.85 && tampons.geant ? "geant" : p.forme === 4 ? "grogner" : grave > 0.55 || p.forme === 0 ? "rugir" : "cri";
+  const l = tampons[banque];
+  if (l && l.length) {
+    const buf = l[Math.floor(p.hauteur * 997) % l.length];
+    const vitesse = (0.8 + p.hauteur * 0.45) * (1.25 - grave * 0.5) * (humeur === "joie" ? 1.2 : 1) * (banque === "geant" ? 1.1 : 1);
+    jouerTampon(buf, t, { vitesse, vol: banque === "geant" ? 0.75 : 0.62, filtre: element === "glace" ? 6000 : element === "eau" ? 2600 : 4200, rev: 0.25 + grave * 0.35 });
+    bruit(t, 0.5 + grave * 0.4, p.souffle * 0.8, "bandpass", element === "glace" ? 3800 : element === "eau" ? 900 : 1700, element === "eau" ? 500 : 600, busEffets, { q: 1.4 });
+    if (element === "eau") for (let k = 0; k < 3; k++) osc("sine", 300 + Math.random() * 300, t + 0.1 + k * 0.08, 0.08, 0.05, busEffets, { vers: 900 });
+    if (element === "glace") osc("sine", 1800 + p.hauteur * 900, t, 0.5, 0.025, busEffets, { rev: 0.6 });
+    return;
+  }
   const taille = 1 - grave * 0.55; // les gros dragons parlent plus grave
   const base = 300 * p.hauteur * taille;
   const court = humeur === "joie" || humeur === "douleur" || humeur === "attaque";
@@ -195,6 +221,7 @@ export const Son = {
   atterrir(grave = 0.5) {
     const t = T0();
     ech("cuir", t, { vol: 0.6, vitesse: 0.7 - grave * 0.25 });
+    if (grave > 0.55) ech("lourd", t, { vol: 0.35 + grave * 0.3, vitesse: 1.1 - grave * 0.4 });
     ech("roche", t + 0.03, { vol: 0.35, vitesse: 0.6 });
     osc("sine", 90 - grave * 30, t, 0.2, 0.3, busEffets, { vers: 40 });
   },

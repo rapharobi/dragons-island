@@ -253,20 +253,36 @@ function animerEclosion(element, id, double, apres) {
   let t = 0;
   const lum = new T.PointLight(ELEMENTS[element].couleur, 0, 6, 2); lum.position.set(0, 1.4, 0.8); D.zone.add(lum);
   const fissures = [];
+  const couleur = new T.Color(ELEMENTS[element].couleur).getHex();
+  const moments = [0.7, 1.4, 2.0, 2.5];
   const etape = setInterval(() => {
     t += 0.05;
-    o.rotation.z = Math.sin(t * 30) * 0.08 * Math.min(1, t);
-    o.userData.coque.material.emissiveIntensity = 0.1 + t * 0.3;
-    lum.intensity = t * 1.5;
-    if (Math.abs(t - 0.6) < 0.026 || Math.abs(t - 1.2) < 0.026 || Math.abs(t - 1.7) < 0.026) {
+    // L'œuf tremble par à-coups, de plus en plus fort, et monte doucement
+    const secousse = (t % 0.7) < 0.32 ? Math.sin(t * 38) * (0.05 + t * 0.03) : 0;
+    o.rotation.z = secousse; o.rotation.x = secousse * 0.5;
+    o.position.y = 0.4 + Math.min(0.35, t * 0.12);
+    o.userData.coque.material.emissiveIntensity = Math.min(0.55, 0.1 + t * 0.15);
+    lum.intensity = t * 1.4;
+    D.orbite.viser(new T.Vector3(0, 1.0 + t * 0.05, 0), (etroit() ? 8.5 : 5.6) - t * 0.4, D.orbite.thetaV + 0.004, 1.2);
+    for (const m of moments) if (Math.abs(t - m) < 0.026) {
       Son.craque();
-      const f = mesh(new T.BoxGeometry(0.03, 0.35, 0.02), mat(0xffffff, { e: ELEMENTS[element].couleur, ei: 2 }), false);
-      f.position.set((Math.random() - 0.5) * 0.4, 0.9 + Math.random() * 0.4, 0.43); f.rotation.z = Math.random() - 0.5; D.zone.add(f); fissures.push(f);
+      // Une fissure en zigzag, lumineuse, avec un rayon de lumière qui s'en échappe
+      const a = Math.random() * Math.PI * 2, y0 = 0.75 + Math.random() * 0.5;
+      const f = new T.Group(); f.position.set(Math.sin(a) * 0.46, y0, Math.cos(a) * 0.46); f.rotation.y = a; o.add(f);
+      for (let s = 0; s < 3; s++) { const seg = mesh(new T.BoxGeometry(0.03, 0.18, 0.02), mat(0xffffff, { e: couleur, ei: 2.2 }), false); seg.position.set((s % 2 ? 0.04 : -0.04), s * 0.15 - 0.15, 0); seg.rotation.z = s % 2 ? 0.5 : -0.5; f.add(seg); }
+      const rayon = mesh(new T.ConeGeometry(0.14, 1.6, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, 0.8), new T.MeshBasicMaterial({ color: couleur, transparent: true, opacity: 0.35, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }), false);
+      f.add(rayon); fissures.push(f);
     }
-    if (t >= 2.1) {
+    if (t >= 3.0) {
       clearInterval(etape);
       Son.eclosion();
-      D.zone.remove(o); fissures.forEach((f) => D.zone.remove(f));
+      // L'œuf éclate : colonne de lumière et onde de choc
+      const col = new T.Mesh(new T.CylinderGeometry(0.5, 1.1, 10, 16, 1, true), new T.MeshBasicMaterial({ color: couleur, transparent: true, opacity: 0.6, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+      col.position.y = 5; D.zone.add(col);
+      const onde = new T.Mesh(new T.TorusGeometry(0.6, 0.08, 6, 40), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false }));
+      onde.rotation.x = Math.PI / 2; onde.position.y = 0.3; D.zone.add(onde);
+      let k = 0; const fondu = setInterval(() => { k += 0.05; col.material.opacity = 0.6 * (1 - k); col.scale.set(1 + k, 1, 1 + k); onde.scale.setScalar(1 + k * 6); onde.material.opacity = 0.9 * (1 - k); if (k >= 1) { clearInterval(fondu); D.zone.remove(col); D.zone.remove(onde); } }, 40);
+      D.zone.remove(o);
       const mc = o.userData.coque.material;
       for (let k = 0; k < 14; k++) {
         const e = mesh(new T.TetrahedronGeometry(0.12 + Math.random() * 0.1, 0), mc, false);

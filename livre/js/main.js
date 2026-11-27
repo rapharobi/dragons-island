@@ -14,6 +14,7 @@ import * as Reglages from "./reglages.js";
 import * as Pilotage from "./pilotage.js";
 import "./village.js";
 import "./couvoir3d.js";
+import "./journal.js";
 import { verifierRecits } from "./recit.js";
 import { verifierExpedition } from "./expeditions.js";
 import { verifierRaids, lancerAttaque } from "./attaque.js";
@@ -176,6 +177,7 @@ async function demarrer() {
     return;
   }
   await charger();
+  ctx.moteur.regler((E() && E().reglages.qualite) || "haute");
   const e = E();
   reglerVolumes(e.reglages.volEffets ?? 1, e.reglages.volMusique ?? 1);
   reglerSon(e.reglages.son, e.reglages.musique);

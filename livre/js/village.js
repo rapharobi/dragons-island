@@ -557,7 +557,7 @@ function ameliorer(uid) {
   let ok = false;
   changer((s) => { const x = s.village.batiments.find((y) => y.uid === uid); if (!assez(c)) return; majProduction(x); payer(s, c); x.niveau++; ok = true; });
   if (!ok) return;
-  Son.evolution(); toast(`${BATIMENTS[b.type].nom} niveau ${b.niveau} !`, "bon");
+  Son.evolution(); toast(`${BATIMENTS[b.type].nom} niveau ${b.niveau} !`, "bon"); signaler("ameliore", b.type);
   synchro();
   const o = V.objets.get(uid); if (o) poussiere(o.g);
   ficheBatiment(uid);

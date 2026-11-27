@@ -58,6 +58,7 @@ export function blocExpedition(rendre, rapide = false) {
   }
   const nb = choisis.size;
   b.append(liste, el("button", { class: "btn" + (nb ? " principal" : ""), disabled: !nb, onclick: () => {
+    setTimeout(() => import("./tuto.js").then((m) => m.signaler("expedition")), 0);
     changer((s) => { const t0 = maintenant(); s.expedition = { debut: t0, fin: t0 + dureeExpedition(nb, rapide) }; for (const d of s.dragons) if (choisis.has(d.uid)) d.expedition = true; });
     choisis.clear(); Son.ailes(0.5); toast("L'expédition s'envole !", "bon"); rendre();
   } }, nb ? `Partir en expédition (${Math.round(dureeExpedition(nb, rapide) / 60000)} min)` : "Choisis 1 à 3 dragons"));

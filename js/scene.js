@@ -49,7 +49,23 @@ export class Moteur {
     } else cam.clearViewOffset();
     cam.updateProjectionMatrix();
   }
+  // Graphismes : « basse » (sans ombres, image plus légère), « moyenne », « haute »
+  regler(q) {
+    if (!this.r) return;
+    const dpr = window.devicePixelRatio || 1;
+    this.qualite = q;
+    this.r.setPixelRatio(q === "basse" ? Math.min(dpr, 1) : q === "moyenne" ? Math.min(dpr, 1.5) : Math.min(dpr, 2));
+    this.r.shadowMap.enabled = q !== "basse";
+    this.r.shadowMap.type = q === "haute" ? T.PCFSoftShadowMap : T.PCFShadowMap;
+    this.taille();
+    if (this.decor) this.rafraichirMateriaux(this.decor);
+  }
+  rafraichirMateriaux(decor) {
+    decor._qualite = this.qualite;
+    decor.scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { m.needsUpdate = true; }); });
+  }
   montrer(decor, zone = null) {
+    if (this.qualite && decor._qualite !== this.qualite) this.rafraichirMateriaux(decor);
     if (this.decor && this.decor !== decor && this.decor.cacher) this.decor.cacher();
     if (this.decor && this.decor.orbite) this.decor.orbite.actif = false;
     this.decor = decor;

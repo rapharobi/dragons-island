@@ -28,7 +28,7 @@ const CHAPITRES = [
     id: "tour",
     quand: (e) => e.tuto.etape === "fini" && e.dragons.length >= 6 && e.oeufs.couvoir.niveau >= 1,
     pages: [
-      ["La tour du nid", "On raconte qu'au-delà des îles se dresse une tour faite de nids. Ceux qui y entrent n'ont droit qu'à trois œufs… et ceux qui atteignent le sommet en ressortent avec un œuf que personne n'a jamais vu."],
+      ["La tour du nid", "On raconte que sur le continent des mages, au pic du nord, se dresse une tour faite de nids. Ceux qui y entrent n'ont droit qu'à trois œufs… et ceux qui atteignent le sommet en ressortent avec un œuf que personne n'a jamais vu."],
       [`${MENTOR}`, "Tu la trouveras dans Combat. Choisis bien tes trois premiers œufs !"],
     ],
   },

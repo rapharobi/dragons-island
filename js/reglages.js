@@ -53,6 +53,9 @@ function rendre() {
   p.append(el("div", { class: "opt" }, el("h3", {}, "Son"),
     seg([[true, "Bruitages activés"], [false, "Bruitages coupés"]], r.son, (v) => { changer((s) => { s.reglages.son = v; }); initAudio(); reglerSon(v, E().reglages.musique); }),
     seg([[true, "Musique activée"], [false, "Musique coupée"]], r.musique, (v) => { changer((s) => { s.reglages.musique = v; }); initAudio(); reglerSon(E().reglages.son, v); })));
+  p.append(el("div", { class: "opt" }, el("h3", {}, "Graphismes"),
+    el("p", {}, "Si le jeu rame sur ton téléphone, baisse la qualité : moins d'ombres et une image plus légère."),
+    seg([["basse", "Basse"], ["moyenne", "Moyenne"], ["haute", "Haute"]], r.qualite || "haute", (v) => { changer((s) => { s.reglages.qualite = v; }); window.__jeu.moteur.regler(v); })));
   if (pleinEcranPossible()) p.append(el("div", { class: "opt" }, el("h3", {}, "Affichage"),
     el("p", {}, "Le jeu prend tout l'écran du téléphone, sans la barre du navigateur."),
     el("div", { class: "seg" }, el("button", { onclick: () => basculerPleinEcran() }, "⛶ Plein écran (activer / quitter)"))));

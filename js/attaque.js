@@ -50,6 +50,7 @@ styles("attaque", `
 .at-sort .i { font-size: 18px; line-height: 1; }
 .at-sort.choisi { border-color: #b48aff; background: rgba(180,138,255,.3); box-shadow: 0 0 14px rgba(180,138,255,.5); }
 .at-sort:disabled { opacity: .4; }
+.at-combo { position: absolute; transform: translate(-50%, -50%); font: 800 20px var(--titre); color: #ffe08a; text-shadow: 0 2px 0 #7a3a10, 0 0 14px rgba(255,180,80,.8); animation: gain 0.9s ease-out forwards; pointer-events: none; }
 .at-etoiles { font-size: 34px; letter-spacing: 6px; text-align: center; color: var(--ambre); }
 .at-trouve { display: grid; gap: 8px; text-align: center; }
 .at-trouve .nom { font-family: var(--titre); font-size: 22px; color: var(--ambre); }
@@ -333,7 +334,33 @@ function touche(c, d, element) {
   }
   void element;
 }
+function comboTexte(pos) {
+  A.combos = (A.combos || 0) + 1;
+  particules(pos, 0xffffff, 10, 2, 0.6);
+  particules(pos, 0xf2b544, 10, 2.4, 0.7);
+  if (!A.calque) return;
+  const p = versEcran(pos, A.camera);
+  const e = el("div", { class: "at-combo", style: { left: `${Math.round(p.x)}px`, top: `${Math.round(p.y)}px` } }, "Combo !");
+  A.calque.append(e); setTimeout(() => e.remove(), 900);
+}
+// Piqué en escadrille : les dragons ailés qui visent la même cible plongent ensemble
+function majEscadrille(dt) {
+  A.escadrille = (A.escadrille || 6) - dt;
+  if (A.escadrille > 0) return;
+  A.escadrille = 7;
+  const volants = A.unites.filter((u) => u.pv > 0 && u.vol && u.cible && !u.arrivee);
+  const parCible = new Map();
+  for (const u of volants) { const l = parCible.get(u.cible) || []; l.push(u); parCible.set(u.cible, l); }
+  for (const [cible, l] of parCible) {
+    if (l.length < 2) continue;
+    l.forEach((u, i) => { u.pique = 1.1 + i * 0.15; });
+    Son.ailes && Son.ailes(0.6);
+    const q = pointVise(cible);
+    setTimeout(() => { if (!A) return; particules(q, 0xffffff, 16, 2.2, 0.8); for (const u of l) if (u.pv > 0) projectile(u.m.position.clone(), cible, degatsDe(u, cible) * 0.8, COUL[u.element], { source: u, duree: 0.25, arc: 0 }); }, 500);
+  }
+}
 function majEffets(dt) {
+  majEscadrille(dt);
   for (let i = A.effets.length - 1; i >= 0; i--) {
     const f = A.effets[i]; f.t += dt;
     const k = Math.min(1, f.t / f.vie);
@@ -544,7 +571,8 @@ function majUnite(u, dt, bats, ennemis, cam) {
   }
   u.m.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
   u.recharge -= dt;
-  if (u.vol) p.y += (u.alt + Math.sin(A.t * 2.5 + u.ph) * 0.25 - p.y) * Math.min(1, dt * 3);
+  if (u.pique > 0) { u.pique -= dt; p.y += ((u.pique > 0.55 ? u.alt + 1.5 : 0.6) - p.y) * Math.min(1, dt * 6); }
+  else if (u.vol) p.y += (u.alt + Math.sin(A.t * 2.5 + u.ph) * 0.25 - p.y) * Math.min(1, dt * 3);
   if (u.recharge > 0) return;
   u.recharge = u.camp === "moi" ? (u.rage > 0 ? 0.7 : 1.15) : 1.35;
   u.anim.jouer("attaque");
@@ -601,7 +629,16 @@ function majTirs(dt) {
     const c = s.cible;
     if (c.pv <= 0) continue;
     if (c.egide > 0) { particules(vise, 0xf2b544, 5, 1); continue; }
-    c.pv -= s.degats;
+    let deg = s.degats;
+    // Combo : deux éléments différents frappent la même cible en moins d'une seconde
+    if (s.source && s.source.camp === "moi") {
+      const h = c.coups || (c.coups = []);
+      const el2 = s.source.element;
+      if (h.some((x) => A.t - x.t < 1 && x.el !== el2)) { deg *= 1.3; c.coups = []; comboTexte(vise); }
+      else h.push({ t: A.t, el: el2 });
+      if (h.length > 6) h.splice(0, h.length - 6);
+    }
+    c.pv -= deg;
     particules(vise, s.couleur, 7, 1.4);
     if (c.m) {
       // Un dragon touché
@@ -653,6 +690,7 @@ function finAttaque(retraite = false) {
   });
   historiser("attaque", `${A.nom} · ${pct} % ${"★".repeat(etoiles)}`, victoire ? "victoire" : "defaite", { revanche: A.compo ? null : { nom: A.nom, niveau: A.n } });
   if (victoire) Son.victoire(); else Son.defaite();
+  import("./tuto.js").then((m) => m.signaler("attaque_village", { victoire }));
   for (const u of A.unites) if (u.pv > 0) u.anim.jouer(victoire ? "joie" : "repos");
   const apres = A.opts.apres;
   if (A.plateau) A.plateau.remove();
