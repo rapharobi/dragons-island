@@ -47,6 +47,8 @@ styles("boutique", `
 .bq-code-champ { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(190,120,255,.5); background: rgba(255,255,255,.05); color: inherit; font: 13px var(--mono); }
 .bq-ruban { justify-self: start; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #1a1208; background: var(--ambre); border-radius: 6px; padding: 1px 6px; }
 .bq-apercu { position: fixed; z-index: 15; left: 50%; transform: translateX(-50%); top: calc(var(--hud) + var(--tuto, 0px) + 10px); padding: 5px 12px; border-radius: 999px; background: rgba(13,14,19,.75); border: 1px solid var(--trait); font-size: 12px; color: var(--doux); white-space: nowrap; }
+.bq-vol { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; width: 28px; height: 28px; margin: -14px 0 0 -14px; filter: drop-shadow(0 0 8px rgba(242,181,68,.8)); }
+.bq-vol svg { width: 28px; height: 28px; }
 .bq2 { position: fixed; z-index: 15; right: var(--bord-d); top: calc(var(--hud) + var(--tuto, 0px) + 8px); bottom: calc(var(--bas) + 84px); width: min(450px, 42vw); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .bq2-tete { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
 .bq2-tete h2 { font-size: 24px; }
@@ -279,7 +281,7 @@ function champCode(apres) {
     const r = await utiliserCode(champ.value);
     bouton.disabled = false;
     if (!r.ok) { Son.erreur(); msg.textContent = r.raison; msg.style.color = "#ff9a9a"; return; }
-    Son.achat(); toast(`Code accepté : +${nb(r.gemmes)} gemmes !`, "bon");
+    Son.achat(); toast(`Code accepté : +${nb(r.gemmes)} gemmes !`, "bon"); animerAchat("gemmes", 10);
     ctxJeu.majHud(); if (apres) apres(); rendre();
   } }, "Valider le code");
   return el("div", { class: "bq-code" }, el("div", { class: "bq-code-ligne" }, champ, bouton), msg);
@@ -295,7 +297,25 @@ function acheterGemmes(g) {
   });
 }
 // Achat en gemmes : vérifie le solde, demande confirmation, débite puis donne
-function payer(prix, nom, donner) {
+// Animation d'achat : l'objet jaillit de la vitrine et vole jusqu'à ta réserve en haut de l'écran
+function animerAchat(ic, n = 6) {
+  const cible = document.querySelector(`#hud .puce[data-res="${ic}"]`) || document.querySelector('#hud .puce[data-res="gemmes"]');
+  const rc = cible ? cible.getBoundingClientRect() : { left: innerWidth / 2, top: 20, width: 0, height: 0 };
+  const x1 = rc.left + rc.width / 2, y1 = rc.top + rc.height / 2;
+  const x0 = innerWidth * (innerWidth > 760 ? 0.3 : 0.5), y0 = innerHeight * 0.28;
+  for (let i = 0; i < n; i++) {
+    const e = el("div", { class: "bq-vol" }, icone(ic));
+    document.body.append(e);
+    const dx = (Math.random() - 0.5) * 120, dy = -40 - Math.random() * 60;
+    const a = e.animate([
+      { transform: `translate(${x0}px, ${y0}px) scale(.4)`, opacity: 0 },
+      { transform: `translate(${x0 + dx}px, ${y0 + dy}px) scale(1.4)`, opacity: 1, offset: 0.3 },
+      { transform: `translate(${x1}px, ${y1}px) scale(.6)`, opacity: 0.9 },
+    ], { duration: 900 + i * 90, easing: "cubic-bezier(.3,.7,.4,1)", fill: "forwards" });
+    a.onfinish = () => { e.remove(); if (cible) cible.animate([{ transform: "scale(1)" }, { transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 260 }); };
+  }
+}
+function payer(prix, nom, donner, ic = "gemmes") {
   const solde = E().ressources.gemmes || 0;
   if (solde < prix) {
     Son.erreur();
@@ -312,7 +332,7 @@ function payer(prix, nom, donner) {
     boutons: [{ texte: "Annuler" }, { texte: `Acheter · ${nb(prix)} gemmes`, classe: "principal", action: () => {
       let ok = false;
       changer((s) => { if ((s.ressources.gemmes || 0) >= prix) { s.ressources.gemmes -= prix; donner(s); ok = true; } });
-      if (ok) { Son.achat(); toast(`${nom} : c'est à toi !`, "bon"); }
+      if (ok) { Son.achat(); toast(`${nom} : c'est à toi !`, "bon"); animerAchat(ic); }
       ctxJeu.majHud(); rendre();
     } }],
   });
@@ -335,19 +355,56 @@ function tasGemmes(n, rayon, haut, couleurs = [0xb45cff, 0xd08aff, 0x7fd6ff, 0xf
   return g;
 }
 // Coffre : taille, ouverture, cerclages dorés, contenu qui déborde
-function coffre(taille, contenu) {
-  const g = new T.Group(), bois = matBois();
-  const L = 1.3 * taille, H = 0.6 * taille, P = 0.85 * taille;
-  const c = new T.Group(); c.position.y = H / 2; g.add(c);
-  c.add(new T.Mesh(new T.BoxGeometry(L, H, P), bois));
-  for (const x of [-0.38, 0, 0.38]) { const b = new T.Mesh(new T.BoxGeometry(0.07 * taille, H + 0.02, P + 0.02), matOr()); b.position.x = x * L; c.add(b); }
-  const serrure = new T.Mesh(new T.BoxGeometry(0.16 * taille, 0.2 * taille, 0.05), matOr()); serrure.position.set(0, 0.1 * taille, P / 2 + 0.01); c.add(serrure);
-  const couvercle = new T.Group(); couvercle.position.set(0, H / 2, -P / 2); c.add(couvercle);
-  couvercle.add(new T.Mesh(new T.CylinderGeometry(P / 2, P / 2, L, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 0, P / 2), bois));
-  for (const x of [-0.38, 0.38]) { const b = new T.Mesh(new T.CylinderGeometry(P / 2 + 0.02, P / 2 + 0.02, 0.07 * taille, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(x * L, 0, P / 2), matOr()); couvercle.add(b); }
-  couvercle.rotation.x = -1.95;
-  if (contenu) { contenu.position.y = H / 2 - 0.05; c.add(contenu); }
-  return { g, couvercle, H };
+// Un vrai coffre creux : fond, quatre parois, doublure en velours, couvercle bombé doublé à l'intérieur.
+// Il arrive fermé et s'ouvre (grincement, gemmes qui jaillissent). magique = coffre doré à runes qui brillent.
+function coffre(taille, contenu, magique = false) {
+  const g = new T.Group();
+  const corps = magique ? matOr() : matBois();
+  const ferrure = magique ? new T.MeshStandardMaterial({ color: 0x6a3aa8, emissive: 0x4a1a8a, emissiveIntensity: 0.5, metalness: 0.6, roughness: 0.3, flatShading: true }) : matOr();
+  const velours = new T.MeshStandardMaterial({ color: magique ? 0x4a1a6a : 0x7a1a2a, roughness: 1, flatShading: true, side: T.DoubleSide, emissive: magique ? 0x3a0a6a : 0x000000, emissiveIntensity: magique ? 0.5 : 0 });
+  const L = 1.3 * taille, H = 0.6 * taille, P = 0.85 * taille, e = 0.06 * Math.max(1, taille);
+  const c = new T.Group(); g.add(c);
+  const boite = (sx, sy, sz, m, x, y, z) => { const b = new T.Mesh(new T.BoxGeometry(sx, sy, sz), m); b.position.set(x, y, z); c.add(b); return b; };
+  boite(L, e, P, corps, 0, e / 2, 0);
+  boite(L, H, e, corps, 0, H / 2, P / 2 - e / 2); boite(L, H, e, corps, 0, H / 2, -P / 2 + e / 2);
+  boite(e, H, P - 2 * e, corps, L / 2 - e / 2, H / 2, 0); boite(e, H, P - 2 * e, corps, -L / 2 + e / 2, H / 2, 0);
+  // Doublure intérieure
+  const fond = new T.Mesh(new T.PlaneGeometry(L - 2 * e, P - 2 * e), velours); fond.rotation.x = -Math.PI / 2; fond.position.y = e + 0.005; c.add(fond);
+  for (const s of [-1, 1]) { const m = new T.Mesh(new T.PlaneGeometry(L - 2 * e, H - e), velours); m.position.set(0, (H + e) / 2, s * (P / 2 - e - 0.004)); c.add(m); }
+  // Cerclages et bordure du haut
+  for (const x of [-0.36, 0.36]) { boite(0.07 * taille, H + 0.02, 0.02, ferrure, x * L, H / 2, P / 2 + 0.005); boite(0.07 * taille, H + 0.02, 0.02, ferrure, x * L, H / 2, -P / 2 - 0.005); }
+  boite(L + 0.03, 0.05, 0.04, ferrure, 0, H, P / 2); boite(L + 0.03, 0.05, 0.04, ferrure, 0, H, -P / 2);
+  const serrure = boite(0.16 * taille, 0.2 * taille, 0.05, ferrure, 0, H - 0.12 * taille, P / 2 + 0.02);
+  if (magique) for (let k = 0; k < 4; k++) boite(0.12 * taille, 0.03, 0.02, new T.MeshBasicMaterial({ color: 0xd8a8ff }), (k - 1.5) * 0.22 * L, H * 0.35, P / 2 + 0.012);
+  // Couvercle bombé : bois dehors, velours dedans, articulé à l'arrière
+  const couvercle = new T.Group(); couvercle.position.set(0, H, -P / 2); c.add(couvercle);
+  const geoC = (r) => new T.CylinderGeometry(r, r, L, 14, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(0, 0, P / 2);
+  couvercle.add(new T.Mesh(geoC(P / 2), corps));
+  const dedans = new T.Mesh(geoC(P / 2 - 0.02), velours); couvercle.add(dedans);
+  for (const x of [-0.36, 0.36]) { const b = new T.Mesh(new T.CylinderGeometry(P / 2 + 0.015, P / 2 + 0.015, 0.07 * taille, 14, 1, true, 0, Math.PI).rotateZ(Math.PI / 2).translate(x * L, 0, P / 2), ferrure); b.material.side = T.DoubleSide; couvercle.add(b); }
+  const fermoir = new T.Mesh(new T.BoxGeometry(0.14 * taille, 0.12 * taille, 0.04), ferrure); fermoir.position.set(0, -0.02, P + 0.01); couvercle.add(fermoir);
+  couvercle.rotation.x = 0;
+  if (contenu) { contenu.position.y = e + 0.02; c.add(contenu); contenu.scale.setScalar(0.001); }
+  const lumiere = new T.PointLight(magique ? 0xc08aff : 0xffd27a, 0, 3); lumiere.position.y = H * 0.8; c.add(lumiere);
+  // Gemmes qui jaillissent à l'ouverture
+  const jets = [];
+  let ouvert = 0, jailli = false;
+  const maj = (t, dt = 0.016) => {
+    ouvert = Math.min(1, ouvert + dt / 1.1);
+    const k = ouvert < 0.25 ? 0 : (ouvert - 0.25) / 0.75;
+    const e2 = 1 - Math.pow(1 - k, 3);
+    couvercle.rotation.x = -1.95 * e2 + (ouvert < 0.25 ? Math.sin(ouvert * 80) * 0.03 : Math.sin(t * 1.4) * 0.04 * e2);
+    if (contenu) contenu.scale.setScalar(Math.max(0.001, Math.min(1, k * 1.4)));
+    lumiere.intensity = e2 * (magique ? 2.4 : 1.6) * (0.85 + Math.sin(t * 4) * 0.15);
+    if (!jailli && k > 0.15) {
+      jailli = true;
+      Son.coffre && Son.coffre(magique);
+      for (let i = 0; i < 16; i++) { const m = gemme([0xb45cff, 0x7fd6ff, 0xffd86a, 0xff6ad8][i % 4], 0.05 + Math.random() * 0.04); m.position.set(0, H, 0); m.userData.v = new T.Vector3((Math.random() - 0.5) * 2.4, 2.5 + Math.random() * 2, (Math.random() - 0.5) * 2.4); m.userData.vie = 1.4; c.add(m); jets.push(m); }
+    }
+    for (let i = jets.length - 1; i >= 0; i--) { const m = jets[i]; m.userData.v.y -= 6 * dt; m.position.addScaledVector(m.userData.v, dt); m.rotation.y += dt * 6; m.userData.vie -= dt; if (m.position.y < 0.04) { m.position.y = 0.04; m.userData.v.set(0, 0, 0); } if (m.userData.vie <= 0) { m.scale.multiplyScalar(0.9); if (m.scale.x < 0.05) { c.remove(m); jets.splice(i, 1); } } }
+  };
+  void serrure; void dedans;
+  return { g, couvercle, H, L, P, maj };
 }
 function bourse(pleine) {
   const g = new T.Group();
@@ -365,8 +422,16 @@ function objetGemmes(niv) {
   if (niv <= 1) g.add(bourse(niv === 1));
   else {
     const taille = [0, 0, 0.6, 0.85, 1.15, 1.5][niv];
-    const contenu = tasGemmes([0, 0, 14, 26, 45, 70][niv], 0.45 * taille, 0.35 * taille);
-    const c = coffre(taille, contenu); g.add(c.g); haut = c.H + 0.4;
+    const magique = niv >= 4;
+    const contenu = tasGemmes([0, 0, 18, 32, 55, 85][niv], 0.36 * taille, 0.7 * taille);
+    const c = coffre(taille, contenu, magique); g.add(c.g); haut = c.H + 0.4;
+    majs.push((t, dt) => c.maj(t, dt));
+    if (magique) {
+      // Des gemmes flottent au-dessus du coffre ouvert
+      const flott = new T.Group(); flott.position.y = c.H + 0.5; g.add(flott);
+      for (let k = 0; k < 6; k++) { const gm = gemme([0xb45cff, 0x7fd6ff, 0xff6ad8][k % 3], 0.09); const a = (k / 6) * 6.28; gm.position.set(Math.cos(a) * 0.55 * taille, 0, Math.sin(a) * 0.55 * taille); flott.add(gm); }
+      majs.push((t) => { flott.rotation.y = t * 0.7; flott.children.forEach((gm, i) => { gm.position.y = Math.sin(t * 2 + i) * 0.1; gm.rotation.y = t * 2; }); flott.scale.setScalar(Math.min(1, Math.max(0.001, c.couvercle.rotation.x / -1.95))); });
+    }
     if (niv >= 4) { const tas = tasGemmes(niv === 5 ? 60 : 30, niv === 5 ? 1.7 : 1.3, niv === 5 ? 0.35 : 0.2); g.add(tas); }
     if (niv === 5) {
       // La couronne au sommet et des rayons de lumière
@@ -378,7 +443,6 @@ function objetGemmes(niv) {
       majs.push((t) => { cour.rotation.y = t * 0.8; cour.position.y = c.H + 0.85 + Math.sin(t * 1.6) * 0.06; rayons.rotation.y = t * 0.3; rayons.children.forEach((r, i) => { r.material.opacity = 0.1 + Math.max(0, Math.sin(t * 2 + i)) * 0.12; }); });
       haut = c.H + 1.4;
     }
-    majs.push((t) => { c.couvercle.rotation.x = -1.95 + Math.sin(t * 1.4) * 0.05; });
   }
   const l = lum(0xc08aff, 1.2 + niv * 0.45, haut + 0.3);
   g.add(etincelles(12 + niv * 8, 0.8 + niv * 0.25, haut + 0.4, 0xffffff));
@@ -389,13 +453,16 @@ function objetPack(n, taille, coeur) {
   const g = new T.Group(), majs = [];
   const oeufs = new T.Group();
   const couls = [0xff7a3a, 0x7fd6ff, 0x2fd0c0];
-  for (let i = 0; i < n; i++) { const o = oeuf(couls[i % 3]); const k = n <= 3 ? (i - 1) * 0.33 : ((i % 4) - 1.5) * 0.26; o.position.set(k * taille, 0.1 + Math.floor(i / 4) * 0.12, ((Math.floor(i / 4) % 2) - 0.5) * 0.18 * taille); o.scale.setScalar(Math.min(1, 0.8 + taille * 0.15)); oeufs.add(o); }
-  const c = coffre(taille, oeufs); g.add(c.g);
+  // Paille au fond, œufs couchés dedans
+  for (let k = 0; k < 18; k++) { const b = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.3 * taille, 3), new T.MeshStandardMaterial({ color: 0xd8b860, roughness: 1 })); b.rotation.set(Math.PI / 2, 0, Math.random() * 3); b.position.set((Math.random() - 0.5) * 0.9 * taille, 0.02, (Math.random() - 0.5) * 0.5 * taille); oeufs.add(b); }
+  for (let i = 0; i < n; i++) { const o = oeuf(couls[i % 3]); const k = n <= 3 ? (i - 1) * 0.33 : ((i % 4) - 1.5) * 0.26; o.position.set(k * taille, 0.16 + Math.floor(i / 4) * 0.14, ((Math.floor(i / 4) % 2) - 0.5) * 0.2 * taille); o.rotation.z = (i % 2 ? 0.4 : -0.4); o.scale.setScalar(Math.min(1, 0.75 + taille * 0.12)); oeufs.add(o); }
+  const c = coffre(taille, oeufs, coeur); g.add(c.g);
+  majs.push((t, dt) => c.maj(t, dt));
   if (coeur) { const h = new T.Mesh(new T.SphereGeometry(0.16, 10, 8), new T.MeshStandardMaterial({ color: 0xff3a5a, emissive: 0xff1a3a, emissiveIntensity: 0.8, roughness: 0.3, flatShading: true })); h.position.set(0.9 * taille, 0.2, 0.5); g.add(h); majs.push((t) => { h.scale.setScalar(1 + Math.max(0, Math.sin(t * 5)) * 0.15); }); }
   for (let i = 0; i < 8 + n * 2; i++) { const p = piece(); const a = Math.random() * 6.28, r = 0.6 * taille + 0.3 + Math.random() * 0.6; p.position.set(Math.cos(a) * r, 0.02 + Math.random() * 0.04, Math.sin(a) * r); g.add(p); }
   const l = new T.PointLight(0xffc86a, 2, 6); l.position.y = c.H + 0.6; g.add(l);
   g.add(etincelles(16 + n * 2, 1 + taille * 0.4, 1.4, 0xffe8a0));
-  majs.push((t) => { c.couvercle.rotation.x = -1.95 + Math.sin(t * 1.5) * 0.06; l.intensity = 1.7 + Math.sin(t * 4) * 0.35; oeufs.children.forEach((o, i) => { o.position.y = 0.1 + Math.floor(i / 4) * 0.12 + Math.sin(t * 2 + i) * 0.03; }); });
+  majs.push((t) => { l.intensity = 1.7 + Math.sin(t * 4) * 0.35; oeufs.children.forEach((o, i) => { o.position.y = 0.16 + Math.floor(i / 4) * 0.14 + Math.sin(t * 2 + i) * 0.03; }); });
   return { g, majs, haut: c.H + 0.8 };
 }
 function objetBraises(n) {
@@ -461,11 +528,11 @@ function articles(cat) {
   if (cat === "packs") return PACKS.map((pk, i) => {
     const deja = pk.unique && e.achats && e.achats[pk.id];
     return { cat, cle: "p" + pk.id, nom: pk.nom, court: pk.nom.replace("Pack du ", "").replace("Pack de l'", "").replace(/^./, (c) => c.toUpperCase()), sous: pk.contenu[0][1], ic: "oeuf", prix: pk.prix, ruban: pk.ruban, texte: pk.texte, contenu: pk.contenu, deja: deja ? "Déjà acheté" : null,
-      modele: () => objetPack([3, 6, 12][i], [0.75, 1, 1.3][i], i === 2), acheter: () => payer(pk.prix, pk.nom, (s) => { pk.donner(s); s.achats = s.achats || {}; s.achats[pk.id] = (s.achats[pk.id] || 0) + 1; }) };
+      modele: () => objetPack([3, 6, 12][i], [0.75, 1, 1.3][i], i === 2), acheter: () => payer(pk.prix, pk.nom, (s) => { pk.donner(s); s.achats = s.achats || {}; s.achats[pk.id] = (s.achats[pk.id] || 0) + 1; }, "oeuf") };
   });
   if (cat === "braises") return BRAISES.map(([n, prix, txt]) => ({ cat, cle: "b" + n, nom: `${n} braises d'éclosion`, court: `${n} braises`, sous: "", ic: "braises", prix,
-    texte: `${txt} Une braise fait avancer un œuf d'un quart : 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`, modele: () => objetBraises(n), acheter: () => payer(prix, `${n} braises d'éclosion`, (s) => { s.ressources.braises = (s.ressources.braises || 0) + n; }) }));
-  if (cat === "ressources") return RESSOURCES.map((r) => ({ cat, cle: "r" + r.nom, nom: r.nom, court: r.nom.replace(/^\d+ /, "").replace("Recharge d'", "").replace(/^./, (c) => c.toUpperCase()), sous: (r.nom.match(/^\d+/) || [""])[0], ic: r.ic, prix: r.prix, texte: r.texte, modele: () => objetRessource(r.ic), acheter: () => payer(r.prix, r.nom, r.donner) }));
+    texte: `${txt} Une braise fait avancer un œuf d'un quart : 4 braises = éclosion immédiate. Tu en as ${e.ressources.braises || 0}.`, modele: () => objetBraises(n), acheter: () => payer(prix, `${n} braises d'éclosion`, (s) => { s.ressources.braises = (s.ressources.braises || 0) + n; }, "braises") }));
+  if (cat === "ressources") return RESSOURCES.map((r) => ({ cat, cle: "r" + r.nom, nom: r.nom, court: r.nom.replace(/^\d+ /, "").replace("Recharge d'", "").replace(/^./, (c) => c.toUpperCase()), sous: (r.nom.match(/^\d+/) || [""])[0], ic: r.ic, prix: r.prix, texte: r.texte, modele: () => objetRessource(r.ic), acheter: () => payer(r.prix, r.nom, r.donner, r.ic) }));
   if (cat === "ul") return e.dragons.map((d) => ({ cat, cle: "u" + d.uid, uid: d.uid, nom: `${PAR_ID[d.id].nom} UL`, court: PAR_ID[d.id].nom, sous: d.ulPossede ? "✦ possédée" : "", ic: "oeuf", prix: d.ulPossede ? null : PRIX_UL, el: PAR_ID[d.id].element,
     texte: "Une robe rare, aux reflets métalliques et aux couleurs uniques. Seule l'apparence change : aucun avantage en combat.",
     acheter: () => d.ulPossede ? (changer((s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ul = !x.ul; }), Son.achat(), rendre()) : payer(PRIX_UL, `${PAR_ID[d.id].nom} UL`, (s) => { const x = s.dragons.find((y) => y.uid === d.uid); x.ulPossede = true; x.ul = true; }) }));

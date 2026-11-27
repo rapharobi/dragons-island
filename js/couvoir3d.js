@@ -27,7 +27,6 @@ styles("couvoir3d", `
 .cv-etiq.chaud small { color: #ffe3a0; }
 .cv-etiq::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 10px; height: 10px; transform: translateX(-50%) rotate(45deg); background: rgba(14, 12, 24, .78); border-right: 1px solid rgba(242,181,68,.35); border-bottom: 1px solid rgba(242,181,68,.35); }
 @keyframes cv-pulse { 50% { transform: translate(-50%, -100%) scale(1.06); } }
-body.vue-couvoir .iles-choix > :not([data-id=tout]):not([data-id=centre]) { display: none; }
 .iles-choix .pastille { display: inline-grid; place-items: center; min-width: 17px; height: 17px; margin-left: 6px; padding: 0 4px; border-radius: 9px; background: var(--mal); color: #fff; font: 600 10px var(--mono); }
 .fiche-ile .carte { padding: 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--trait); display: grid; gap: 8px; }
 .fiche-ile .ligne { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }

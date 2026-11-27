@@ -4,7 +4,7 @@ import { Animateur } from "./anim.js";
 import { ciel, eclairage, Orbite, versEcran } from "./scene.js";
 import { mat, mesh, bloc } from "./outils3d.js";
 import { E, changer, depenserEnergie, energie, gagnerXp, maintenant, noter, rationsPourSoigner, soignerEquipe, remplirCouvoir } from "./etat.js";
-import { DRAGONS, PAR_ID, ELEMENTS, TOURS, COUT, degats, tirerAlea, domine, postures, pvMax, stadeEffectif, stadeDuNiveau, xpCombat, ESPERANCE, nomStade, armuresDe, habitatDe } from "./regles.js";
+import { DRAGONS, PAR_ID, ELEMENTS, TOURS, COUT, degats, tirerAlea, domine, postures, pvMax, stadeEffectif, stadeDuNiveau, xpCombat, ESPERANCE, nomStade, armuresDe, habitatDe, fmtDuree } from "./regles.js";
 import { preparer, ouvrirSalon, nouveauCode, codeValide, identifiant, modeReseau, lienInvitation, VERSION_RESEAU, aleaGraine } from "./reseau.js";
 import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement } from "./ui.js";
 import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } from "./tuto.js";
@@ -12,6 +12,9 @@ import { Son, Musique } from "./son.js";
 import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang, difficulte } from "./ligues.js";
 import { ouvrirArchipel, cibleArchipel, ILES_COMBAT } from "./archipel.js";
 import { lancerAttaque, niveauVillage } from "./attaque.js";
+import { boss, blocBoss, infliger, nomBoss } from "./boss.js";
+import { contenuHall, historiser, verifierSaison } from "./hall.js";
+import { blocExpedition } from "./expeditions.js";
 
 const T = window.THREE;
 let D = null, ctxJeu = null, ui = null, C = null;
@@ -497,6 +500,38 @@ function choixOrdinateur(moi, lui, hasard = 0.12) {
 let prep = { mode: "bot", equipe: [], niveauAmi: 10 };
 // Lancé par Lia pendant le guide : { tours, eux, faible, uids, nom, titre, texte }
 export function combatGuide(ctx, conf) { ctx.aller("combat", { mode: "guide" }); prep.mode = "guide"; prep.guide = conf; lancer(); }
+// Ce qu'affiche la fiche de chaque lieu du continent des mages
+function classeOuvert() { const e = E(); return etapeTuto() === "mage" || (e.dragons.length >= 7 && e.dragons.some((d) => d.niveau >= 5)); }
+function contenuLieu(id, refaire, partir) {
+  const b = el("div", { class: "choix" });
+  const bouton = (texte, sous, action, principal = true, desactive = false) => el("button", { class: "btn" + (principal ? " principal" : ""), disabled: desactive, onclick: action }, el("b", {}, texte), sous ? el("small", {}, sous) : null);
+  if (id === "arene") {
+    b.append(blocLigue());
+    b.append(bouton("Préparer le duel classé", `Coûte ${COUT.combat} d'énergie`, () => partir("arene", "bot"), true, !classeOuvert()));
+    if (!classeOuvert()) b.append(el("p", { class: "doux" }, `Le classé s'ouvre avec 7 dragons, dont au moins un au niveau 5 (tu en as ${E().dragons.length}).`));
+  } else if (id === "tour") b.append(bouton("Entrer dans la tour", "21 étages · roguelite", () => partir("tour", "tour")));
+  else if (id === "sauvage") b.append(bouton("Chasser les dragons sauvages", "Coûte 2 d'énergie", () => partir("sauvage", "sauvage")));
+  else if (id === "villages") b.append(bouton("Préparer l'attaque", `Village niveau ${niveauVillage()} · toute ta couvée`, () => partir("villages", "village")));
+  else if (id === "amis") {
+    b.append(bouton("Sur le même téléphone", "Chacun choisit à son tour, sans regarder.", () => partir("amis", "ami")));
+    b.append(bouton("En ligne, avec un code", "Chacun sur son téléphone, reliés par un code.", () => partir("amis", "ligne"), false));
+  } else if (id === "port") b.append(blocExpedition(refaire, E().tuto && E().tuto.etape === "expedition"));
+  else if (id === "hall") b.append(contenuHall(refaire));
+  else if (id === "boss") b.append(blocBoss(() => partir("boss", "boss")));
+  return b;
+}
+function statutLieu(id) {
+  const e = E();
+  if (id === "arene") return classeOuvert() ? [`🏆 ${(e.ligue && e.ligue.trophees) || 0} trophées`] : ["7 dragons dont un niv. 5", true];
+  if (id === "tour") { const tn = e.tourNid || {}; return [tn.run ? `Étage ${tn.run.etage}/21 en cours` : `Record : étage ${tn.record || 0}/21`]; }
+  if (id === "sauvage") return ["Dragons faciles"];
+  if (id === "villages") return [`Village niveau ${niveauVillage()}`];
+  if (id === "amis") return ["Même téléphone · en ligne"];
+  if (id === "port") { const ex = e.expedition; if (!ex) return ["Prêt à partir"]; const r = ex.fin - maintenant(); return r > 0 ? [`En route · ${fmtDuree(r)}`] : ["De retour !", false, true]; }
+  if (id === "hall") return [nomRang((e.ligue && e.ligue.trophees) || 0)];
+  if (id === "boss") { const B = boss(); return B.pv > 0 ? [`${Math.round((1 - B.pv / B.max) * 100)} % abattu`, false, B.combats === 0] : ["Abattu !"]; }
+  return [""];
+}
 function montrerArene() { ctxJeu.moteur.montrer(D); D.orbite.viser(new T.Vector3(0, 0.9, 0), 11, 0.6, 1.1); D.orbite.auto = 0.08; }
 export function ouvrir(ctx, params = {}) {
   ctxJeu = ctx;
@@ -528,7 +563,9 @@ export function ouvrir(ctx, params = {}) {
   else if (params.mode) { prep.mode = params.mode; prep.ile = (ILES_COMBAT.find((i) => i.modes.includes(params.mode)) || {}).id || null; }
   else {
     // L'archipel des combats : on choisit une île, puis on prépare le combat dans l'arène
-    ouvrirArchipel(ctx, ui, (ile, mode) => { prep.ile = ile; prep.mode = mode; montrerArene(); rendrePrep(); if (mode === "ligne") montrerBlocLigne(); signaler("ile_combat", ile); });
+    verifierSaison();
+    const partir = (ile, mode) => { prep.ile = ile; prep.mode = mode; montrerArene(); rendrePrep(); if (mode === "ligne") montrerBlocLigne(); signaler("ile_combat", ile); };
+    ouvrirArchipel(ctx, ui, partir, { lieu: params.lieu, contenu: (id, refaire) => contenuLieu(id, refaire, partir), statut: statutLieu });
     return;
   }
   montrerArene();
@@ -570,6 +607,7 @@ function rendrePrep() {
     ["village", "Attaquer un village", `Tes dragons partent à l'assaut d'un village ennemi : ses tours tirent, toi tu choisis les cibles. Détruis son couvoir pour gagner du butin (et parfois un œuf). Village niveau ${niveauVillage()}. Coûte 3 d'énergie.`],
     ["tour", "La tour du nid", `Mode roguelite : tu entres sans dragon, tu choisis 3 œufs, et tu grimpes ${ETAGES} étages contre une IA de plus en plus forte. Au sommet : un œuf et un œuf mystère UL. Coûte ${COUT_TOUR} d'énergie par ascension.`],
     ["sauvage", "Dragons sauvages", "Des dragons sauvages plus faibles que les tiens (2 niveaux de moins) : de l'expérience et des rations sans trop de risques. Coûte 2 d'énergie."],
+    ["boss", "Le dragon-roi", "Le dragon géant de la semaine. Chaque combat lui retire des PV pour de bon. Coûte 4 d'énergie."],
     ["ami", "Défi entre amis", "Sur le même appareil : chacun choisit à son tour, sans regarder. L'écart de niveau est permis. Gratuit."],
   ];
   if (et === "sauvage1" || et === "sauvage2") modes = modes.filter((m) => m[0] === "sauvage" || m[0] === "ligne");
@@ -905,7 +943,7 @@ function essayerReveler() {
 function coutMode(mode) {
   const et = etapeTuto();
   if (et !== "fini") return 0;
-  return mode === "bot" ? COUT.combat : mode === "sauvage" ? 2 : mode === "village" ? 3 : 0; // la tour se paie à l'entrée
+  return mode === "bot" || mode === "boss" ? COUT.combat : mode === "sauvage" ? 2 : mode === "village" ? 3 : 0; // la tour se paie à l'entrée
 }
 
 function membreJoueur(d) {
@@ -970,6 +1008,12 @@ function lancer() {
       lui = equipeBot(niveaux.map((n) => Math.min(20, n + bonusNiveau(advLigue.t))), Math.max(0, stadeMax + difficulte(advLigue.t).stade));
       nomAdv = advLigue.nom;
     }
+  } else if (prep.mode === "boss") {
+    // Le dragon-roi : un seul dragon géant, avec tous les PV qu'il lui reste cette semaine
+    const B = boss();
+    const m = membreBot(B.id, B.niveau, 4);
+    m.pv = m.pvMax = Math.max(1, Math.round(B.pv)); m.nom = `${PAR_ID[B.id].nom} le Roi`;
+    lui = [m]; nomAdv = nomBoss();
   } else if (prep.mode === "sauvage") {
     const n = Math.max(1, Math.min(3, moi.length));
     const nv = et === "sauvage1" ? 1 : et === "sauvage2" ? 2 : Math.max(1, moyen - 2);
@@ -1004,6 +1048,8 @@ function lancer() {
       ? ["Défi en ligne", `${nomAdv} est prêt !`, `${lui.length} dragon${lui.length > 1 ? "s" : ""} de niveau ${nivAdv} en moyenne. Chacun choisit en secret sur son téléphone.`]
       : prep.mode === "tour"
       ? [`La tour du nid · étage ${run.etage}/${ETAGES}`, run.etage >= ETAGES ? "Le gardien du sommet se dresse !" : `${nomAdv} t'attend`, `Même équipe que toi : ${lui.length} dragon${lui.length > 1 ? "s" : ""} de niveau ${nivAdv} en moyenne.`]
+      : prep.mode === "boss"
+      ? ["Le volcan gronde…", "Le dragon-roi s'éveille !", `Il lui reste ${lui[0].pv.toLocaleString("fr-FR")} PV cette semaine. Chaque dégât compte.`]
       : prep.mode === "sauvage"
       ? ["Les herbes bougent…", "Des dragons sauvages surgissent !", `${lui.length} dragon${lui.length > 1 ? "s" : ""} sauvage${lui.length > 1 ? "s" : ""} de niveau ${nivAdv}.`]
       : et === "mage"
@@ -1029,7 +1075,7 @@ function debutTour() {
   C.choix = [null, null];
   C.dernierChoix = null;
   viserArene();
-  if (C.mode === "bot" || C.mode === "sauvage" || C.mode === "tour" || C.mode === "guide") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" || C.mode === "guide" ? 0.45 : C.mode === "tour" ? Math.max(0, 0.5 - C.etage * 0.024) : C.adv ? difficulte(C.adv.t).hasard : 0.12);
+  if (C.mode === "bot" || C.mode === "sauvage" || C.mode === "tour" || C.mode === "guide" || C.mode === "boss") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" || C.mode === "guide" ? 0.45 : C.mode === "boss" ? 0.2 : C.mode === "tour" ? Math.max(0, 0.5 - C.etage * 0.024) : C.adv ? difficulte(C.adv.t).hasard : 0.12);
   if (!D.cotes[0]) { const m = C.equipes[0].find((x) => x.pv > 0); placerDragon(0, m); }
   if (!D.cotes[1]) { const m = C.equipes[1].find((x) => x.pv > 0); placerDragon(1, m); }
   rendreChoix(0);
@@ -1477,6 +1523,10 @@ function finCombat(raison) {
       noter(`Combat contre ${C.noms[1]} : ${resultat} (${t0} à ${t1}).`);
     }
   });
+  // Le dragon-roi garde ses blessures toute la semaine
+  if (C.mode === "boss") { gains.unshift(`−${t0.toLocaleString("fr-FR")} PV au dragon-roi`, ...infliger(t0)); }
+  // Historique du hall de la ligue
+  if (["bot", "boss", "sauvage"].includes(C.mode)) historiser(C.mode === "bot" ? "duel" : C.mode, C.mode === "boss" ? `Dragon-roi : ${t0} dégâts` : `${C.noms[1]} (${t0} à ${t1})`, resultat);
   // Ligue : trophées gagnés ou perdus
   if (C.mode === "bot" && C.adv) {
     const r = resultatLigue(resultat, C.adv);

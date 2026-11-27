@@ -85,6 +85,7 @@ body.ecran-iles:not(.hud-ligne) .puce .jauge { width: 26px; }
 /* ---------- Panneaux ---------- */
 #ecran { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
 #ecran > * { pointer-events: auto; }
+#ecran > .ar-etiqs, #ecran > .cv-etiqs, #ecran > .at-iles, #ecran > .ar-titre, #ecran > .titre-intro, #ecran > .cv-fete { pointer-events: none; }
 .panneau { background: var(--panneau); border: 1px solid var(--trait); border-radius: 16px; backdrop-filter: blur(12px); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--trait-fort); background: rgba(255,255,255,0.06); font-weight: 600; font-size: 13px; transition: background .15s, transform .1s; }
 .btn:hover { background: rgba(255,255,255,0.12); }

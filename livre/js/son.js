@@ -256,6 +256,15 @@ export const Son = {
       [392, 494, 587, 784].forEach((f, i) => osc("sine", f, t + 0.3 + i * 0.1, 0.9, 0.05, busEffets, { rev: 0.7 }));
     }
   },
+  coffre(magique = false) {
+    const t = T0();
+    bruit(t, 0.45, 0.35, "bandpass", 300, 900, busEffets, { q: 6 });
+    ech("bois", t, { vol: 0.4, vitesse: 0.6 });
+    const notes = magique ? [784, 988, 1175, 1568, 1976] : [523, 659, 784, 1047];
+    notes.forEach((f, i) => osc(magique ? "sine" : "triangle", f, t + 0.3 + i * 0.07, 0.6, 0.09, busEffets, { rev: 0.6 }));
+    if (magique) bruit(t + 0.3, 1.2, 0.12, "highpass", 4000, 9000, busEffets, { a: 0.2, rev: 0.6 });
+    ech("pieces", t + 0.35, { vol: 0.5 });
+  },
   craque() { const t = T0(); for (let i = 0; i < 3; i++) bruit(t + i * 0.05, 0.04, 0.4, "bandpass", 2500 + Math.random() * 1500, null, busEffets, { q: 4 }); },
   eclosion() {
     const t = T0();
