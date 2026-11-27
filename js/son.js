@@ -184,6 +184,28 @@ export const Son = {
     if (element === "feu") bruit(t, 0.4, 0.25, "highpass", 3000, 1500);
     if (fort) { osc("sawtooth", 880, t + 0.05, 0.25, 0.08, busEffets, { vers: 1760, filtre: 3000 }); }
   },
+  // Choix d'un œuf : chaque élément a sa signature sonore
+  oeuf(element = "feu") {
+    const t = T0();
+    if (element === "feu") {
+      // souffle qui s'embrase, crépitements, accord chaud qui monte
+      bruit(t, 0.9, 0.4, "lowpass", 250, 2400, busEffets, { a: 0.1, rev: 0.3 });
+      for (let i = 0; i < 9; i++) bruit(t + 0.1 + Math.random() * 0.9, 0.03, 0.3, "bandpass", 2000 + Math.random() * 2500, null, busEffets, { q: 5 });
+      [262, 330, 392, 523].forEach((f, i) => osc("sawtooth", f, t + 0.15 + i * 0.08, 0.7, 0.05, busEffets, { filtre: 1800, rev: 0.4 }));
+      osc("sine", 70, t, 0.6, 0.25, busEffets, { vers: 140 });
+    } else if (element === "glace") {
+      // carillon de cristal et givre qui scintille
+      ech("verre", t, { vol: 0.4, vitesse: 1.4, rev: 0.6 });
+      [1568, 2093, 2637, 3136, 4186].forEach((f, i) => osc("sine", f, t + 0.05 + i * 0.09, 0.9, 0.06, busEffets, { rev: 0.8 }));
+      [1760, 2349].forEach((f, i) => osc("triangle", f, t + 0.6 + i * 0.12, 1.2, 0.035, busEffets, { rev: 0.9 }));
+      bruit(t, 1.3, 0.1, "highpass", 5000, 9000, busEffets, { a: 0.3, rev: 0.6 });
+    } else {
+      // bulles qui remontent et vague douce
+      bruit(t, 1.1, 0.28, "bandpass", 500, 1200, busEffets, { a: 0.25, q: 0.8, rev: 0.4 });
+      for (let i = 0; i < 8; i++) { const f = 280 + Math.random() * 300; osc("sine", f, t + 0.05 + i * 0.11 + Math.random() * 0.05, 0.1, 0.1, busEffets, { vers: f * 2.6 }); }
+      [392, 494, 587, 784].forEach((f, i) => osc("sine", f, t + 0.3 + i * 0.1, 0.9, 0.05, busEffets, { rev: 0.7 }));
+    }
+  },
   craque() { const t = T0(); for (let i = 0; i < 3; i++) bruit(t + i * 0.05, 0.04, 0.4, "bandpass", 2500 + Math.random() * 1500, null, busEffets, { q: 4 }); },
   eclosion() {
     const t = T0();

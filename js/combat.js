@@ -9,7 +9,7 @@ import { preparer, ouvrirSalon, nouveauCode, codeValide, identifiant, modeReseau
 import { el, styles, toast, modale, fermerModale, barre, icone, couleurElement } from "./ui.js";
 import { signaler, etape as etapeTuto, afficher as afficherTuto, cacherBulle } from "./tuto.js";
 import { Son, Musique } from "./son.js";
-import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang } from "./ligues.js";
+import { adversaire, resultat as resultatLigue, blocLigue, bonusNiveau, nomRang, difficulte } from "./ligues.js";
 import { lancerAttaque, niveauVillage } from "./attaque.js";
 
 const T = window.THREE;
@@ -941,7 +941,7 @@ function lancer() {
     else {
       // Duel classé : un mage de ta ligue, avec à peu près tes trophées
       advLigue = adversaire();
-      lui = equipeBot(niveaux.map((n) => Math.min(20, n + bonusNiveau(advLigue.t))), stadeMax);
+      lui = equipeBot(niveaux.map((n) => Math.min(20, n + bonusNiveau(advLigue.t))), Math.max(0, stadeMax + difficulte(advLigue.t).stade));
       nomAdv = advLigue.nom;
     }
   } else if (prep.mode === "sauvage") {
@@ -1003,7 +1003,7 @@ function debutTour() {
   C.choix = [null, null];
   C.dernierChoix = null;
   viserArene();
-  if (C.mode === "bot" || C.mode === "sauvage" || C.mode === "tour" || C.mode === "guide") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" || C.mode === "guide" ? 0.45 : C.mode === "tour" ? Math.max(0, 0.5 - C.etage * 0.024) : 0.12);
+  if (C.mode === "bot" || C.mode === "sauvage" || C.mode === "tour" || C.mode === "guide") C.choix[1] = choixOrdinateur(C.equipes[1], C.equipes[0], C.mode === "sauvage" || C.mode === "guide" ? 0.45 : C.mode === "tour" ? Math.max(0, 0.5 - C.etage * 0.024) : C.adv ? difficulte(C.adv.t).hasard : 0.12);
   if (!D.cotes[0]) { const m = C.equipes[0].find((x) => x.pv > 0); placerDragon(0, m); }
   if (!D.cotes[1]) { const m = C.equipes[1].find((x) => x.pv > 0); placerDragon(1, m); }
   rendreChoix(0);

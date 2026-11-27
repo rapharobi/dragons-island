@@ -35,7 +35,9 @@ styles("couvoir", `
 .titre-intro { position: fixed; z-index: 16; top: calc(var(--hud) + var(--tuto, 0px) + 20px); left: 0; right: 0; text-align: center; padding: 0 var(--bord-d) 0 var(--bord-g); pointer-events: none; }
 .titre-intro h2 { font-size: clamp(26px, 5vw, 44px); }
 .titre-intro p { color: var(--doux); margin: 6px auto 0; max-width: 46ch; }
-@media (max-width: 560px) { .couv-panneau { left: var(--bord-g); right: var(--bord-d); width: auto; top: auto; bottom: calc(var(--bas) + 78px); max-height: 46vh; } .choix-oeufs { flex-direction: column; bottom: calc(var(--bas) + 80px); } .choix-oeufs button { padding: 9px 12px; } }
+@media (max-width: 560px) { .couv-panneau { left: var(--bord-g); right: var(--bord-d); width: auto; top: auto; bottom: calc(var(--bas) + 78px); max-height: 46vh; } .choix-oeufs { bottom: calc(var(--bas) + 78px); gap: 8px; } .choix-oeufs > button { padding: 8px 10px; text-align: center; } .choix-oeufs b { font-size: 16px; } .titre-intro h2 { font-size: 26px; } .titre-intro p { font-size: 13px; } }
+.choix-oeufs > button.plus-tard { flex: 1 0 100%; padding: 6px; background: none; border: none; text-align: center; }
+.choix-oeufs > button.plus-tard b { font-size: 14px; color: var(--doux); font-family: inherit; text-decoration: underline; }
 `);
 
 function construireDecor() {
@@ -64,12 +66,30 @@ function construireDecor() {
   orbite.viser(new T.Vector3(0, 0.9, 0), 6.5, 0.0, 1.2);
   const zone = new T.Group(); scene.add(zone);
   D = {
-    scene, camera, orbite, zone, lucioles, t: 0, oeufsChoix: [], couvoir: null, nouveau: null, eclats: [],
+    scene, camera, orbite, zone, lucioles, t: 0, oeufsChoix: [], couvoir: null, nouveau: null, eclats: [], etincelles: [],
     update(dt) {
       D.t += dt;
       orbite.update(dt);
       for (const l of lucioles) { const u = l.userData; u.a += u.v * dt; l.position.set(Math.cos(u.a) * u.r, u.h + Math.sin(D.t * 1.3 + u.a) * 0.3, Math.sin(u.a) * u.r); }
-      for (const o of D.oeufsChoix) { o.rotation.y += dt * (o.userData.choisi ? 2 : 0.5); o.position.y = Math.sin(D.t * 2 + o.position.x) * 0.06 + (o.userData.choisi ? 0.85 : 0.5); const s = o.userData.choisi ? 1.18 : 1; o.scale.x += (s - o.scale.x) * Math.min(1, dt * 6); o.scale.y = o.scale.z = o.scale.x; }
+      for (const o of D.oeufsChoix) {
+        const u = o.userData, ch = u.choisi, elx = u.element;
+        let y = Math.sin(D.t * 2 + u.x0) * 0.06 + (ch ? 0.85 : 0.5);
+        o.rotation.z = 0; o.rotation.x = 0;
+        if (ch && elx === "feu") { o.rotation.y += dt * 1.2; o.rotation.z = Math.sin(D.t * 23) * 0.05 + Math.sin(D.t * 3) * 0.04; y += Math.abs(Math.sin(D.t * 4)) * 0.12; }
+        else if (ch && elx === "glace") { o.rotation.y += dt * 3.2; y += Math.sin(D.t * 1.5) * 0.08; }
+        else if (ch && elx === "eau") { o.rotation.y += dt * 0.8; y += Math.sin(D.t * 2.2) * 0.16; o.rotation.z = Math.sin(D.t * 1.6) * 0.14; o.rotation.x = Math.cos(D.t * 1.3) * 0.1; }
+        else o.rotation.y += dt * 0.5;
+        o.position.y = y;
+        const s = (ch ? 1.22 : 1) + (u.pop || 0);
+        u.pop = Math.max(0, (u.pop || 0) - dt * 1.2);
+        o.scale.x += (s - o.scale.x) * Math.min(1, dt * 8); o.scale.y = o.scale.z = o.scale.x;
+        // lueur de la coquille et lumière qui pulse
+        u.coque.material.emissiveIntensity += ((ch ? 0.55 + Math.sin(D.t * (elx === "feu" ? 11 : 4)) * 0.2 : selection ? 0.02 : 0.08) - u.coque.material.emissiveIntensity) * Math.min(1, dt * 6);
+        if (u.lum) u.lum.intensity = ch ? (elx === "feu" ? 3 + Math.sin(D.t * 17) * 0.6 + Math.random() * 0.5 : 2.8 + Math.sin(D.t * 3) * 0.7) : selection ? 0.5 : 1.4;
+        if (u.halo) { const hm = u.halo.material; hm.opacity += ((ch ? 0.55 + Math.sin(D.t * 3) * 0.2 : 0) - hm.opacity) * Math.min(1, dt * 5); u.halo.rotation.z += dt * 0.8; u.halo.scale.setScalar(1 + (ch ? Math.sin(D.t * 2.5) * 0.12 : 0)); u.halo.position.y = 0.52; }
+        if (ch) { u.reste = (u.reste || 0) + dt * (elx === "glace" ? 22 : 30); while (u.reste >= 1) { u.reste--; etincelle(o, elx, false); } }
+      }
+      animerEtincelles(dt);
       if (D.couvoir) for (const o of D.couvoir.userData.oeufs || []) {
         const pret = o.userData.pret;
         o.rotation.z = pret ? Math.sin(D.t * 18) * 0.06 * (Math.sin(D.t * 2) > 0.3 ? 1 : 0) : 0;
@@ -86,7 +106,7 @@ function construireDecor() {
 
 function viderZone() {
   while (D.zone.children.length) D.zone.remove(D.zone.children[0]);
-  D.oeufsChoix = []; D.couvoir = null; D.nouveau = null;
+  D.oeufsChoix = []; D.couvoir = null; D.nouveau = null; D.etincelles = [];
 }
 
 function afficherCouvoir() {
@@ -109,9 +129,17 @@ function afficherCouvoir() {
 // Choisir un œuf : on le touche (le bouton ou l'œuf en 3D), il s'illumine, puis « Choisir cet œuf » confirme
 let selection = null, valider = null;
 function selectionner(elx, confirmer) {
+  const nouveau = selection !== elx;
   selection = elx; valider = confirmer;
-  Son.clic();
   for (const o of D.oeufsChoix) o.userData.choisi = o.userData.element === elx;
+  const o = D.oeufsChoix.find((x) => x.userData.element === elx);
+  if (o && nouveau) {
+    Son.oeuf(elx);
+    o.userData.pop = 0.35;
+    for (let k = 0; k < 36; k++) etincelle(o, elx, true);
+    const p = o.position;
+    D.orbite.viser(new T.Vector3(p.x * 0.6, 1.75, p.z), etroit() ? 10.5 : 6, D.orbite.thetaV, 1.22);
+  } else Son.clic();
   document.querySelectorAll(".choix-oeufs > button").forEach((b) => b.classList.toggle("choisi", b.classList.contains(elx)));
   let barre = document.getElementById("oeuf-confirmer");
   if (!barre) { barre = el("div", { id: "oeuf-confirmer", class: "oeuf-confirmer" }); (document.querySelector(".choix-oeufs") || ui).prepend(barre); }
@@ -133,19 +161,85 @@ function installerToucherOeufs() {
     if (bouton) bouton.click();
   });
 }
-function afficherChoix(starters) {
+const etroit = () => window.innerWidth / window.innerHeight < 0.8;
+let vueChoix = null;
+function afficherChoix(starters, liste = ["feu", "glace", "eau"]) {
   viderZone();
-  ["feu", "glace", "eau"].forEach((elx, i) => {
+  selection = null;
+  const ecart = etroit() ? 1.5 : 1.9;
+  liste.forEach((elx, i) => {
+    const x = (i - (liste.length - 1) / 2) * ecart;
     const o = construireOeuf(elx, 1.1);
-    o.position.set((i - 1) * 1.9, 0.5, 0.6);
+    o.position.set(x, 0.5, 0.6);
     const socle = mesh(new T.CylinderGeometry(0.55, 0.65, 0.5, 8).translate(0, 0.25, 0), mat(0x5a5048, { r: 1 }));
-    socle.position.set((i - 1) * 1.9, 0, 0.6);
-    const lum = new T.PointLight(ELEMENTS[elx].couleur, 1.4, 3, 2); lum.position.set((i - 1) * 1.9, 1.6, 1.2);
-    D.zone.add(o, socle, lum);
-    o.userData.element = elx;
+    socle.position.set(x, 0, 0.6);
+    const lum = new T.PointLight(ELEMENTS[elx].couleur, 1.4, 3, 2); lum.position.set(x, 1.6, 1.2);
+    // Halo au sol, visible quand l'œuf est choisi
+    const halo = new T.Mesh(new T.RingGeometry(0.55, 0.85, 32), new T.MeshBasicMaterial({ color: ELEMENTS[elx].couleur, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+    halo.rotation.x = -Math.PI / 2; halo.position.set(x, 0.52, 0.6);
+    D.zone.add(o, socle, lum, halo);
+    o.userData.element = elx; o.userData.lum = lum; o.userData.halo = halo; o.userData.x0 = x;
     D.oeufsChoix.push(o);
   });
-  D.orbite.viser(new T.Vector3(0, 1.0, 0.6), window.innerWidth / window.innerHeight < 0.8 ? 12 : 7.0, 0, 1.25);
+  // Les œufs se placent entre le titre (en haut) et les boutons (en bas)
+  vueChoix = etroit() ? [new T.Vector3(0, 1.3, 0.6), 8 + liste.length * 1.8, 0, 1.22] : [new T.Vector3(0, 1.0, 0.6), 7.0, 0, 1.25];
+  D.orbite.viser(...vueChoix);
+}
+
+// ---------- Étincelles autour de l'œuf choisi ----------
+const GEO_ETINCELLE = new T.OctahedronGeometry(0.05, 0);
+const MAT_ETINCELLE = {};
+function matEtincelle(c) {
+  if (!MAT_ETINCELLE[c]) MAT_ETINCELLE[c] = new T.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false });
+  return MAT_ETINCELLE[c];
+}
+const COULEURS_ETINCELLES = { feu: [0xffd060, 0xff8a2a, 0xff4a1a], glace: [0xffffff, 0xbfeaff, 0x7fd6ff], eau: [0x9ffff0, 0x4ad8ff, 0xe0ffff] };
+function etincelle(o, elx, burst) {
+  const cs = COULEURS_ETINCELLES[elx];
+  const m = new T.Mesh(GEO_ETINCELLE, matEtincelle(cs[Math.floor(Math.random() * cs.length)]));
+  const a = Math.random() * Math.PI * 2;
+  const p = o.position;
+  const u = { vie: 0, max: 0.9 + Math.random() * 0.8, elx, phase: Math.random() * 6.28, taille: 0.6 + Math.random() * 0.9 };
+  if (burst) {
+    m.position.set(p.x, p.y + 0.6, p.z);
+    const v = 1.6 + Math.random() * 1.8;
+    u.v = new T.Vector3(Math.cos(a) * v, 0.6 + Math.random() * 2.2, Math.sin(a) * v);
+    u.g = 3; u.max = 0.7 + Math.random() * 0.5;
+  } else if (elx === "feu") {
+    // braises qui montent en tremblant
+    m.position.set(p.x + Math.cos(a) * 0.4, p.y + 0.15 + Math.random() * 0.3, p.z + Math.sin(a) * 0.4);
+    u.v = new T.Vector3(Math.cos(a) * 0.25, 1 + Math.random() * 0.9, Math.sin(a) * 0.25); u.g = -0.4;
+  } else if (elx === "glace") {
+    // éclats de givre en orbite autour de l'œuf
+    u.orbite = { a, r: 0.6 + Math.random() * 0.35, h: 0.1 + Math.random() * 1.3, va: (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random()) };
+    u.max = 1.4 + Math.random() * 0.8;
+  } else {
+    // bulles qui remontent en ondulant
+    m.position.set(p.x + Math.cos(a) * 0.35, p.y + 0.05, p.z + Math.sin(a) * 0.35);
+    u.v = new T.Vector3(0, 0.7 + Math.random() * 0.5, 0); u.g = 0; u.x0 = m.position.x; u.z0 = m.position.z;
+    u.taille *= 1.4;
+  }
+  m.userData = u; m.userData.o = o;
+  D.zone.add(m); D.etincelles.push(m);
+}
+function animerEtincelles(dt) {
+  for (let i = D.etincelles.length - 1; i >= 0; i--) {
+    const m = D.etincelles[i], u = m.userData;
+    u.vie += dt;
+    const k = u.vie / u.max;
+    if (k >= 1 || !m.parent) { m.parent && m.parent.remove(m); D.etincelles.splice(i, 1); continue; }
+    if (u.orbite) {
+      const ob = u.orbite, p = u.o.position; ob.a += ob.va * dt;
+      m.position.set(p.x + Math.cos(ob.a) * ob.r, p.y + ob.h + Math.sin(D.t * 3 + u.phase) * 0.05, p.z + Math.sin(ob.a) * ob.r);
+      m.scale.setScalar(u.taille * (0.5 + 0.5 * Math.abs(Math.sin(D.t * 9 + u.phase))) * Math.sin(k * Math.PI));
+    } else {
+      u.v.y -= (u.g || 0) * dt;
+      m.position.addScaledVector(u.v, dt);
+      if (u.x0 !== undefined) { m.position.x = u.x0 + Math.sin(D.t * 7 + u.phase) * 0.08; m.position.z = u.z0 + Math.cos(D.t * 6 + u.phase) * 0.05; }
+      m.scale.setScalar(u.taille * (1 - k));
+    }
+    m.rotation.y += dt * 5; m.rotation.x += dt * 3;
+  }
 }
 
 // ---------- Éclosion animée ----------
@@ -234,9 +328,9 @@ export function fermer() { clearInterval(minuteurUI); ctxJeu.moteur.definirZone(
 
 function ecranIntro() {
   ui.innerHTML = "";
-  afficherChoix(true);
   const deja = E().ilesVisibles || [];
   const restants = ["feu", "glace", "eau"].filter((x) => !deja.includes(x));
+  afficherChoix(true, restants);
   ui.append(el("div", { class: "titre-intro" }, el("h2", {}, restants.length === 3 ? "Trois œufs !" : "Choisis le prochain œuf"), el("p", {}, "Touche un œuf pour le choisir. Chaque œuf cache un dragon d'un élément, et son île surgira quand il éclora. Le Feu bat la Glace, la Glace bat l'Eau, l'Eau bat le Feu.")));
   const starters = { feu: "braisil", glace: "givrelin", eau: "ondin" };
   const z = el("div", { class: "choix-oeufs" });
@@ -466,8 +560,8 @@ function rendreChoix() {
       toast(`Œuf ${elx === "eau" ? "d'" : "de "}${ELEMENTS[elx].nom} ajouté au couvoir.`, "bon");
       mode = E().oeufs.choix > 0 ? "choix" : "couvoir";
       rendre();
-    }) }, el("b", {}, ELEMENTS[elx].nom), el("small", {}, complet ? "Tu les as déjà tous : ce sera un double au hasard." : `${7 - E().dragons.filter((d) => PAR_ID[d.id].element === elx && true).map((d) => d.id).filter((v, i, a) => a.indexOf(v) === i).length} dragon(s) encore à découvrir`)));
+    }) }, el("b", {}, ELEMENTS[elx].nom), el("small", {}, complet ? "Double au hasard" : `${7 - E().dragons.filter((d) => PAR_ID[d.id].element === elx && true).map((d) => d.id).filter((v, i, a) => a.indexOf(v) === i).length} à découvrir`)));
   }
-  z.append(el("button", { style: { "--el": "var(--doux)", flex: "0 0 auto" }, onclick: () => { mode = "couvoir"; rendre(); } }, el("b", {}, "Plus tard")));
+  z.append(el("button", { class: "plus-tard", onclick: () => { mode = "couvoir"; rendre(); } }, el("b", {}, "Plus tard")));
   ui.append(z);
 }

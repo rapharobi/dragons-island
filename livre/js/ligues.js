@@ -69,8 +69,20 @@ export function adversaire() {
   const l = proches.length ? proches : bots().map((b) => ({ ...b, t: tropheesBot(b) })).sort((a, b) => Math.abs(a.t - t) - Math.abs(b.t - t)).slice(0, 8);
   return l[Math.floor(Math.random() * l.length)];
 }
-// Bonus de niveau des dragons adverses selon la ligue (plus haut = plus fort)
-export function bonusNiveau(t) { return Math.floor(ligueDe(t) / 2); }
+// Difficulté des mages selon leurs trophées : en Bronze, leurs dragons sont plus faibles que les tiens
+// et ils jouent plus au hasard ; ils deviennent plus forts et plus malins à chaque ligue.
+const PALIERS_DIFF = [
+  { max: 150, niveau: -3, stade: -1, hasard: 0.6 },
+  { max: 400, niveau: -2, stade: -1, hasard: 0.45 },
+  { max: 650, niveau: -1, stade: 0, hasard: 0.34 },
+  { max: 900, niveau: -1, stade: 0, hasard: 0.26 },
+  { max: 1500, niveau: 0, stade: 0, hasard: 0.18 },
+  { max: 2300, niveau: 1, stade: 0, hasard: 0.12 },
+  { max: 3200, niveau: 2, stade: 0, hasard: 0.08 },
+  { max: Infinity, niveau: 3, stade: 0, hasard: 0.05 },
+];
+export function difficulte(t) { return PALIERS_DIFF.find((p) => t < p.max); }
+export function bonusNiveau(t) { return difficulte(t).niveau; }
 
 export function resultat(issue, adv) {
   let delta = 0;
